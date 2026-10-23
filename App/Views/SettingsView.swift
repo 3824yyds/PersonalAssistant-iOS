@@ -109,7 +109,7 @@ struct MemoryView:View {
 
 struct AboutView:View {
     var body:some View {List {
-        Section("个人助理 · iOS 3.5.1 (3)") {Text("记录生活，理清财务。为 iPhone 设计的笔记、账本与智能助理。")}
+        Section("个人助理 · iOS 3.5.1 (4)") {Text("记录生活，理清财务。为 iPhone 设计的笔记、账本与智能助理。")}
         Section("使用与隐私") {
             Text("笔记、账本和个人头像在本机加密保存。请定期导出加密备份，并妥善保管资料库密码。")
             Text("卡包展示你记录的账户与交易，余额随账本更新，不连接银行账户或提供支付服务。")

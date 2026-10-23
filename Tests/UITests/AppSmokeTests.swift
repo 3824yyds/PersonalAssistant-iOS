@@ -99,6 +99,56 @@ final class AppSmokeTests:XCTestCase {
         XCTAssertLessThan(app.buttons["Face ID 解锁"].frame.maxY,app.frame.height*0.82)
         XCTAssertGreaterThan(app.secureTextFields.firstMatch.frame.midY,app.frame.height*0.3)
     }
+    func testScrolledChromeAndInlineProposals() {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-scroll-fixture","--ui-proposal-fixture"];app.launch()
+        if app.buttons["创建资料库"].waitForExistence(timeout:5) {
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+        XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20))
+        for page in ["笔记","提醒","账本"] {
+            app.buttons[page].firstMatch.tap()
+            app.swipeUp();app.swipeUp()
+            let navigation=app.descendants(matching:.any).matching(identifier:"main.navigation").firstMatch
+            let header=app.buttons["卡包与资产"].frame.midY
+            let middle=luminance(app,point:CGPoint(x:2,y:app.frame.height*0.5))
+            XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:header)),middle,accuracy:0.015,"No rectangular header after scrolling \(page)")
+            XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:navigation.frame.midY)),middle,accuracy:0.015,"No rectangular footer after scrolling \(page)")
+            attach(app,page+"ScrolledClearChrome")
+        }
+        app.buttons["助理"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5))
+        let back=app.buttons["返回"],model=app.buttons["chat.model"]
+        XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minX-back.frame.maxX,4)
+        let orb=app.descendants(matching:.any).matching(identifier:"assistant.orb").firstMatch
+        XCTAssertEqual(orb.frame.width,88,accuracy:1);XCTAssertEqual(orb.frame.height,88,accuracy:1)
+        XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:back.frame.midY)),luminance(app,point:CGPoint(x:2,y:back.frame.maxY+24)),accuracy:0.015)
+        attach(app,"AssistantSeparatedHeaderCloudSphere")
+        back.tap();app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
+        let body=app.descendants(matching:.any).matching(identifier:"note.body").firstMatch
+        XCTAssertTrue(body.waitForExistence(timeout:5))
+        let original=body.value as? String
+        for mode in ["润色","摘要","要点","会议纪要","行动清单"] {
+            app.buttons["AI 工具"].tap()
+            let tool=app.buttons[mode]
+            if !tool.isHittable {app.scrollViews.element(boundBy:1).swipeLeft()}
+            tool.tap()
+            let adopt=app.buttons["note.proposal.adopt"],cancel=app.buttons["note.proposal.cancel"]
+            XCTAssertTrue(adopt.waitForExistence(timeout:5));XCTAssertEqual(app.navigationBars.count,1,"Result stays in the original editor")
+            XCTAssertFalse(app.navigationBars["润色预览"].exists);XCTAssertFalse(app.navigationBars["整理预览"].exists)
+            attach(app,"Inline"+mode+"Result")
+            cancel.tap();XCTAssertEqual(body.value as? String,original)
+            app.buttons["AI 工具"].tap()
+            if !tool.isHittable {app.scrollViews.element(boundBy:1).swipeLeft()}
+            tool.tap();XCTAssertTrue(adopt.waitForExistence(timeout:5));adopt.tap()
+            let adopted=body.value as? String
+            if mode=="润色" {XCTAssertEqual(adopted,"去公园散步，与朋友聚餐，也给自己留出休息的时间。")}
+            else {XCTAssertTrue(adopted?.hasPrefix((original ?? "")+"\n\n")==true);XCTAssertTrue(adopted?.contains("## "+mode)==true)}
+            app.buttons["撤销采用"].tap();XCTAssertEqual(body.value as? String,original)
+        }
+        app.buttons["关闭"].tap()
+    }
     func luminance(_ app:XCUIApplication,point:CGPoint)->Double {
         guard let image=UIImage(data:app.screenshot().pngRepresentation)?.cgImage else {XCTFail("Missing screenshot");return -1}
         let x=point.x/app.frame.width*CGFloat(image.width),y=point.y/app.frame.height*CGFloat(image.height)

@@ -56,7 +56,7 @@ struct LedgerView: View {
                     if let selectedDay { ForEach(stats.filter {Calendar.current.isDate($0.date,inSameDayAs:selectedDay)}) { r in Button {editing=r} label:{RecordRow(record:r,document:store.current)}.buttonStyle(.plain) } }
                 } else { BudgetPanel(month:month,currency:statsCurrency,records:stats) }
             }.padding(16)
-        }.background(Theme.background(scheme)).navigationTitle("账本").navigationBarTitleDisplayMode(.inline)
+        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().navigationTitle("账本").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement:.topBarLeading) {Menu {
                 Button("记一笔",systemImage:"plus") {creating=true}
                 NavigationLink("月度报告与预测",destination:FinancialReportView())

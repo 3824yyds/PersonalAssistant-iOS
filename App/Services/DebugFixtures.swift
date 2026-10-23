@@ -2,6 +2,10 @@
 import Foundation
 
 enum DebugFixtures {
+    static var proposals:Bool {ProcessInfo.processInfo.arguments.contains("--ui-proposal-fixture")}
+    static func proposal(mode:String,title:String,body:String)->NoteAIProposal {
+        NoteAIProposal(mode:mode,source:NoteTextVersion(title:title,body:body),result:NoteTextVersion(title:mode=="润色" ? "从容的周末":title,body:mode=="润色" ? "去公园散步，与朋友聚餐，也给自己留出休息的时间。":"## "+mode+"\n\n安排散步、聚餐与休息。"),evidence:mode=="润色" ? []:["想去公园走走。"])
+    }
     static var motion:Bool {ProcessInfo.processInfo.arguments.contains("--ui-motion-fixture")}
     @MainActor static func showThinking(in store:AppStore) {
         guard motion else {return}
@@ -18,6 +22,13 @@ enum DebugFixtures {
         wallet.set("cards",items:d.accounts.enumerated().map {index,account in Item(["accountId":.string(account.id),"institution":.string(account.text("name")),"lastFour":.string(String(1231+index)),"network":.string(index==2 ? "mastercard":"unionpay")])})
         d.wallet=wallet
         d.notes=[Item(["id":.string("00000000-0000-0000-0000-000000000100"),"title":.string("版式检查笔记"),"body":.string("想去天安门看看，也想去西安。\n\n## 摘要\n\n- 想去北京和西安。"),"createdAt":.int(Clock.milliseconds),"updatedAt":.int(Clock.milliseconds)])]
+        if ProcessInfo.processInfo.arguments.contains("--ui-scroll-fixture") {
+            d.notes=(0..<32).map {index in Item(["id":.string("scroll-note-\(index)"),"title":.string("笔记 \(index+1)"),"body":.string("滚动检查页面背景与悬浮控件。"),"updatedAt":.int(Clock.milliseconds-Int64(index))])}
+            d.records=(0..<32).flatMap {index -> [Item] in
+                [Item(["id":.string("scroll-reminder-\(index)"),"kind":.string("reminder"),"title":.string("提醒 \(index+1)"),"due":.int(Clock.milliseconds+Int64(index)*3600000),"completed":.bool(false)]),
+                 Item(["id":.string("scroll-expense-\(index)"),"kind":.string("expense"),"title":.string("账目 \(index+1)"),"cents":.int(100),"currency":.string("CNY"),"date":.int(Clock.milliseconds-Int64(index)*3600000)])]
+            }
+        }
         return d
     }
 }

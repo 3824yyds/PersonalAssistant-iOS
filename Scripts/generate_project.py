@@ -27,7 +27,7 @@ app=add('product','PBXFileReference',explicitFileType='wrapper.application',path
 product_refs=[app]
 app_id=uid('app-target')
 app_config={
- 'PRODUCT_NAME':'PersonalAssistant','PRODUCT_BUNDLE_IDENTIFIER':'cn.local.assistant.ios','INFOPLIST_FILE':'App/Info.plist','MARKETING_VERSION':'3.5.1','CURRENT_PROJECT_VERSION':'3',
+ 'PRODUCT_NAME':'PersonalAssistant','PRODUCT_BUNDLE_IDENTIFIER':'cn.local.assistant.ios','INFOPLIST_FILE':'App/Info.plist','MARKETING_VERSION':'3.5.1','CURRENT_PROJECT_VERSION':'4',
  'SWIFT_VERSION':'5.0','SWIFT_OBJC_BRIDGING_HEADER':'App/Native/BridgingHeader.h','CLANG_CXX_LANGUAGE_STANDARD':'c++17',
  'CODE_SIGN_STYLE':'Automatic','TARGETED_DEVICE_FAMILY':'1','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SDKROOT':'iphoneos',
  'ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES':'AppIconSky AppIconPeach','ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS':'YES',

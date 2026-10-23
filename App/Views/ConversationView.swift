@@ -43,13 +43,14 @@ struct ConversationView:View {
             }
             VStack(spacing:8) {modePicker;composer}.layoutPriority(1)
         }
-            .background {ConversationBackground()}.navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement:.topBarLeading) {Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:18)).frame(minWidth:28,minHeight:28)}.accessibilityLabel("返回")}
+                if #available(iOS 26.0,*) {ToolbarSpacer(.fixed,placement:.topBarLeading)}
                 if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
-            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.medium));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.medium)).foregroundStyle(.primary)}}}
+            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.medium));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.accessibilityIdentifier("chat.model").disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.medium)).foregroundStyle(.primary)}}}
             .onAppear {
                 #if DEBUG
                 DebugFixtures.showThinking(in:store)
@@ -126,7 +127,7 @@ struct ConversationView:View {
     func cancelVoice() {pendingVoice=nil;holding=false;gestureStarted=false;store.voiceCapture=nil;speech.cancel()}
     var welcome:some View {
         VStack(spacing:18) {
-            AIOrb(active:true,colorful:true).frame(width:44,height:44).accessibilityIdentifier("assistant.orb")
+            AIOrb(active:true).frame(width:88,height:88).accessibilityIdentifier("assistant.orb")
             Text(finance ? "一起理清你的财务":"今天心情怎么样？").font(.system(size:28,weight:.regular)).multilineTextAlignment(.center).frame(maxWidth:290)
         }.frame(maxWidth:.infinity).accessibilityElement(children:.contain).accessibilityIdentifier("assistant.greeting")
     }
@@ -173,7 +174,7 @@ struct ConversationBackground:View {
     var body:some View {
         GeometryReader {proxy in Theme.background(scheme).overlay(alignment:.bottom) {
             Rectangle().fill(LinearGradient(colors:[.clear,Color(red:0.55,green:0.78,blue:1).opacity(scheme == .dark ? 0.10:0.32)],startPoint:.top,endPoint:.bottom)).frame(height:proxy.size.height*0.58)
-        }}.ignoresSafeArea(edges:.bottom).allowsHitTesting(false)
+        }}.ignoresSafeArea().allowsHitTesting(false)
     }
 }
 struct MarkdownBody:View {

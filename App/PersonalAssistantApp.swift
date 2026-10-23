@@ -5,6 +5,19 @@ import SwiftUI
     @StateObject private var store = AppStore()
     @Environment(\.scenePhase) private var phase
     @State private var backgroundAt: Date?
+    init() {
+        // The page paints behind the floating controls, including scrolled bar states.
+        let navigation=UINavigationBarAppearance();navigation.configureWithTransparentBackground()
+        navigation.shadowColor = .clear
+        UINavigationBar.appearance().standardAppearance=navigation
+        UINavigationBar.appearance().scrollEdgeAppearance=navigation
+        UINavigationBar.appearance().compactAppearance=navigation
+        UINavigationBar.appearance().compactScrollEdgeAppearance=navigation
+        let toolbar=UIToolbarAppearance();toolbar.configureWithTransparentBackground()
+        toolbar.shadowColor = .clear
+        UIToolbar.appearance().standardAppearance=toolbar
+        UIToolbar.appearance().scrollEdgeAppearance=toolbar
+    }
     var body: some Scene {
         WindowGroup {
             Group { if store.document != nil { MainTabs() } else { UnlockView() } }
@@ -31,13 +44,9 @@ struct MainTabs: View {
     @StateObject private var keyboard = KeyboardVisibility()
     var body: some View {
         ZStack(alignment:.bottomTrailing) {
-            Theme.background(scheme)
-                .overlay {Color.black.opacity(expanded ? 0.14:0)}
-                .ignoresSafeArea().allowsHitTesting(false)
+            Theme.background(scheme).ignoresSafeArea().allowsHitTesting(false)
             if tab==3 {ConversationBackground().ignoresSafeArea().allowsHitTesting(false)}
-            VStack(spacing:0) {
-            ZStack {
-            // One navigation container avoids TabView applying keyboard insets a second time.
+            // Reserve room for the capsule without creating a separate footer surface.
             NavigationStack {
                 Group {
                     switch tab {
@@ -46,14 +55,16 @@ struct MainTabs: View {
                     case 3: ConversationView(onBack:{tab=previousTab})
                     default: NotesView()
                     }
-                }.toolbar { ToolbarControls(sheet:$sheet) }
+                }.appClearChrome().toolbar {ToolbarControls(sheet:$sheet)}
             }.id(tab)
-            if expanded { Color.black.opacity(0.14).contentShape(Rectangle()).onTapGesture { animate { expanded=false } } }
-            }.clipped()
-            if !keyboard.visible && tab != 3 {
-            MainNavigation(selection:$tab,expanded:$expanded)
+                .safeAreaInset(edge:.bottom,spacing:0) {
+                    if !keyboard.visible && tab != 3 {Color.clear.frame(height:60).allowsHitTesting(false)}
+                }
+            if expanded {
+                Color.black.opacity(0.14).ignoresSafeArea().contentShape(Rectangle())
+                    .onTapGesture {animate {expanded=false}}
             }
-            }
+            if !keyboard.visible && tab != 3 {MainNavigation(selection:$tab,expanded:$expanded)}
             if expanded && !keyboard.visible {
                 AppGlassGroup {VStack(spacing:10) {
                     quick("note.text","新建笔记",.note)
@@ -70,7 +81,7 @@ struct MainTabs: View {
         .sheet(item:$sheet) { value in
             NavigationStack {
                 switch value { case .note:NoteEditor();case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }
-            }.environmentObject(store).interactiveDismissDisabled(store.busy)
+            }.appClearChrome().environmentObject(store).interactiveDismissDisabled(store.busy)
         }
     }
     @ViewBuilder func quick(_ icon:String,_ title:String,_ target:RootSheet)->some View {

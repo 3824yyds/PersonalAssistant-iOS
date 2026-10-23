@@ -30,7 +30,7 @@ struct WalletView: View {
                 }
                 Panel {NavigationLink {AccountsView()} label:{Label("全部账户与转账",systemImage:"building.columns")};Divider();NavigationLink {AssetsView()} label:{Label("资产与负债",systemImage:"chart.pie")};Divider();NavigationLink {LoansView()} label:{Label("贷款与还款",systemImage:"calendar.badge.clock")}}
             }.padding(16)
-        }.background(Theme.background(scheme)).navigationTitle("卡包与资产").navigationBarTitleDisplayMode(.inline)
+        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().navigationTitle("卡包与资产").navigationBarTitleDisplayMode(.inline)
             .toolbar {ToolbarItem(placement:.topBarLeading) {Button("完成") {dismiss()}};ToolbarItem(placement:.topBarTrailing) {Button {creating=true} label:{Image(systemName:"plus")}.accessibilityLabel("添加账户")}}
             .sheet(isPresented:$creating) {NavigationStack {AccountEditor()}.environmentObject(store)}
             .sheet(item:$editing) {a in NavigationStack {AccountEditor(account:a)}.environmentObject(store)}

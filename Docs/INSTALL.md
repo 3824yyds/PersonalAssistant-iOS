@@ -1,6 +1,6 @@
 # 只有 iPhone 时的签名与安装
 
-1. 获取交付的 `PersonalAssistant-iOS-3.5.1-build3-unsigned.ipa`，源码 ZIP 不能当作安装包。
+1. 获取交付的 `PersonalAssistant-iOS-3.5.1-build4-unsigned.ipa`，源码 ZIP 不能当作安装包。
 2. 在你已经使用的 iOS 签名工具中导入 IPA，选择你自己的有效签名证书及对应描述文件，然后签名安装。不同工具具体界面不同，以其说明为准。
 3. 如系统要求，在“设置 → 通用 → VPN与设备管理”中完成相应信任。开发者签名方式可能还需要在“设置 → 隐私与安全性”开启开发者模式；是否出现取决于签名/安装方式。
 4. 初次启动创建资料库密码；已经使用本应用时请保留相同应用标识和签名进行更新，更新前导出加密备份。
@@ -9,7 +9,7 @@
 
 ## 从 GitHub 构建获取 IPA
 
-在手机浏览器打开本工程私有仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-build3-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
+在手机浏览器打开本工程私有仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-build4-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
 
 手动重新运行时选择 `Run workflow`。流程会先运行核心测试、iPhone模拟器测试，再构建Metal原生库及真正的iOS arm64程序。生成时不上传你的证书，不使用Apple ID，也不提交App Store。
 
