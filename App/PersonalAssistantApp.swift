@@ -29,7 +29,7 @@ struct MainTabs: View {
     @StateObject private var keyboard = KeyboardVisibility()
     let tabs = [("笔记","note.text"),("账本","book.closed"),("提醒","bell"),("助理","bubble.left.and.bubble.right")]
     var body: some View {
-        ZStack {
+        ZStack(alignment:.bottomTrailing) {
             Theme.background(scheme).ignoresSafeArea()
             VStack(spacing:0) {
             ZStack {
@@ -57,17 +57,17 @@ struct MainTabs: View {
                     Image(systemName:"plus").font(.system(size:22,weight:.regular)).rotationEffect(.degrees(expanded ? 45:0)).frame(width:44,height:44).appGlass(Circle(),interactive:true,tinted:true).foregroundStyle(.white)
                 }.buttonStyle(.plain).accessibilityLabel(expanded ? "收起快捷操作":"展开快捷操作").padding(.leading,8).padding(.trailing,16)
             }.padding(.vertical,6).padding(.leading,8).appGlass(Capsule())
-                .overlay(alignment:.bottomTrailing) {
-                    if expanded {
-                        AppGlassGroup {VStack(spacing:10) {
-                            quick("note.text","新建笔记",.note)
-                            quick("plus.forwardslash.minus","记一笔",.entry)
-                            quick("bell","新建提醒",.reminder)
-                        }}.padding(.trailing,16).padding(.bottom,66).transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
-                    }
-                }
                 .padding(.horizontal,12).padding(.bottom,4)
             }
+            }
+            if expanded && !keyboard.visible {
+                AppGlassGroup {VStack(spacing:10) {
+                    quick("note.text","新建笔记",.note)
+                    quick("plus.forwardslash.minus","记一笔",.entry)
+                    quick("bell","新建提醒",.reminder)
+                }}.padding(.trailing,28).padding(.bottom,70)
+                    .transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
+                    .zIndex(1)
             }
             if let voice=store.voiceCapture,let speech=store.speech {VoiceCaptureOverlay(speech:speech,state:voice).ignoresSafeArea().allowsHitTesting(false).zIndex(2)}
         }
