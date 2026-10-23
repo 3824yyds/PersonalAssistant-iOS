@@ -2,6 +2,7 @@ import Foundation
 import CryptoKit
 import CommonCrypto
 import Security
+import LocalAuthentication
 
 enum VaultCrypto {
     static let maximum = 32*1024*1024, rounds: UInt32 = 600_000
@@ -16,7 +17,7 @@ enum VaultCrypto {
         return envelope.subdata(in:12..<44)
     }
     static func derive(password: String, salt: Data) throws -> Data {
-        guard password.count >= 12, password.utf8.count <= 1024, salt.count == 32 else { throw AppError.message("备份密码至少 12 个字符，最多 1024 字节") }
+        guard password.utf16.count >= 12, password.utf8.count <= 1024, salt.count == 32 else { throw AppError.message("备份密码至少 12 个字符，最多 1024 字节") }
         var output = Data(count:32)
         let pass = Array(password.utf8)
         let status = output.withUnsafeMutableBytes { out in
@@ -59,7 +60,7 @@ enum Keychain {
     }
     static func read(_ name: String, prompt: String? = nil) throws -> Data? {
         var query: [String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:name,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne]
-        if let prompt { query[kSecUseOperationPrompt as String] = prompt }
+        if let prompt {let context=LAContext();context.localizedReason=prompt;query[kSecUseAuthenticationContext as String]=context}
         var result: CFTypeRef?; let status = SecItemCopyMatching(query as CFDictionary,&result)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else { throw AppError.message("系统认证未完成，请使用资料库密码解锁") }; return result as? Data

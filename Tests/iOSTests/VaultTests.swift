@@ -3,6 +3,14 @@ import CryptoKit
 @testable import PersonalAssistant
 
 final class VaultTests:XCTestCase {
+    @MainActor func testCancellingReplyInvalidatesOnlyPendingOutput() {
+        let store=AppStore();store.messages=[ChatMessage(role:"user",content:"你好"),ChatMessage(role:"assistant",content:"")];store.activeReplyID="old";store.assistantBusy=true
+        store.cancelReply();XCTAssertNil(store.activeReplyID);XCTAssertFalse(store.assistantBusy);XCTAssertEqual(store.messages.count,1)
+    }
+    @MainActor func testCancellingReplyPreservesAlreadyDisplayedText() {
+        let store=AppStore();store.messages=[ChatMessage(role:"user",content:"你好"),ChatMessage(role:"assistant",content:"你好！")];store.activeReplyID="old";store.assistantBusy=true
+        store.cancelReply();XCTAssertEqual(store.messages.last?.content,"你好！");XCTAssertFalse(store.assistantBusy)
+    }
     func testEnvelopeRoundTripAndAuthentication() throws {
         let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"test-password-351",salt:salt),plain=Data("测试笔记与财务资料".utf8)
         let encrypted=try VaultCrypto.encrypt(plain,key:key,salt:salt)

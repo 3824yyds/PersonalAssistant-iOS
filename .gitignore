@@ -6,3 +6,4 @@ NativeBuild/
 *.mobileprovision
 *.p8
 xcuserdata/
+__pycache__/

@@ -46,7 +46,7 @@ struct ConversationView:View {
                 TextField(finance ? "问问你的财务状况…":"发消息…",text:$input,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused)
                 Button {Task {if speech.recording {speech.finish()}else{await speech.start()}}} label:{Image(systemName:"mic").font(.system(size:20)).frame(width:34,height:42)}.accessibilityLabel("语音输入").disabled(store.assistantBusy)
                 Button {
-                    if store.assistantBusy {store.activeTask?.cancel();LocalModel.shared.cancel();store.assistantBusy=false}else{send()}
+                    if store.assistantBusy {store.cancelReply()}else{send()}
                 } label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
             }.padding(.horizontal,8).padding(.vertical,4).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
         }.background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
@@ -76,12 +76,12 @@ struct ConversationView:View {
         input="";focused=false;tools=false;follow=true
         let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model
         store.messages.append(ChatMessage(role:"user",content:question))
-        let answerID=UUID().uuidString;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
+        let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
         store.activeTask=Task {
-            defer {if store.epoch==epoch {store.assistantBusy=false}}
+            defer {if store.epoch==epoch && store.activeReplyID==answerID {store.assistantBusy=false;store.activeReplyID=nil}}
             do {
-                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model) {partial in guard store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial}
-                try Task.checkCancellation();guard store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
+                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model) {partial in guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial}
+                try Task.checkCancellation();guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
             }catch is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
             catch {if store.epoch==epoch {store.messages.removeAll {$0.id==answerID};store.present(error)}}
         }

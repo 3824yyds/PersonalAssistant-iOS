@@ -32,6 +32,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var key = Data(), salt = Data()
     var epoch = UUID()
     var activeTask: Task<Void,Never>?
+    var activeReplyID: String?
     var speech: SpeechService?
     init() {
         hasVault = (try? PrivateFiles.url()).map { FileManager.default.fileExists(atPath:$0.path) } ?? false
@@ -43,6 +44,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     func present(_ error: Error) { if !(error is CancellationError) { self.error = error.localizedDescription } }
     func unlock(password: String, creating: Bool = false) async {
         guard !busy else { return }; busy = true; defer { busy = false }
+        let unlockEpoch=epoch
         let attemptData = (try? Keychain.read("attempts")) ?? Data()
         let attempts = (try? JSONDecoder().decode([String:Double].self,from:attemptData)) ?? [:]
         if (attempts["until"] ?? 0) > Date().timeIntervalSince1970 { error = "尝试次数较多，请稍后再试"; return }
@@ -60,6 +62,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
                 let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:key)).validated()
                 return (d,key,salt)
             }.value
+            guard unlockEpoch==epoch else {return}
             key = result.1; salt = result.2; var d = result.0; d.accounts = Finance.accounts(d); document = d; hasVault = true
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat")
             Keychain.delete("attempts"); epoch = UUID(); await loadHistory()
@@ -82,10 +85,14 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
         } catch { present(error) }
     }
     func lock() {
-        epoch = UUID(); activeTask?.cancel(); activeTask = nil; assistantBusy = false
+        epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
         document = nil; messages = []; sessions = []; key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
+    }
+    func cancelReply() {
+        activeReplyID=nil;activeTask?.cancel();activeTask=nil;assistantBusy=false;LocalModel.shared.cancel()
+        messages.removeAll {$0.role=="assistant" && $0.content.isEmpty}
     }
     @discardableResult func commit(_ change: (inout Document) throws -> Void) async -> Bool {
         guard var next = document, !busy else { return false }
@@ -129,7 +136,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
         guard let d = document else { throw AppError.message("请先解锁资料库") }; let key = key, salt = salt
         return try await Task.detached { try VaultCrypto.encrypt(d.encoded(),key:key,salt:salt) }.value
     }
-    func saveHistory() async {
+    private func snapshotCurrentHistory() {
         guard document != nil, !key.isEmpty else { return }
         let retention = current.settings.int("chatRetentionDays",fallback:7)
         sessions.removeAll { $0.updated < Date().addingTimeInterval(-Double(retention)*86400) }
@@ -138,10 +145,14 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
             let s = ChatSession(id:activeSessionID,title:existing?.title ?? String((messages.first { $0.role == "user" }?.content ?? "新对话").prefix(24)),updated:Date(),messages:messages)
             sessions.removeAll { $0.id == s.id }; sessions.insert(s,at:0)
         }
+    }
+    private func persistHistory() async {
+        guard document != nil,!key.isEmpty else{return}
         do { let data = try JSONEncoder().encode(Array(sessions.prefix(100))), key = key, salt = salt
             try await Task.detached { try PrivateFiles.write(VaultCrypto.encrypt(data,key:key,salt:salt),name:"chat.pavault") }.value
         } catch { present(error) }
     }
+    func saveHistory() async {snapshotCurrentHistory();await persistHistory()}
     func loadHistory() async {
         do {
             if let data = try? PrivateFiles.boundedRead(PrivateFiles.url("chat.pavault")) {
@@ -150,5 +161,5 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
             }
         } catch { self.error = "历史对话未能读取，当前资料库不受影响" }
     }
-    func newChat() async { await saveHistory(); messages = []; activeSessionID = UUID().uuidString }
+    func newChat() async {snapshotCurrentHistory();messages=[];activeSessionID=UUID().uuidString;await persistHistory()}
 }

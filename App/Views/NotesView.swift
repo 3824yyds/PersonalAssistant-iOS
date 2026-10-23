@@ -90,7 +90,7 @@ struct NoteEditor:View {
         if let bytes=try? PrivateFiles.boundedRead(PrivateFiles.url("note-draft.pavault")),let plain=try? VaultCrypto.decrypt(bytes,key:key),let draft=try? JSONDecoder().decode(Item.self,from:plain),draft.text("slot")==id,draft.int("baseUpdatedAt")==((note?.int("updatedAt")) ?? 0) {recovery=draft;recoverPrompt=true}
     }
     func scheduleDraft() {
-        guard draftLoaded,store.document != nil else{return};dirty=true;draftTask?.cancel()
+        guard draftLoaded,!recoverPrompt,store.document != nil else{return};dirty=true;draftTask?.cancel()
         let draft=Item(["slot":.string(note?.id ?? "new"),"baseUpdatedAt":.int(note?.int("updatedAt") ?? 0),"title":.string(title),"body":.string(bodyText)]),key=store.key,salt=store.salt
         draftTask=Task {do {try await Task.sleep(nanoseconds:750_000_000);try Task.checkCancellation();let plain=try JSONEncoder().encode(draft);try PrivateFiles.write(VaultCrypto.encrypt(plain,key:key,salt:salt),name:"note-draft.pavault")}catch{}}
     }

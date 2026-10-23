@@ -16,7 +16,7 @@ import Combine
     func start() async {
         cancel(); error = nil; text = ""
         let speechAllowed = await withCheckedContinuation { continuation in SFSpeechRecognizer.requestAuthorization { continuation.resume(returning:$0 == .authorized) } }
-        let audioAllowed = await withCheckedContinuation { continuation in AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning:$0) } }
+        let audioAllowed = await withCheckedContinuation { continuation in AVAudioApplication.requestRecordPermission { continuation.resume(returning:$0) } }
         guard speechAllowed && audioAllowed else { error = "请到系统设置允许麦克风和语音识别权限"; return }
         guard let recognizer = SFSpeechRecognizer(locale:Locale(identifier:"zh-CN")), recognizer.isAvailable else { error = "中文语音识别暂不可用，请检查系统语音语言设置"; return }
         guard recognizer.supportsOnDeviceRecognition else { error = "这台设备尚不支持离线普通话识别，请先在系统设置中准备中文语音资源，或使用键盘听写"; return }
