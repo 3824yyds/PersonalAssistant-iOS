@@ -9,7 +9,14 @@ struct ConversationView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @StateObject var speech=SpeechService()
-    @State var input="",finance=false,tools=false,history=false,modelMenu=false,follow=true,viewport:CGFloat=0,availableModels=["deepseek-chat","deepseek-reasoner"]
+    @State var input=""
+    @State var finance=false
+    @State var tools=false
+    @State var history=false
+    @State var modelMenu=false
+    @State var follow=true
+    @State var viewport:CGFloat=0
+    @State var availableModels=["deepseek-chat","deepseek-reasoner"]
     @FocusState var focused:Bool
     var body:some View {
         VStack(spacing:0) {
@@ -124,7 +131,10 @@ struct ChatHistoryView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var select:(ChatSession)->Void
-    @State var query="",renaming:ChatSession?,title="",rename=false
+    @State var query=""
+    @State var renaming:ChatSession?
+    @State var title=""
+    @State var rename=false
     var sessions:[ChatSession] {store.sessions.filter {query.isEmpty || ($0.title+$0.messages.map(\.content).joined()).localizedCaseInsensitiveContains(query)}}
     var body:some View {List {
         Button("新对话",systemImage:"plus") {Task {await store.newChat();dismiss()}}

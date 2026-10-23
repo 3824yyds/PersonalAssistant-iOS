@@ -4,7 +4,11 @@ struct WalletView: View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var scheme
-    @State var expanded=false, selected:String?, creating=false, editing:Item?, assets=false
+    @State var expanded=false
+    @State var selected:String?
+    @State var creating=false
+    @State var editing:Item?
+    @State var assets=false
     var cards:[Item] {store.current.accounts.filter {!$0.bool("archived") && ["bank","credit"].contains($0.text("type"))}}
     var body:some View {
         ScrollView {
@@ -66,7 +70,8 @@ struct NetworkMark:View {
 struct CardDetailsView:View {
     @EnvironmentObject var store:AppStore
     var account:Item
-    @State var editing=false,repaying=false
+    @State var editing=false
+    @State var repaying=false
     var card:Item {store.current.wallet.items("cards").first {$0.text("accountId")==account.id} ?? Item()}
     var balance:Int64 {Finance.balance(account,in:store.current)}
     var currency:String {account.text("currency",fallback:"CNY")}
@@ -97,7 +102,9 @@ struct CardDetailsView:View {
 
 struct AccountsView:View {
     @EnvironmentObject var store:AppStore
-    @State var creating=false,editing:Item?,transferring=false
+    @State var creating=false
+    @State var editing:Item?
+    @State var transferring=false
     var body:some View {List {
         ForEach(store.current.accounts) {a in Button {editing=a} label:{HStack {AccountIcon(name:a.text("name"),type:a.text("type"));VStack(alignment:.leading,spacing:4) {Text(a.text("name")).foregroundStyle(.primary);Text(a.bool("archived") ? "已归档":a.text("currency",fallback:"CNY")).font(.caption).foregroundStyle(.secondary)};Spacer();Amount(cents:Finance.balance(a,in:store.current))}}}
         Section {Button("添加账户",systemImage:"plus") {creating=true};Button("账户转账",systemImage:"arrow.left.arrow.right") {transferring=true}}
@@ -112,7 +119,22 @@ struct AccountEditor:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var account:Item?
-    @State var name="",currency="CNY",type="bank",opening="0.00",lastFour="",network="unionpay",design="",limit="0.00",statement="0.00",statementMonth=Clock.month(),statementDay=1,repaymentDay=20,memo="",branch="",archived=false,presets=false
+    @State var name=""
+    @State var currency="CNY"
+    @State var type="bank"
+    @State var opening="0.00"
+    @State var lastFour=""
+    @State var network="unionpay"
+    @State var design=""
+    @State var limit="0.00"
+    @State var statement="0.00"
+    @State var statementMonth=Clock.month()
+    @State var statementDay=1
+    @State var repaymentDay=20
+    @State var memo=""
+    @State var branch=""
+    @State var archived=false
+    @State var presets=false
     var availableArt:[CardArtwork] {Artwork.cards.filter {$0.bank==name && $0.kind==type && $0.network==network}}
     var body:some View {
         Form {
@@ -168,7 +190,10 @@ struct TransferView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var to:String="",repayment=false
-    @State var fromID="",toID="",amount="",memo=""
+    @State var fromID=""
+    @State var toID=""
+    @State var amount=""
+    @State var memo=""
     var accounts:[Item] {store.current.accounts.filter {!$0.bool("archived")}}
     var body:some View {Form {
         Picker("转出账户",selection:$fromID) {Text("请选择").tag("");ForEach(accounts.filter {!repayment || $0.text("type") != "credit"}) {Text($0.text("name")+" · "+$0.text("currency",fallback:"CNY")).tag($0.id)}}
@@ -184,7 +209,8 @@ struct TransferView:View {
 
 struct AssetsView:View {
     @EnvironmentObject var store:AppStore
-    @State var editing:Item?,adding=false
+    @State var editing:Item?
+    @State var adding=false
     var body:some View {List {
         Section("手动资产与负债") {ForEach(store.current.wallet.items("assets")) {a in Button {editing=a} label:{HStack {VStack(alignment:.leading,spacing:5) {Text(a.text("name"));Text(a.text("kind")=="debt" ? "负债":"资产").font(.caption).foregroundStyle(.secondary)};Spacer();Amount(cents:a.int("cents"),currency:a.text("currency",fallback:"CNY"))}}}.onDelete {indices in let ids=Set(indices.map {store.current.wallet.items("assets")[$0].id});Task {await store.commit {d in var w=d.wallet;w.set("assets",items:w.items("assets").filter {!ids.contains($0.id)});d.wallet=w}}}}
         Section {Button("添加资产",systemImage:"plus") {adding=true}}
@@ -197,6 +223,10 @@ struct AssetEditor:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var asset:Item?
-    @State var name="",amount="",currency="CNY",kind="fund",memo=""
+    @State var name=""
+    @State var amount=""
+    @State var currency="CNY"
+    @State var kind="fund"
+    @State var memo=""
     var body:some View {Form {TextField("资产名称",text:$name);Picker("类型",selection:$kind) {Text("基金").tag("fund");Text("股票").tag("stock");Text("房产").tag("property");Text("独立存款").tag("deposit");Text("其他资产").tag("other");Text("其他负债").tag("debt")};Picker("币种",selection:$currency) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}};TextField("估值金额",text:$amount).keyboardType(.decimalPad);TextField("备注",text:$memo);Text("与账户存款分开记录，避免将同一笔资产重复计入。").font(.caption).foregroundStyle(.secondary)}.navigationTitle(asset==nil ? "添加资产":"编辑资产").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {do {guard !name.isEmpty else {throw AppError.message("请填写资产名称")};var a=asset ?? Item.make();a.set("name",name);a.set("kind",kind);a.set("currency",currency);a.set("cents",try Money.parse(amount,allowZero:true));a.set("valuedAt",Clock.milliseconds);a.set("memo",memo);Task {if await store.commit({$0.upsertWallet(a,in:"assets")}) {dismiss()}}}catch{store.present(error)}}}}.onAppear {currency=store.currency;if let a=asset {name=a.text("name");kind=a.text("kind");currency=a.text("currency");amount=Money.amount(a.int("cents"));memo=a.text("memo")}}}
 }

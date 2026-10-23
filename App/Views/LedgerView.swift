@@ -4,9 +4,18 @@ import Charts
 struct LedgerView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.colorScheme) var scheme
-    @State var month = Date(), selectedDay: Date?
-    @State var tab = 0, query = "", currency = "", account = "", kind = ""
-    @State var editing: Item?, creating = false, filters = false, datePicker = false, importing = false
+    @State var month = Date()
+    @State var selectedDay: Date?
+    @State var tab = 0
+    @State var query = ""
+    @State var currency = ""
+    @State var account = ""
+    @State var kind = ""
+    @State var editing: Item?
+    @State var creating = false
+    @State var filters = false
+    @State var datePicker = false
+    @State var importing = false
     var records: [Item] { Finance.select(store.current,month:month,currency:currency.isEmpty ? nil:currency,account:account.isEmpty ? nil:account).filter { r in (kind.isEmpty || r.text("kind")==kind) && (query.isEmpty || (r.text("title")+r.text("body")+r.text("category")).localizedCaseInsensitiveContains(query)) } }
     var statsCurrency: String { currency.isEmpty ? store.currency:currency }
     var stats: [Item] { Finance.select(store.current,month:month,currency:statsCurrency,account:account.isEmpty ? nil:account) }
@@ -95,7 +104,13 @@ struct RecordEditor: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) var dismiss
     var record: Item?
-    @State var title="", amount="", kind="expense", category="餐饮", accountID="", date=Date(), memo=""
+    @State var title=""
+    @State var amount=""
+    @State var kind="expense"
+    @State var category="餐饮"
+    @State var accountID=""
+    @State var date=Date()
+    @State var memo=""
     @State var deleting=false
     var linked: Bool {!(record?.text("loanId").isEmpty ?? true) || !(record?.text("wealthRef").isEmpty ?? true)}
     var accounts:[Item] {store.current.accounts.filter {!$0.bool("archived")}}
@@ -131,7 +146,8 @@ struct RecordEditor: View {
 
 struct CategoryStatistics: View {
     var records:[Item],currency:String
-    @State var income=false, selected:String?
+    @State var income=false
+    @State var selected:String?
     var slices:[(String,Int64)] {Dictionary(grouping:records.filter {$0.text("kind")==((income) ? "income":"expense")},by:{$0.text("category",fallback:"其他")}).map {($0.key,$0.value.reduce(Int64(0)){$0+$1.int("cents")})}.sorted {$0.1>$1.1}}
     var body: some View {
         Panel {
@@ -165,7 +181,9 @@ struct CalendarPanel: View {
 struct BudgetPanel: View {
     @EnvironmentObject var store:AppStore
     var month:Date,currency:String,records:[Item]
-    @State var adding=false,category="",amount=""
+    @State var adding=false
+    @State var category=""
+    @State var amount=""
     var budgets:[Item] {store.current.root.items("budgets").filter {$0.text("month")==Clock.month(month) && $0.text("currency")==currency}}
     var body:some View {Panel {
         HStack {Text("月度预算").font(.headline);Spacer();Button("设置") {adding=true}}

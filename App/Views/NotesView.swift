@@ -6,7 +6,10 @@ import VisionKit
 struct NotesView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
-    @State var query="",scope="active",editing:Item?,creating=false
+    @State var query=""
+    @State var scope="active"
+    @State var editing:Item?
+    @State var creating=false
     var notes:[Item] {store.current.notes.filter {n in (scope=="trash" ? n.int("deletedAt")>0:scope=="archived" ? n.bool("archived") && n.int("deletedAt")==0:!n.bool("archived") && n.int("deletedAt")==0) && (query.isEmpty || (n.text("title")+n.text("body")+n.text("folder")).localizedCaseInsensitiveContains(query))}.sorted {a,b in a.bool("pinned")==b.bool("pinned") ? a.int("updatedAt")>b.int("updatedAt"):a.bool("pinned")}}
     var body:some View {
         List {
@@ -34,9 +37,24 @@ struct NoteEditor:View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var scheme
     var note:Item?
-    @State var noteID=UUID().uuidString.lowercased(),title="",bodyText="",folder="收件箱",tools=false,working=false,scanner=false,dirty=false
-    @State var resultTitle="",resultBody="",preview=false,replace=false,undo:(String,String)?
-    @State var task:Task<Void,Never>?,draftTask:Task<Void,Never>?,draftLoaded=false,recovery:Item?,recoverPrompt=false
+    @State var noteID=UUID().uuidString.lowercased()
+    @State var title=""
+    @State var bodyText=""
+    @State var folder="收件箱"
+    @State var tools=false
+    @State var working=false
+    @State var scanner=false
+    @State var dirty=false
+    @State var resultTitle=""
+    @State var resultBody=""
+    @State var preview=false
+    @State var replace=false
+    @State var undo:(String,String)?
+    @State var task:Task<Void,Never>?
+    @State var draftTask:Task<Void,Never>?
+    @State var draftLoaded=false
+    @State var recovery:Item?
+    @State var recoverPrompt=false
     var body:some View {
         VStack(spacing:0) {
             ScrollView {

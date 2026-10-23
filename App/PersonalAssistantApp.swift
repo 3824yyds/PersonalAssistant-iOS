@@ -73,7 +73,8 @@ struct MainTabs: View {
 
 struct UnlockView: View {
     @EnvironmentObject var store: AppStore
-    @State var password = "", confirmation = ""
+    @State var password = ""
+    @State var confirmation = ""
     @State var showPassword = false
     var body: some View {
         GeometryReader { proxy in

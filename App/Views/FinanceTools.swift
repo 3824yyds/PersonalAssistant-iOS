@@ -3,7 +3,11 @@ import Charts
 
 struct FinancialReportView:View {
     @EnvironmentObject var store:AppStore
-    @State var month=Date(),currency="CNY",cloud="",working=false,task:Task<Void,Never>?
+    @State var month=Date()
+    @State var currency="CNY"
+    @State var cloud=""
+    @State var working=false
+    @State var task:Task<Void,Never>?
     var body:some View {ScrollView {VStack(alignment:.leading,spacing:16) {
         DatePicker("报告月份",selection:$month,displayedComponents:.date).datePickerStyle(.compact)
         Picker("币种",selection:$currency) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}}
@@ -20,7 +24,10 @@ struct FinancialReportView:View {
 struct ForecastPoint:Identifiable {var date:Date,base:Int64,scenario:Int64;var id:Date {date}}
 struct ForecastView:View {
     @EnvironmentObject var store:AppStore
-    @State var currency="CNY",purchase="",purchaseDate=Date().addingTimeInterval(86400),days=31
+    @State var currency="CNY"
+    @State var purchase=""
+    @State var purchaseDate=Date().addingTimeInterval(86400)
+    @State var days=31
     var points:[ForecastPoint] {
         let d=store.current,now=Date(),amount=(try? Money.parse(purchase,allowZero:true)) ?? 0
         let start=d.accounts.filter {$0.text("currency",fallback:"CNY")==currency && $0.text("type") != "credit"}.reduce(Int64(0)) {$0+Finance.balance($1,in:d)}
@@ -56,7 +63,21 @@ struct LoansView:View {
 struct LoanEditor:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
-    @State var name="",lender="",principal="",received="",annual="",fee="0.00",accountID="",months=12,type="online",lenderType="unknown",method="annuity",baseDate=Date(),firstDue=Date().addingTimeInterval(30*86400),recordReceipt=false,lpr=""
+    @State var name=""
+    @State var lender=""
+    @State var principal=""
+    @State var received=""
+    @State var annual=""
+    @State var fee="0.00"
+    @State var accountID=""
+    @State var months=12
+    @State var type="online"
+    @State var lenderType="unknown"
+    @State var method="annuity"
+    @State var baseDate=Date()
+    @State var firstDue=Date().addingTimeInterval(30*86400)
+    @State var recordReceipt=false
+    @State var lpr=""
     var body:some View {Form {
         Section("合同") {TextField("贷款名称",text:$name);Picker("贷款类型",selection:$type) {Text("网贷").tag("online");Text("车贷").tag("car");Text("商业房贷").tag("mortgage");Text("公积金贷").tag("fund");Text("民间借款").tag("private");Text("其他").tag("other")};TextField("债权方",text:$lender);Picker("机构性质",selection:$lenderType) {Text("尚未核实").tag("unknown");Text("银行").tag("bank");Text("持牌消费 / 汽车金融").tag("finance");Text("小贷公司").tag("smallloan");Text("个人 / 非金融企业").tag("private")}}
         Section("金额与利率") {TextField("合同本金（CNY）",text:$principal).keyboardType(.decimalPad);TextField("年利率（%）",text:$annual).keyboardType(.decimalPad);TextField("每月固定费用",text:$fee).keyboardType(.decimalPad);Stepper("期限：\(months)个月",value:$months,in:1...480);Picker("还款方式",selection:$method) {Text("等额本息").tag("annuity");Text("等额本金").tag("principal");Text("先息后本").tag("bullet");Text("按初始本金计息").tag("flat")};if lenderType=="private" {TextField("合同期一年期 LPR（%）",text:$lpr).keyboardType(.decimalPad)}}
@@ -74,7 +95,8 @@ struct LoanEditor:View {
 struct LoanDetailView:View {
     @EnvironmentObject var store:AppStore
     var loanID:String
-    @State var paying:Installment?,risk=false
+    @State var paying:Installment?
+    @State var risk=false
     var loan:Item {store.current.wallet.items("loans").first {$0.id==loanID} ?? Item()}
     var plan:[Installment] {(try? Loans.schedule(loan)) ?? []}
     var body:some View {List {
@@ -93,7 +115,11 @@ struct LoanPaymentView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     let loan:Item,installment:Installment
-    @State var accountID="",principal="",interest="",fee="",date=Date()
+    @State var accountID=""
+    @State var principal=""
+    @State var interest=""
+    @State var fee=""
+    @State var date=Date()
     var body:some View {Form {Picker("付款账户",selection:$accountID) {Text("请选择").tag("");ForEach(store.current.accounts.filter {$0.text("currency",fallback:"CNY")=="CNY" && !$0.bool("archived") && $0.text("type") != "credit"}) {Text($0.text("name")).tag($0.id)}};TextField("实际归还本金",text:$principal).keyboardType(.decimalPad);TextField("实际支付利息",text:$interest).keyboardType(.decimalPad);TextField("实际支付费用",text:$fee).keyboardType(.decimalPad);DatePicker("实际支付日期",selection:$date,in:...Date(),displayedComponents:.date);Text("本金减少负债，利息和费用计入支出，均影响付款账户余额。").font(.caption).foregroundStyle(.secondary)}.navigationTitle("记录第\(installment.id)期还款").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("确认") {save()}.disabled(store.busy)}}.onAppear {accountID=loan.text("accountId");principal=Money.amount(installment.principal);interest=Money.amount(installment.interest);fee=Money.amount(installment.fee)}}
     func save() {do {let p=try Money.parse(principal,allowZero:true),i=try Money.parse(interest,allowZero:true),f=try Money.parse(fee,allowZero:true);guard p+i+f>0,let a=store.current.accounts.first(where:{$0.id==accountID}) else {throw AppError.message("请核对还款金额和账户")};let outstanding=loan.int("principalCents")-store.current.records.filter {$0.text("loanId")==loan.id && $0.text("kind")=="loan_principal"}.reduce(0){$0+$1.int("cents")};guard p<=outstanding else {throw AppError.message("归还本金超过待还本金")};let group=UUID().uuidString.lowercased();Task {if await store.commit({d in guard !d.records.contains(where:{$0.text("loanId")==loan.id && $0.int("loanPeriod")==installment.id}) else {throw AppError.message("本期已记录还款")};for (kind,category,cents) in [("loan_principal","贷款本金",p),("expense","贷款利息",i),("expense","贷款费用",f)] where cents>0 {d.records.append(Item.make(["kind":.string(kind),"title":.string(loan.text("name")+" · 第\(installment.id)期 · "+category),"category":.string(category),"cents":.int(cents),"currency":.string("CNY"),"account":.string(a.text("name")),"date":.int(Int64(date.timeIntervalSince1970*1000)),"loanId":.string(loan.id),"loanPeriod":.int(Int64(installment.id)),"loanGroupId":.string(group)]))}}) {dismiss()}}}catch{store.present(error)}}
 }
@@ -111,7 +137,13 @@ struct EvidenceView:View {
 
 struct ExchangeView:View {
     @EnvironmentObject var store:AppStore
-    @State var base="HKD",quote="CNY",amount="100",rate:Decimal?,source="",working=false,task:Task<Void,Never>?
+    @State var base="HKD"
+    @State var quote="CNY"
+    @State var amount="100"
+    @State var rate:Decimal?
+    @State var source=""
+    @State var working=false
+    @State var task:Task<Void,Never>?
     var body:some View {Form {
         Picker("从",selection:$base) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}};Picker("到",selection:$quote) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}};TextField("金额",text:$amount).keyboardType(.decimalPad)
         Button {working=true;task=Task {defer{working=false};do {let result=try await RateService.lookup(base:base,quote:quote);rate=result.0;source=result.1}catch{store.present(error)}}} label:{HStack {Text("查询汇率");if working {ProgressView()}}}.disabled(working)

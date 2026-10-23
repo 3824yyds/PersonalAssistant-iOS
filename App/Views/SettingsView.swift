@@ -32,7 +32,11 @@ struct SettingsView:View {
 
 struct CloudSettingsView:View {
     @EnvironmentObject var store:AppStore
-    @State var key="",models=["deepseek-chat","deepseek-reasoner"],custom="",fetching=false,notice=false
+    @State var key=""
+    @State var models=["deepseek-chat","deepseek-reasoner"]
+    @State var custom=""
+    @State var fetching=false
+    @State var notice=false
     var body:some View {Form {
         Section {Toggle("使用云端智能",isOn:Binding(get:{store.cloudEnabled},set:{v in if v {notice=true}else{Task {await store.setting("cloudEnabled",.bool(false))}}}))} footer:{Text("开启后，问题、近期对话及财务咨询所需资料会原文发送至 DeepSeek；关闭后使用本机智能。")}
         Section("DeepSeek") {
@@ -55,7 +59,9 @@ struct CloudSettingsView:View {
 struct LocalModelView:View {
     @EnvironmentObject var store:AppStore
     @StateObject var download=ModelDownload()
-    @State var importing=false,installed=LocalModel.shared.available,checking=false
+    @State var importing=false
+    @State var installed=LocalModel.shared.available
+    @State var checking=false
     var body:some View {Form {
         Section {HStack {Image(systemName:"cpu").font(.title2).foregroundStyle(Theme.accent);VStack(alignment:.leading,spacing:5) {Text("千问 · Qwen2.5").font(.headline);Text("1.5B · Q4_K_M").font(.caption).foregroundStyle(.secondary)};Spacer();if installed {Image(systemName:"checkmark.circle.fill").foregroundStyle(Theme.income)}}}
         Section {
@@ -84,7 +90,10 @@ struct AppearanceView:View {
 
 struct MemoryView:View {
     @EnvironmentObject var store:AppStore
-    @State var adding=false,editing:Item?,text="",kind="preference"
+    @State var adding=false
+    @State var editing:Item?
+    @State var text=""
+    @State var kind="preference"
     var memory:Item {Item(store.current.root.raw["assistantMemory"]?.object ?? [:])}
     var body:some View {List {
         Toggle("使用助理记忆",isOn:Binding(get:{memory.bool("enabled",fallback:true)},set:{v in Task {await store.commit {d in var m=Item(d.root.raw["assistantMemory"]?.object ?? [:]);m.set("enabled",v);d.root.raw["assistantMemory"] = .object(m.raw)}}}))
@@ -118,7 +127,13 @@ struct DataFile:FileDocument {
 }
 struct BackupView:View {
     @EnvironmentObject var store:AppStore
-    @State var importing=false,exporting=false,restore=false,confirm=false,bytes=Data(),password="",file=DataFile(data:Data())
+    @State var importing=false
+    @State var exporting=false
+    @State var restore=false
+    @State var confirm=false
+    @State var bytes=Data()
+    @State var password=""
+    @State var file=DataFile(data:Data())
     var body:some View {Form {
         Section {Button("导出完整加密备份",systemImage:"square.and.arrow.up") {Task {do {file=DataFile(data:try await store.backup());exporting=true}catch{store.present(error)}}};Button("从完整备份恢复",systemImage:"square.and.arrow.down") {importing=true}}
         Section {Text("备份使用当前资料库密码加密。恢复将替换当前笔记、账本、账户等资料，请先导出当前备份。").font(.caption).foregroundStyle(.secondary)}
@@ -133,7 +148,12 @@ struct BackupView:View {
 struct ImportExportView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
-    @State var importing=false,exporting=false,review=false,accountID="",drafts:[Item]=[],file=DataFile(data:Data())
+    @State var importing=false
+    @State var exporting=false
+    @State var review=false
+    @State var accountID=""
+    @State var drafts:[Item]=[]
+    @State var file=DataFile(data:Data())
     var body:some View {Form {
         Section("导入账单") {Picker("入账账户",selection:$accountID) {Text("请选择").tag("");ForEach(store.current.accounts.filter {!$0.bool("archived")}) {Text($0.text("name")+" · "+$0.text("currency",fallback:"CNY")).tag($0.id)}};Button("选择 CSV 文件") {importing=true}.disabled(accountID.isEmpty)}
         Section("导出") {Button("导出全部流水 CSV") {file=DataFile(data:Data(CSV.export(store.current.records,document:store.current).utf8));exporting=true}}

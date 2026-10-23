@@ -2,7 +2,10 @@ import SwiftUI
 
 struct RemindersView:View {
     @EnvironmentObject var store:AppStore
-    @State var query="",showCompleted=false,priority:Int64 = -1,editing:Item?
+    @State var query=""
+    @State var showCompleted=false
+    @State var priority:Int64 = -1
+    @State var editing:Item?
     var items:[Item] {store.current.records.filter {$0.text("kind")=="reminder" && $0.bool("completed")==showCompleted && (priority<0 || $0.int("priority",fallback:1)==priority) && (query.isEmpty || ($0.text("title")+$0.text("body")).localizedCaseInsensitiveContains(query))}.sorted {$0.int("due")<$1.int("due")}}
     var body:some View {List {
         if items.isEmpty {EmptyState(icon:"bell",title:showCompleted ? "还没有已完成提醒":"今天也能从容安排",subtitle:"点右下角＋，添加一项提醒").listRowSeparator(.hidden).listRowBackground(Color.clear)}
@@ -30,7 +33,12 @@ struct ReminderEditor:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var reminder:Item?
-    @State var title="",bodyText="",date=Date().addingTimeInterval(3600),period="none",priority=1,paused=false
+    @State var title=""
+    @State var bodyText=""
+    @State var date=Date().addingTimeInterval(3600)
+    @State var period="none"
+    @State var priority=1
+    @State var paused=false
     var body:some View {Form {
         Section {TextField("要提醒什么",text:$title);TextField("备注",text:$bodyText,axis:.vertical).lineLimit(2...5)}
         Section {DatePicker("提醒时间",selection:$date,displayedComponents:[.date,.hourAndMinute]);Picker("重复",selection:$period) {Text("不重复").tag("none");Text("每天").tag("daily");Text("每周").tag("weekly");Text("每月").tag("monthly");Text("每年").tag("yearly")};Picker("优先级",selection:$priority) {Text("低").tag(0);Text("普通").tag(1);Text("高").tag(2)};Toggle("暂停提醒",isOn:$paused)}
