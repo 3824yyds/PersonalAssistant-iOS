@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct LedgerView: View {
+    @Binding var sheet:RootSheet?
     @EnvironmentObject var store: AppStore
     @Environment(\.colorScheme) var scheme
     @State var month = Date()
@@ -20,7 +21,19 @@ struct LedgerView: View {
     var statsCurrency: String { currency.isEmpty ? store.currency:currency }
     var stats: [Item] { Finance.select(store.current,month:month,currency:statsCurrency,account:account.isEmpty ? nil:account) }
     var body: some View {
-        ScrollView {
+        VStack(spacing:0) {
+            PageHeader(title:"账本",sheet:$sheet) {
+                Menu {
+                Button("记一笔",systemImage:"plus") {creating=true}
+                NavigationLink("月度报告与预测",destination:FinancialReportView().toolbar(.visible,for:.navigationBar))
+                NavigationLink("账户与转账",destination:AccountsView().toolbar(.visible,for:.navigationBar))
+                NavigationLink("贷款与还款",destination:LoansView().toolbar(.visible,for:.navigationBar))
+                NavigationLink("订阅与资金规划",destination:WealthToolsView().toolbar(.visible,for:.navigationBar))
+                NavigationLink("汇率换算",destination:ExchangeView().toolbar(.visible,for:.navigationBar))
+                Button("导入 / 导出账单",systemImage:"square.and.arrow.down") {importing=true}
+            } label:{Image(systemName:"ellipsis.circle").accessibilityLabel("账本工具")}
+            }
+            ScrollView {
             LazyVStack(spacing:12) {
                 Picker("账本视图",selection:$tab) { Text("流水").tag(0); Text("统计").tag(1); Text("日历").tag(2); Text("预算").tag(3) }.pickerStyle(.segmented)
                 HStack {
@@ -56,16 +69,8 @@ struct LedgerView: View {
                     if let selectedDay { ForEach(stats.filter {Calendar.current.isDate($0.date,inSameDayAs:selectedDay)}) { r in Button {editing=r} label:{RecordRow(record:r,document:store.current)}.buttonStyle(.plain) } }
                 } else { BudgetPanel(month:month,currency:statsCurrency,records:stats) }
             }.padding(16)
-        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().navigationTitle("账本").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement:.topBarLeading) {Menu {
-                Button("记一笔",systemImage:"plus") {creating=true}
-                NavigationLink("月度报告与预测",destination:FinancialReportView())
-                NavigationLink("账户与转账",destination:AccountsView())
-                NavigationLink("贷款与还款",destination:LoansView())
-                NavigationLink("订阅与资金规划",destination:WealthToolsView())
-                NavigationLink("汇率换算",destination:ExchangeView())
-                Button("导入 / 导出账单",systemImage:"square.and.arrow.down") {importing=true}
-            } label:{Image(systemName:"ellipsis.circle").accessibilityLabel("账本工具")}} }
+            }.clipped()
+        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
             .sheet(item:$editing) {r in NavigationStack {RecordEditor(record:r)}.environmentObject(store)}
             .sheet(isPresented:$creating) {NavigationStack {RecordEditor()}.environmentObject(store)}
             .sheet(isPresented:$importing) {NavigationStack {ImportExportView()}.environmentObject(store)}

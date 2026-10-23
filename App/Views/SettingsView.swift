@@ -33,7 +33,7 @@ struct SettingsView:View {
 struct CloudSettingsView:View {
     @EnvironmentObject var store:AppStore
     @State var key=""
-    @State var models=["deepseek-chat","deepseek-reasoner"]
+    @State var models=["deepseek-flash","deepseek-v4-pro"]
     @State var custom=""
     @State var fetching=false
     @State var notice=false

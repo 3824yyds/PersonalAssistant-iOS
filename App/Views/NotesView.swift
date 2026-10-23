@@ -4,6 +4,7 @@ import Vision
 import VisionKit
 
 struct NotesView:View {
+    @Binding var sheet:RootSheet?
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @State var query=""
@@ -12,20 +13,24 @@ struct NotesView:View {
     @State var creating=false
     var notes:[Item] {store.current.notes.filter {n in (scope=="trash" ? n.int("deletedAt")>0:scope=="archived" ? n.bool("archived") && n.int("deletedAt")==0:!n.bool("archived") && n.int("deletedAt")==0) && (query.isEmpty || (n.text("title")+n.text("body")+n.text("folder")).localizedCaseInsensitiveContains(query))}.sorted {a,b in a.bool("pinned")==b.bool("pinned") ? a.int("updatedAt")>b.int("updatedAt"):a.bool("pinned")}}
     var body:some View {
-        List {
+        VStack(spacing:0) {
+            PageHeader(title:scope=="trash" ? "最近删除":scope=="archived" ? "已归档":"笔记",sheet:$sheet) {
+                Menu {Button("全部笔记") {scope="active"};Button("已归档") {scope="archived"};Button("最近删除") {scope="trash"};Button("新建笔记",systemImage:"plus") {creating=true}} label:{Image(systemName:"line.3.horizontal.decrease").accessibilityLabel("笔记筛选")}
+            }
+            List {
             if notes.isEmpty {EmptyState(icon:"note.text",title:query.isEmpty ? "记下此刻的想法":"没有找到笔记",subtitle:query.isEmpty ? "点右下角＋，开始写第一篇笔记":"换个关键词再试试").listRowBackground(Color.clear).listRowSeparator(.hidden)}
             ForEach(notes) {n in
                 Button {editing=n} label:{VStack(alignment:.leading,spacing:7) {
                     HStack(spacing:6) {if n.bool("pinned") {Image(systemName:"pin.fill").font(.caption2).foregroundStyle(Theme.accent)};Text(n.text("title")).font(.system(size:15,weight:.semibold)).foregroundStyle(.primary).lineLimit(1);Spacer()}
                     Text(NoteText.snippet(n.text("body"))).font(.system(size:13)).foregroundStyle(.secondary).lineLimit(2)
                     Text(Date(timeIntervalSince1970:Double(n.int("updatedAt"))/1000).formatted(.dateTime.month().day())+" · "+n.text("folder",fallback:"收件箱")).font(.system(size:10)).foregroundStyle(.tertiary)
-                }.padding(.vertical,8).contentShape(Rectangle())}.buttonStyle(.plain).accessibilityIdentifier("note.row.\(n.id)")
+                }.padding(.vertical,8).contentShape(Rectangle())}.buttonStyle(.plain).listRowBackground(Color.clear).accessibilityIdentifier("note.row.\(n.id)")
                     .swipeActions(edge:.trailing,allowsFullSwipe:false) {Button(role:.destructive) {mutate(n,key:"deletedAt",value:.int(Clock.milliseconds))} label:{Label("删除",systemImage:"trash")};if scope=="trash" {Button {mutate(n,key:"deletedAt",value:.int(0))} label:{Label("恢复",systemImage:"arrow.uturn.backward")}.tint(Theme.accent)}}
                     .contextMenu {Button(n.bool("pinned") ? "取消置顶":"置顶",systemImage:"pin") {mutate(n,key:"pinned",value:.bool(!n.bool("pinned")))};Button(n.bool("archived") ? "移出归档":"归档",systemImage:"archivebox") {mutate(n,key:"archived",value:.bool(!n.bool("archived")))}}
             }
-        }.listStyle(.plain).scrollContentBackground(.hidden).background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome()
-            .searchable(text:$query,prompt:"搜索笔记").navigationTitle(scope=="trash" ? "最近删除":scope=="archived" ? "已归档":"笔记").navigationBarTitleDisplayMode(.inline)
-            .toolbar {ToolbarItem(placement:.topBarLeading) {Menu {Button("全部笔记") {scope="active"};Button("已归档") {scope="archived"};Button("最近删除") {scope="trash"};Button("新建笔记",systemImage:"plus") {creating=true}} label:{Image(systemName:"line.3.horizontal.decrease").accessibilityLabel("笔记筛选")}}}
+            }.listStyle(.plain).scrollContentBackground(.hidden).clipped()
+            FloatingSearchField(text:$query,prompt:"搜索笔记")
+        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
             .sheet(item:$editing) {n in NavigationStack {NoteEditor(note:n)}.environmentObject(store)}
             .sheet(isPresented:$creating) {NavigationStack {NoteEditor()}.environmentObject(store)}
     }
@@ -82,7 +87,7 @@ struct NoteEditor:View {
             }.scrollDismissesKeyboard(.interactively)
             AppGlassGroup {VStack(spacing:10) {
                 if working {ProcessingBar(label:"正在整理笔记").padding(.horizontal,16)}
-                if tools && !working && proposal==nil {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.transition(.move(edge:.bottom).combined(with:.opacity))}
+                if tools && !working && proposal==nil {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.accessibilityIdentifier("note.ai.tools").transition(.move(edge:.bottom).combined(with:.opacity))}
                 HStack {
                     if let pending=proposal {
                         Button("取消") {proposal=nil}.accessibilityIdentifier("note.proposal.cancel")
@@ -91,7 +96,7 @@ struct NoteEditor:View {
                             .padding(.horizontal,20).padding(.vertical,10).appGlass(Capsule(),interactive:true,tinted:true).foregroundStyle(.white)
                             .accessibilityIdentifier("note.proposal.adopt")
                     } else {
-                        if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb().frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain)}
+                        if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb().frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("AI 工具").accessibilityIdentifier("note.ai.tools.toggle")}
                         if working {Button("取消") {cancelOperation()}.font(.caption)}
                         Spacer()
                         if undo != nil && !working {Button {if let previous=undo {title=previous.0;bodyText=previous.1;undo=nil}} label:{Image(systemName:"arrow.uturn.backward")}.accessibilityLabel("撤销采用")}

@@ -8,6 +8,7 @@ struct ChatMessage: Codable, Identifiable, Equatable, Sendable {
     var role: String
     var content: String
     var source: String = ""
+    var sources:[WebSource]? = nil
 }
 struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var id = UUID().uuidString
@@ -36,7 +37,7 @@ struct VoiceCaptureState:Equatable {
     @Published var hasVault = false
     @Published var hasAPIKey = false
     @Published var biometricEnabled = UserDefaults.standard.bool(forKey:"biometricEnabled")
-    @Published var model = "deepseek-chat"
+    @Published var model = "deepseek-flash"
     @Published private(set) var appearance=AppAppearance(rawValue:UserDefaults.standard.string(forKey:"appAppearance") ?? "system") ?? .system
     var key = Data(), salt = Data()
     var epoch = UUID()
@@ -93,7 +94,7 @@ struct VoiceCaptureState:Equatable {
             if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
             #endif
             d.accounts = Finance.accounts(d); document = d; hasVault = true
-            cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat")
+            cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(d.settings.text("model",fallback:"deepseek-flash"))
             restoreAppearance(d)
             Keychain.delete("attempts"); epoch = UUID(); await loadHistory()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -111,7 +112,7 @@ struct VoiceCaptureState:Equatable {
             let encrypted = try PrivateFiles.boundedRead(PrivateFiles.url())
             let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:saved)).validated()
             key = saved; salt = try VaultCrypto.salt(encrypted); var next = d; next.accounts = Finance.accounts(d); document = next
-            cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat"); epoch = UUID(); await loadHistory()
+            cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(d.settings.text("model",fallback:"deepseek-flash")); epoch = UUID(); await loadHistory()
             restoreAppearance(d)
         } catch { present(error) }
     }
@@ -132,7 +133,7 @@ struct VoiceCaptureState:Equatable {
             try change(&next); next = try next.validated(); let snapshot = next
             try await Task.detached(priority:.userInitiated) { try PrivateFiles.write(VaultCrypto.encrypt(snapshot.encoded(),key:key,salt:salt)) }.value
             guard token == epoch, document != nil else { return false }
-            document = next; cloudEnabled = next.settings.bool("cloudEnabled",fallback:true); model = next.settings.text("model",fallback:"deepseek-chat")
+            document = next; cloudEnabled = next.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(next.settings.text("model",fallback:"deepseek-flash"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             NotificationService.sync(next.records); return true
         } catch { present(error); return false }

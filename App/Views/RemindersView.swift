@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RemindersView:View {
+    @Binding var sheet:RootSheet?
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @State var query=""
@@ -8,14 +9,21 @@ struct RemindersView:View {
     @State var priority:Int64 = -1
     @State var editing:Item?
     var items:[Item] {store.current.records.filter {$0.text("kind")=="reminder" && $0.bool("completed")==showCompleted && (priority<0 || $0.int("priority",fallback:1)==priority) && (query.isEmpty || ($0.text("title")+$0.text("body")).localizedCaseInsensitiveContains(query))}.sorted {$0.int("due")<$1.int("due")}}
-    var body:some View {List {
+    var body:some View {
+        VStack(spacing:0) {
+            PageHeader(title:"提醒",sheet:$sheet) {
+                Menu {Toggle("查看已完成",isOn:$showCompleted);Picker("优先级",selection:$priority) {Text("全部优先级").tag(Int64(-1));Text("高").tag(Int64(2));Text("普通").tag(Int64(1));Text("低").tag(Int64(0))};Button("开启通知") {Task {if !(await NotificationService.request()) {store.error="通知未开启，请到系统设置允许本应用通知"} else {NotificationService.sync(store.current.records)}}}} label:{Image(systemName:"line.3.horizontal.decrease").accessibilityLabel("提醒筛选")}
+            }
+            List {
         if items.isEmpty {EmptyState(icon:"bell",title:showCompleted ? "还没有已完成提醒":"今天也能从容安排",subtitle:"点右下角＋，添加一项提醒").listRowSeparator(.hidden).listRowBackground(Color.clear)}
         ForEach(items) {r in HStack(alignment:.top,spacing:12) {
             Button {complete(r)} label:{Image(systemName:r.bool("completed") ? "checkmark.circle.fill":"circle").font(.system(size:22,weight:.light)).foregroundStyle(Theme.accent)}.buttonStyle(.borderless).accessibilityLabel("完成提醒")
             Button {editing=r} label:{VStack(alignment:.leading,spacing:6) {Text(r.text("title")).font(.system(size:15,weight:.medium)).foregroundStyle(.primary);Text(Date(timeIntervalSince1970:Double(r.int("due"))/1000).formatted(date:.abbreviated,time:.shortened)).font(.caption).foregroundStyle(r.int("due")<Clock.milliseconds && !r.bool("completed") ? Theme.expense:.secondary);if !r.text("body").isEmpty {Text(r.text("body")).font(.caption).foregroundStyle(.secondary).lineLimit(2)}}}.buttonStyle(.plain);Spacer();if r.int("priority")==2 {Image(systemName:"exclamationmark").foregroundStyle(Theme.expense).font(.caption)}
-        }.padding(.vertical,6).swipeActions {Button(role:.destructive) {Task {await store.commit {$0.records.removeAll {$0.id==r.id}}}} label:{Label("删除",systemImage:"trash")}}}
-    }.listStyle(.plain).scrollContentBackground(.hidden).background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().searchable(text:$query,prompt:"搜索提醒").navigationTitle("提醒").navigationBarTitleDisplayMode(.inline)
-        .toolbar {ToolbarItem(placement:.topBarLeading) {Menu {Toggle("查看已完成",isOn:$showCompleted);Picker("优先级",selection:$priority) {Text("全部优先级").tag(Int64(-1));Text("高").tag(Int64(2));Text("普通").tag(Int64(1));Text("低").tag(Int64(0))};Button("开启通知") {Task {if !(await NotificationService.request()) {store.error="通知未开启，请到系统设置允许本应用通知"} else {NotificationService.sync(store.current.records)}}}} label:{Image(systemName:"line.3.horizontal.decrease").accessibilityLabel("提醒筛选")}}}
+        }.padding(.vertical,6).listRowBackground(Color.clear).swipeActions {Button(role:.destructive) {Task {await store.commit {$0.records.removeAll {$0.id==r.id}}}} label:{Label("删除",systemImage:"trash")}}}
+
+            }.listStyle(.plain).scrollContentBackground(.hidden).clipped()
+            FloatingSearchField(text:$query,prompt:"搜索提醒")
+        }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
         .sheet(item:$editing) {r in NavigationStack {ReminderEditor(reminder:r)}.environmentObject(store)}
     }
     func complete(_ r:Item) {

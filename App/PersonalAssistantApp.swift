@@ -50,16 +50,15 @@ struct MainTabs: View {
             NavigationStack {
                 Group {
                     switch tab {
-                    case 1: LedgerView()
-                    case 2: RemindersView()
-                    case 3: ConversationView(onBack:{tab=previousTab})
-                    default: NotesView()
+                    case 1: LedgerView(sheet:$sheet)
+                    case 2: RemindersView(sheet:$sheet)
+                    case 3: ConversationView(onBack:{tab=previousTab},sheet:$sheet)
+                    default: NotesView(sheet:$sheet)
                     }
-                }.appClearChrome().toolbar {ToolbarControls(sheet:$sheet)}
-            }.id(tab)
-                .safeAreaInset(edge:.bottom,spacing:0) {
+                }.appClearChrome().safeAreaInset(edge:.bottom,spacing:0) {
                     if !keyboard.visible && tab != 3 {Color.clear.frame(height:60).allowsHitTesting(false)}
                 }
+            }.id(tab)
             if expanded {
                 Color.black.opacity(0.14).ignoresSafeArea().contentShape(Rectangle())
                     .onTapGesture {animate {expanded=false}}

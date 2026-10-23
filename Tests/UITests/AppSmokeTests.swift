@@ -132,7 +132,7 @@ final class AppSmokeTests:XCTestCase {
         for mode in ["润色","摘要","要点","会议纪要","行动清单"] {
             app.buttons["AI 工具"].tap()
             let tool=app.buttons[mode]
-            if !tool.isHittable {app.scrollViews.element(boundBy:1).swipeLeft()}
+            if !tool.isHittable {app.scrollViews["note.ai.tools"].swipeLeft()}
             tool.tap()
             let adopt=app.buttons["note.proposal.adopt"],cancel=app.buttons["note.proposal.cancel"]
             XCTAssertTrue(adopt.waitForExistence(timeout:5));XCTAssertEqual(app.navigationBars.count,1,"Result stays in the original editor")
@@ -140,7 +140,7 @@ final class AppSmokeTests:XCTestCase {
             attach(app,"Inline"+mode+"Result")
             cancel.tap();XCTAssertEqual(body.value as? String,original)
             app.buttons["AI 工具"].tap()
-            if !tool.isHittable {app.scrollViews.element(boundBy:1).swipeLeft()}
+            if !tool.isHittable {app.scrollViews["note.ai.tools"].swipeLeft()}
             tool.tap();XCTAssertTrue(adopt.waitForExistence(timeout:5));adopt.tap()
             let adopted=body.value as? String
             if mode=="润色" {XCTAssertEqual(adopted,"去公园散步，与朋友聚餐，也给自己留出休息的时间。")}
@@ -148,6 +148,22 @@ final class AppSmokeTests:XCTestCase {
             app.buttons["撤销采用"].tap();XCTAssertEqual(body.value as? String,original)
         }
         app.buttons["关闭"].tap()
+    }
+    func testWebAnswersHaveCompactExpandableSources() {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-search-fixture"];app.launch()
+        if app.buttons["创建资料库"].waitForExistence(timeout:5) {
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+        XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));app.buttons["助理"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["联网搜索 · 2 个来源"].waitForExistence(timeout:5));attach(app,"WebAnswerCompact")
+        app.buttons.containing(.staticText,identifier:"来源 · 2").firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"chat.source.1").firstMatch.waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["api-docs.deepseek.com · 2026-10-17"].exists)
+        attach(app,"WebAnswerSourcesExpanded")
+        app.buttons["聊天功能"].tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"chat.webSearch").firstMatch.waitForExistence(timeout:5));attach(app,"WebSearchMenu")
     }
     func luminance(_ app:XCUIApplication,point:CGPoint)->Double {
         guard let image=UIImage(data:app.screenshot().pngRepresentation)?.cgImage else {XCTFail("Missing screenshot");return -1}

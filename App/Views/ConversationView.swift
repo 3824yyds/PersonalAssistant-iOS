@@ -7,11 +7,13 @@ private struct BottomPreference:PreferenceKey {
 }
 struct ConversationView:View {
     var onBack:(()->Void)?
+    @Binding var sheet:RootSheet?
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @StateObject var speech=SpeechService()
     var input:String {get {store.chatDraft} nonmutating set {store.chatDraft=newValue}}
     var finance:Bool {store.financeMode}
+    @AppStorage("chat.webSearchEnabled") private var webSearch=true
     @State var voiceMode=false
     @State var holding=false
     @State var gestureStarted=false
@@ -22,10 +24,11 @@ struct ConversationView:View {
     @State var modelMenu=false
     @State var follow=true
     @State var viewport:CGFloat=0
-    @State var availableModels=["deepseek-chat","deepseek-reasoner"]
+    @State var availableModels=["deepseek-flash","deepseek-v4-pro"]
     @FocusState var focused:Bool
     var body:some View {
         VStack(spacing:0) {
+            header
             GeometryReader {geometry in
                 ScrollViewReader {proxy in
                     ScrollView {
@@ -40,20 +43,13 @@ struct ConversationView:View {
                         .onChange(of:store.messages.count) {_,_ in if follow {proxy.scrollTo("latest",anchor:.bottom)}}
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
-            }
+            }.clipped()
             VStack(spacing:8) {modePicker;composer}.layoutPriority(1)
         }
-            .appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement:.topBarLeading) {Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:18)).frame(minWidth:28,minHeight:28)}.accessibilityLabel("返回")}
-                if #available(iOS 26.0,*) {ToolbarSpacer(.fixed,placement:.topBarLeading)}
-                if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
-                ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
-                Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
-            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.medium));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.accessibilityIdentifier("chat.model").disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.medium)).foregroundStyle(.primary)}}}
+            .background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
             .onAppear {
                 #if DEBUG
-                DebugFixtures.showThinking(in:store)
+                DebugFixtures.showThinking(in:store);DebugFixtures.showSearchResults(in:store)
                 #endif
                 store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}
             }
@@ -61,6 +57,20 @@ struct ConversationView:View {
             .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
+    }
+    var header:some View {
+        HStack(spacing:8) {
+            Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
+            if !finance {
+                Menu {
+                    ForEach(availableModels,id:\.self) {model in Button {Task {await store.setting("model",.string(model))}} label:{HStack {Text(modelLabel(model));if store.model==model {Image(systemName:"checkmark")}}}}
+                    Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
+                } label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
+                    .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
+            } else {Text("财务咨询").font(.system(size:15,weight:.medium))}
+            Spacer(minLength:0)
+            HeaderControls(sheet:$sheet)
+        }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
     }
     var modePicker:some View {
         HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
@@ -76,6 +86,9 @@ struct ConversationView:View {
     var composer:some View {
         HStack(alignment:.bottom,spacing:8) {
             Menu {
+                Section {
+                    Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
+                } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
                     Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
@@ -137,13 +150,19 @@ struct ConversationView:View {
         guard !question.isEmpty,!store.assistantBusy else{return}
         guard question.count<=20000 else {store.error="消息过长，请分段发送";return}
         input="";focused=false;follow=true
-        let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model
+        let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model,searchEnabled=webSearch
         store.messages.append(ChatMessage(role:"user",content:question))
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
         store.activeTask=Task {
             defer {if store.epoch==epoch && store.activeReplyID==answerID {store.assistantBusy=false;store.activeReplyID=nil}}
             do {
-                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model) {partial in guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial}
+                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,onPartial:{partial in
+                    guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial
+                },onSources:{sources in
+                    guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].sources=sources
+                },onStatus:{status in
+                    guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].source=status
+                })
                 try Task.checkCancellation();guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
             }catch is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
             catch {if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};store.present(error)}}
@@ -160,9 +179,10 @@ struct ChatBubble:View {
                 if message.role != "user" {Text(message.source).font(.system(size:10)).foregroundStyle(.secondary)}
                 VStack(alignment:.leading,spacing:10) {
                     if message.content.isEmpty && working {Text("正在思考…").font(.subheadline).aiText(revealing:true).padding(.vertical,4)}
-                    else {MarkdownBody(text:message.content).aiText(revealing:working && message.role != "user")}
+                    else {MarkdownBody(text:WebEvidence.cited(message.content,sources:message.sources ?? [])).aiText(revealing:working && message.role != "user")}
                 }.padding(message.role=="user" ? 13:0)
                     .background(message.role=="user" ? Theme.accent.opacity(0.09):.clear,in:RoundedRectangle(cornerRadius:17,style:.continuous))
+                if message.role != "user",let sources=message.sources,!sources.isEmpty {WebSourcesView(sources:sources)}
                 if message.role != "user" && !working {Button {UIPasteboard.general.string=message.content;UIImpactFeedbackGenerator(style:.light).impactOccurred()} label:{Image(systemName:"doc.on.doc").font(.system(size:13)).frame(width:32,height:30)}.foregroundStyle(.secondary).accessibilityLabel("复制回答")}
             }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             if message.role != "user" {Spacer(minLength:6)}

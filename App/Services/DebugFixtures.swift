@@ -7,6 +7,10 @@ enum DebugFixtures {
         NoteAIProposal(mode:mode,source:NoteTextVersion(title:title,body:body),result:NoteTextVersion(title:mode=="润色" ? "从容的周末":title,body:mode=="润色" ? "去公园散步，与朋友聚餐，也给自己留出休息的时间。":"## "+mode+"\n\n安排散步、聚餐与休息。"),evidence:mode=="润色" ? []:["想去公园走走。"])
     }
     static var motion:Bool {ProcessInfo.processInfo.arguments.contains("--ui-motion-fixture")}
+    @MainActor static func showSearchResults(in store:AppStore) {
+        guard ProcessInfo.processInfo.arguments.contains("--ui-search-fixture") else {return}
+        store.messages=[ChatMessage(role:"user",content:"DeepSeek 现在支持联网搜索了吗？"),ChatMessage(role:"assistant",content:"已正式开放网页搜索与抓取接口。[1]\n\n- Search 返回网页搜索结果；Fetch 提取网页正文。[1]\n- 两个接口分别按 5 元／千次成功请求计费。[2]",source:"联网搜索 · 2 个来源",sources:[WebSource(title:"DeepSeek 网页搜索与抓取",url:"https://api-docs.deepseek.com/zh-cn/guides/search/",date:"2026-10-17T00:00:00Z"),WebSource(title:"DeepSeek API 模型与价格",url:"https://api-docs.deepseek.com/zh-cn/quick_start/pricing/")])]
+    }
     @MainActor static func showThinking(in store:AppStore) {
         guard motion else {return}
         store.messages=[ChatMessage(role:"user",content:"帮我整理一下周末计划"),ChatMessage(role:"assistant",content:"可以把周末安排分成出行、休息和准备三部分。",source:"云端回答")]
