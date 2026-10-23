@@ -4,7 +4,7 @@ public enum CSV {
     public static func parse(_ source: String) throws -> [[String]] {
         guard source.utf8.count <= 12*1024*1024 else { throw AppError.message("CSV 过大，请按月份分开导入") }
         var rows: [[String]] = [], row: [String] = [], cell = "", quoted = false
-        let chars = Array(source.replacingOccurrences(of:"\u{FEFF}",with:"")); var i = 0
+        let chars = Array(source.replacingOccurrences(of:"\u{FEFF}",with:"").replacingOccurrences(of:"\r\n",with:"\n")); var i = 0
         while i < chars.count {
             let c = chars[i]
             if c == "\"" {
