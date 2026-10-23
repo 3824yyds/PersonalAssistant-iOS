@@ -1,3 +1,4 @@
+import UIKit
 import SwiftUI
 
 private struct BottomPreference:PreferenceKey {

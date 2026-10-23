@@ -107,6 +107,7 @@ public struct Document: Codable, Equatable, Sendable {
         for (id, refunds) in Dictionary(grouping: records.filter { $0.text("kind") == "refund" }, by: { $0.text("linkId") }) {
             guard let expense = expenses[id], refunds.allSatisfy({ $0.text("currency") == expense.text("currency") }), refunds.reduce(Int64(0), { $0 + $1.int("cents") }) <= expense.int("cents") else { throw AppError.message("退款缺少原支出或累计退款超过原金额") }
         }
+        try Validation.extra(self)
         return self
     }
 }
