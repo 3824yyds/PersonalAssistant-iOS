@@ -36,7 +36,7 @@ struct ConversationView:View {
                         .onPreferenceChange(BottomPreference.self) {y in follow=y<geometry.size.height+80}
                         .onChange(of:store.messages.last?.content) {_,_ in if follow {proxy.scrollTo("latest",anchor:.bottom)}}
                         .onChange(of:store.messages.count) {_,_ in if follow {proxy.scrollTo("latest",anchor:.bottom)}}
-                        .overlay(alignment:.bottom) {if !follow {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
+                        .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }
             if tools {HStack(spacing:12) {Button {finance=false;tools=false} label:{Label("聊天",systemImage:"bubble.left.and.bubble.right")};Button {finance=true;tools=false} label:{Label("财务咨询",systemImage:"chart.bar.xaxis")};Spacer()}.font(.subheadline).padding(16).background(Theme.panel(scheme))}

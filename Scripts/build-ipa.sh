@@ -10,6 +10,7 @@ xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant \
   CODE_SIGN_IDENTITY='' build > build/device-build.log 2>&1 || { tail -n 100 build/device-build.log; exit 1; }
 app=build/DerivedData/Build/Products/Release-iphoneos/PersonalAssistant.app
 test -f "$app/PersonalAssistant"
+cp App/Resources/OpenSourceLicenses.txt "$app/OpenSourceLicenses.txt"
 rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R "$app" build/ipa/Payload/

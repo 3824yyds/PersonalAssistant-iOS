@@ -21,8 +21,8 @@ sources=[];resources=[];groups=[]
 for p in sorted((ROOT/'App').rglob('*')):
     if p.suffix in ['.swift','.cpp']:
         file=ref(str(p.relative_to(ROOT)),'sourcecode.swift' if p.suffix=='.swift' else 'sourcecode.cpp.cpp');sources.append(build(file));groups.append(file)
-for p in [ROOT/'App/Resources/Assets.xcassets',ROOT/'App/Resources/AccountPresets.json',ROOT/'App/Resources/CardArtwork.json',ROOT/'App/Resources/PrivacyInfo.xcprivacy']:
-    file=ref(str(p.relative_to(ROOT)),'folder.assetcatalog' if p.suffix=='.xcassets' else 'text.plist.xml' if p.suffix=='.xcprivacy' else 'text.json');resources.append(build(file));groups.append(file)
+for p in [ROOT/'App/Resources/Assets.xcassets',ROOT/'App/Resources/AccountPresets.json',ROOT/'App/Resources/CardArtwork.json',ROOT/'App/Resources/PrivacyInfo.xcprivacy',ROOT/'App/Resources/OpenSourceLicenses.txt']:
+    file=ref(str(p.relative_to(ROOT)),'folder.assetcatalog' if p.suffix=='.xcassets' else 'text.plist.xml' if p.suffix=='.xcprivacy' else 'text' if p.suffix=='.txt' else 'text.json');resources.append(build(file));groups.append(file)
 app=add('product','PBXFileReference',explicitFileType='wrapper.application',path='PersonalAssistant.app',sourceTree='BUILT_PRODUCTS_DIR')
 product_refs=[app]
 app_id=uid('app-target')
