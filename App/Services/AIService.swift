@@ -80,7 +80,7 @@ enum AIService {
     static func reply(_ question: String, finance: Bool, document: Document, history: [ChatMessage], cloud: Bool, model: String, onPartial: (@MainActor @Sendable (String)->Void)? = nil) async throws -> (String,String) {
         let financePrompt = "你是专业、审慎的个人财务助理，只回答财务问题。分析用户全部已提供财务状况，区分实际数据与建议，先给结论、再给依据和可执行计划。根据地区、收入、必要支出、债务和目标调整，缺少条件时说明假设。法律风险应区分持牌金融机构与民间借贷，不能统一套用利率上限，不作未经核实的法律结论。不代替用户记账或转账。"
         let chatPrompt = "你是友好、直接的个人智能助理，正常回答聊天、写作、编程和知识问题。不要因为数字就把问题当作个人财务分析。只有用户问应用操作时才根据已给出的应用操作说明回答。"
-        let help = "应用操作：底部导航依次为笔记、账本、提醒、助理。右下角＋展开笔记、记账、提醒。卡包入口位于主页右上角。新建账户时一并编辑卡片资料。账本有流水、统计、日历、预算。个人详情可配置 DeepSeek、本机模型、记忆、外观、安全和加密备份。笔记编辑底部的 AI 工具可润色标题与正文、提取摘要/要点/会议纪要/行动清单；采用前均可预览。"
+        let help = "应用操作：底部导航依次为笔记、账本、提醒、助理。右下角＋展开笔记、记账、提醒。卡包入口位于主页右上角。新建账户时一并编辑卡片资料。账本有流水、统计、日历、预算。个人详情可配置 DeepSeek、本机模型、记忆、外观、安全和加密备份。笔记编辑底部的 AI 工具可润色标题与正文、提取摘要/要点/会议纪要/行动清单；采用前均可预览。个人详情顶部可更换个人头像，从系统相册选择照片或使用预设。系统解锁在个人详情启用，锁定后点击登录页 Face ID 图标。聊天输入区左侧声波按钮切换到按住说话，普通松开后发送识别文字，左滑取消，右滑转文字核对；键盘按钮切回文字输入。输入区＋提供聊天、财务咨询、新对话和历史对话。卡包自动匹配机构、类型和卡组织，可在编辑账户的卡片部分切换卡面。"
         var system = (finance ? financePrompt : chatPrompt) + "\n" + help
         if finance { system += "\n" + financeContext(document) }
         else if document.root.raw["assistantMemory"]?.object["enabled"]?.flag != false {

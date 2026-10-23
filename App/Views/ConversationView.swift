@@ -53,7 +53,7 @@ struct ConversationView:View {
             } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}}
             .onAppear {store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
-            .onDisappear {cancelVoice()}
+            .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
     }
