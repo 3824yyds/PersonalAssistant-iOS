@@ -1,15 +1,15 @@
 # 只有 iPhone 时的签名与安装
 
-1. 获取交付的 `PersonalAssistant-iOS-3.5.1-unsigned.ipa`，不要下载 Android APK 或源码ZIP当作安装包。
+1. 获取交付的 `PersonalAssistant-iOS-3.5.1-build2-unsigned.ipa`，源码 ZIP 不能当作安装包。
 2. 在你已经使用的 iOS 签名工具中导入 IPA，选择你自己的有效签名证书及对应描述文件，然后签名安装。不同工具具体界面不同，以其说明为准。
 3. 如系统要求，在“设置 → 通用 → VPN与设备管理”中完成相应信任。开发者签名方式可能还需要在“设置 → 隐私与安全性”开启开发者模式；是否出现取决于签名/安装方式。
-4. 初次启动创建资料库密码；进入“个人详情 → 加密备份与恢复”导入旧版 Android 的**完整** `.pavault` 文件，并输入原备份密码。资料库当前密码继续用于后续备份。
-5. 在“个人详情 → 云端智能”保存自己的 DeepSeek Key，刷新模型列表。它不会从 Android 或源码中自动转移。
-6. 可在“本机智能”下载约1.12GB模型，或导入旧版对应的完整GGUF。录音和拍照首次使用会申请系统权限。
+4. 初次启动创建资料库密码；已经使用本应用时请保留相同应用标识和签名进行更新，更新前导出加密备份。
+5. 在“个人详情 → 云端智能”保存自己的 DeepSeek Key，刷新模型列表。密钥只保存在本机钥匙串中。
+6. 可在“本机智能”下载约1.12GB模型，或导入对应的完整 GGUF。录音和拍照首次使用会申请系统权限。
 
 ## 从 GitHub 构建获取 IPA
 
-在手机浏览器打开本工程私有仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
+在手机浏览器打开本工程私有仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-build2-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
 
 手动重新运行时选择 `Run workflow`。流程会先运行核心测试、iPhone模拟器测试，再构建Metal原生库及真正的iOS arm64程序。生成时不上传你的证书，不使用Apple ID，也不提交App Store。
 

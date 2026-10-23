@@ -15,13 +15,13 @@ struct WalletView: View {
             VStack(alignment:.leading,spacing:16) {
                 HStack {Text("我的卡片 · \(cards.count)").font(.headline);Spacer();if cards.count>2 {Button(expanded ? "收起":"查看全部") {withAnimation(Theme.normal) {expanded.toggle();selected=nil}}.font(.caption)}}
                 if cards.isEmpty {EmptyState(icon:"creditcard",title:"把账户收进卡包",subtitle:"添加银行卡或信用卡，余额会与账本同步")}
-                VStack(spacing:expanded || cards.count<=2 ? 16:-142) {
+                WalletStackLayout(expansion:expanded || cards.count<=2 ? 1:0) {
                     ForEach(cards) {a in
                         VStack(spacing:0) {
                             Button {
                                 if !expanded && cards.count>2 {withAnimation(Theme.normal) {expanded=true};return}
                                 withAnimation(Theme.normal) {selected=selected==a.id ? nil:a.id}
-                            } label:{CardFace(account:a,card:store.current.wallet.items("cards").first {$0.text("accountId")==a.id})}.buttonStyle(.plain)
+                            } label:{CardFace(account:a,card:store.current.wallet.items("cards").first {$0.text("accountId")==a.id})}.buttonStyle(.plain).accessibilityIdentifier("wallet.card.\(a.id)")
                             if selected==a.id && (expanded || cards.count<=2) {
                                 CardDetailsView(account:a).padding(16).frame(maxWidth:.infinity).background(Theme.panel(scheme)).transition(.opacity.combined(with:.move(edge:.top)))
                             }
@@ -37,24 +37,55 @@ struct WalletView: View {
     }
 }
 
+/// Each folded card keeps a visible strip; height follows the actual card ratio, not a negative spacing constant.
+struct WalletStackLayout:Layout {
+    var expansion:CGFloat
+    var animatableData:CGFloat {get {expansion} set {expansion=newValue}}
+    func sizeThatFits(proposal:ProposedViewSize,subviews:Subviews,cache:inout ()) -> CGSize {
+        let width=proposal.width ?? 320
+        let sizes=subviews.map {$0.sizeThatFits(ProposedViewSize(width:width,height:nil))}
+        let height=sizes.enumerated().reduce(CGFloat(0)) {sum,entry in
+            sum + (entry.offset==sizes.count-1 ? entry.element.height:60+(entry.element.height+16-60)*expansion)
+        }
+        return CGSize(width:width,height:height)
+    }
+    func placeSubviews(in bounds:CGRect,proposal:ProposedViewSize,subviews:Subviews,cache:inout ()) {
+        var y=bounds.minY
+        for view in subviews {
+            let size=view.sizeThatFits(ProposedViewSize(width:bounds.width,height:nil))
+            view.place(at:CGPoint(x:bounds.minX,y:y),anchor:.topLeading,proposal:ProposedViewSize(width:bounds.width,height:size.height))
+            y += 60+(size.height+16-60)*expansion
+        }
+    }
+}
+
 struct CardFace:View {
     var account:Item,card:Item?
     var art:CardArtwork? {Artwork.cards.first {$0.id==card?.text("design")}}
     var body:some View {
         GeometryReader {proxy in
-            ZStack(alignment:.bottomTrailing) {
-                if let art {Image(art.id).resizable().interpolation(.high).scaledToFill().frame(width:proxy.size.width,height:206).clipped()}
-                else {
+            Group {
+                if let art {
+                    Image(art.id).resizable().interpolation(.high).scaledToFill()
+                        .frame(width:proxy.size.width,height:proxy.size.height).clipped()
+                } else {
                     LinearGradient(colors:account.text("type")=="credit" ? [Color(red:0.12,green:0.15,blue:0.22),Color(red:0.22,green:0.29,blue:0.39)]:[Color(red:0.16,green:0.36,blue:0.65),Color(red:0.35,green:0.55,blue:0.78)],startPoint:.topLeading,endPoint:.bottomTrailing)
-                    Circle().stroke(.white.opacity(0.08),lineWidth:50).frame(width:250,height:250).offset(x:80,y:70)
-                    VStack(alignment:.leading,spacing:8) {HStack {AccountIcon(name:account.text("name"),type:account.text("type"));Text(account.text("name")).font(.system(size:17,weight:.semibold));Spacer()};Text(account.text("type")=="credit" ? "CREDIT":"DEBIT").font(.system(size:9,weight:.medium)).tracking(3);Spacer()}.foregroundStyle(.white).padding(20)
+                        .overlay(alignment:.trailing) {Circle().stroke(.white.opacity(0.08),lineWidth:50).frame(width:250,height:250).offset(x:80,y:70).allowsHitTesting(false)}
+                        .overlay(alignment:.topLeading) {
+                            VStack(alignment:.leading,spacing:8) {
+                                HStack(spacing:9) {AccountIcon(name:account.text("name"),type:account.text("type"));Text(account.text("name")).font(.system(size:16,weight:.semibold)).lineLimit(1).minimumScaleFactor(0.75)}
+                                Text(account.text("type")=="credit" ? "CREDIT":"DEBIT").font(.system(size:9,weight:.medium)).tracking(3)
+                            }.foregroundStyle(.white).padding(18)
+                        }
                 }
-                HStack(alignment:.bottom,spacing:10) {
-                    if let card,!card.text("lastFour").isEmpty {Text("•••• "+card.text("lastFour")).font(.system(size:13,weight:.semibold,design:.monospaced)).shadow(radius:2)}
-                    NetworkMark(network:card?.text("network") ?? "")
-                }.foregroundStyle(.white).padding(16)
-            }.frame(height:206).contentShape(Rectangle())
-        }.frame(height:206).accessibilityLabel(account.text("name")+"，尾号"+(card?.text("lastFour") ?? "未设置"))
+            }.frame(width:proxy.size.width,height:proxy.size.height)
+                .overlay(alignment:.bottomTrailing) {
+                    HStack(alignment:.center,spacing:10) {
+                        if let card,!card.text("lastFour").isEmpty {Text("•••• "+card.text("lastFour")).font(.system(size:13,weight:.semibold,design:.monospaced)).shadow(color:.black.opacity(0.4),radius:2).accessibilityIdentifier("card.lastFour.\(account.id)")}
+                        NetworkMark(network:card?.text("network") ?? "").accessibilityIdentifier("card.network.\(account.id)")
+                    }.foregroundStyle(.white).padding(16)
+                }.clipped().contentShape(Rectangle())
+        }.aspectRatio(1.586,contentMode:.fit).accessibilityLabel(account.text("name")+"，尾号"+(card?.text("lastFour") ?? "未设置"))
     }
 }
 struct NetworkMark:View {

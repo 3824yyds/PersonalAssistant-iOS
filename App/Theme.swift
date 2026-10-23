@@ -1,5 +1,20 @@
 import UIKit
 import SwiftUI
+import Combine
+
+@MainActor final class KeyboardVisibility: ObservableObject {
+    @Published private(set) var visible = false
+    private var observers = Set<AnyCancellable>()
+    init() {
+        NotificationCenter.default.publisher(for:UIResponder.keyboardWillChangeFrameNotification)
+            .receive(on:RunLoop.main).sink { [weak self] notification in
+                guard let frame=notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else {return}
+                self?.visible = frame.minY < UIScreen.main.bounds.maxY && frame.height>0
+            }.store(in:&observers)
+        NotificationCenter.default.publisher(for:UIResponder.keyboardWillHideNotification)
+            .receive(on:RunLoop.main).sink { [weak self] _ in self?.visible=false }.store(in:&observers)
+    }
+}
 
 enum Theme {
     static let accent = Color(red:0.153,green:0.384,blue:0.765)
@@ -9,7 +24,7 @@ enum Theme {
     static let expense = Color(red:0.78,green:0.36,blue:0.08)
     static let income = Color(red:0.05,green:0.49,blue:0.36)
     static let colors: [Color] = [.cyan,accent,.orange,.purple,.pink,.teal,.indigo,.mint]
-    static func background(_ scheme: ColorScheme) -> Color { scheme == .dark ? .black:Color(red:0.957,green:0.961,blue:0.957) }
+    static func background(_ scheme: ColorScheme) -> Color { scheme == .dark ? .black:Color(white:0.965) }
     static func panel(_ scheme: ColorScheme) -> Color { scheme == .dark ? Color(white:0.082):.white }
     static func finance(_ kind: String) -> Color { switch kind { case "income": return income; case "refund":return accent; case "loan_in":return .purple; case "loan_principal":return .pink; default:return expense } }
     static let categories = ["餐饮","交通","购物","生活","住房","医疗","教育","娱乐","旅行","通讯","订阅","其他"]
@@ -38,22 +53,88 @@ struct EmptyState: View {
     var subtitle: String
     var body: some View { VStack(spacing:12) { Image(systemName:icon).font(.system(size:32,weight:.light)).foregroundStyle(Theme.accent).frame(width:68,height:68).background(Theme.accent.opacity(0.07),in:Circle()); Text(title).font(.headline); Text(subtitle).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center) }.frame(maxWidth:.infinity).padding(.vertical,42) }
 }
+/// Native glass for controls; content cards stay solid for reading contrast.
+struct AppGlass<S:Shape>:ViewModifier {
+    var shape:S
+    var interactive=false
+    var tinted=false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var scheme
+    @ViewBuilder func body(content:Content)->some View {
+        if #available(iOS 26.0,*),!reduceTransparency {
+            content.glassEffect(.regular.tint(tinted ? Theme.accent:.clear).interactive(interactive),in:shape)
+        } else {
+            content.background(tinted ? Theme.accent:Theme.panel(scheme),in:shape)
+        }
+    }
+}
+extension View {
+    func appGlass<S:Shape>(_ shape:S,interactive:Bool=false,tinted:Bool=false)->some View {modifier(AppGlass(shape:shape,interactive:interactive,tinted:tinted))}
+    func aiActivity(_ active:Bool,cornerRadius:CGFloat=17)->some View {overlay {AIActivityOutline(active:active,radius:cornerRadius).allowsHitTesting(false).accessibilityHidden(true)}}
+}
+struct AppGlassGroup<Content:View>:View {
+    @ViewBuilder var content:()->Content
+    @ViewBuilder var body:some View {
+        if #available(iOS 26.0,*) {GlassEffectContainer(spacing:12,content:content)} else {content()}
+    }
+}
+
+/// Blue-and-white cloud sphere, drawn at the displayed resolution with no bitmap edges.
 struct AIOrb: View {
-    var active = false
-    @Environment(\.accessibilityReduceMotion) var reduced
-    @State private var phase = false
-    var body: some View {
-        Circle().fill(LinearGradient(colors:[Color(red:0.48,green:0.81,blue:1),Theme.accent,.white.opacity(0.85)],startPoint:phase ? .topLeading:.bottomTrailing,endPoint:phase ? .bottomTrailing:.topLeading))
-            .overlay { Circle().fill(RadialGradient(colors:[.white.opacity(0.8),.clear],center:.topLeading,startRadius:0,endRadius:30)).padding(3) }
-            .scaleEffect(active && phase ? 1.04:1)
-            .animation(active && !reduced ? .easeInOut(duration:1.6).repeatForever(autoreverses:true):.default,value:phase)
-            .onAppear { phase = active }.onChange(of:active) { _,v in phase = v }
-            .accessibilityLabel(active ? "AI 正在处理":"智能助理")
+    var active=false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var body:some View {
+        TimelineView(.animation(minimumInterval:1.0/30,paused:!active || reduced)) { timeline in
+            let time=active && !reduced ? timeline.date.timeIntervalSinceReferenceDate:0
+            Canvas { context,size in
+                let bounds=CGRect(origin:.zero,size:size),side=min(size.width,size.height)
+                context.clip(to:Path(ellipseIn:bounds))
+                context.fill(Path(ellipseIn:bounds),with:.radialGradient(Gradient(colors:[.white,Color(red:0.75,green:0.89,blue:1),Color(red:0.16,green:0.43,blue:0.91)]),center:CGPoint(x:side*0.32,y:side*0.18),startRadius:0,endRadius:side))
+                var clouds=context
+                clouds.addFilter(.blur(radius:side*0.12))
+                for i in 0..<5 {
+                    let phase=time*0.48+Double(i)*1.31
+                    let x=side*(0.5+CGFloat(sin(phase))*0.22)
+                    let y=side*(0.48+CGFloat(cos(phase*0.83+Double(i)))*0.23)
+                    let width=side*(i%2==0 ? 0.88:0.64)
+                    let cloud=Path(ellipseIn:CGRect(x:x-width/2,y:y-side*0.23,width:width,height:side*0.46))
+                    let color:Color=i%2==0 ? .white:Color(red:0.18,green:0.51,blue:0.96)
+                    clouds.fill(cloud,with:.color(color.opacity(i%2==0 ? 0.82:0.65)))
+                }
+            }.clipShape(Circle())
+        }.accessibilityLabel(active ? "AI 正在处理":"智能助理")
+    }
+}
+struct AIActivityOutline:View {
+    var active:Bool
+    var radius:CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var body:some View {
+        if active {
+            TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
+                let angle=reduced ? 0:timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:4)*90
+                RoundedRectangle(cornerRadius:radius,style:.continuous)
+                    .strokeBorder(AngularGradient(colors:[Theme.accent.opacity(0.08),.cyan.opacity(0.7),Theme.accent.opacity(0.9),.white.opacity(0.75),Theme.accent.opacity(0.08)],center:.center,angle:.degrees(angle)),lineWidth:1.5)
+            }
+        }
     }
 }
 struct ProcessingBar: View {
-    var label: String
-    var body: some View { VStack(alignment:.leading,spacing:8) { HStack { AIOrb(active:true).frame(width:18,height:18); Text(label).font(.caption).foregroundStyle(.secondary); Spacer() }; ProgressView().progressViewStyle(.linear).tint(Theme.accent) }.padding(12).background(Theme.accent.opacity(0.06),in:RoundedRectangle(cornerRadius:12)).clipShape(RoundedRectangle(cornerRadius:12)) }
+    var label:String
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var body:some View {
+        VStack(alignment:.leading,spacing:10) {
+            HStack(spacing:8) {AIOrb(active:true).frame(width:22,height:22);Text(label).font(.caption).foregroundStyle(.secondary);Spacer()}
+            TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
+                GeometryReader {proxy in
+                    let fraction=reduced ? 0.5:(sin(timeline.date.timeIntervalSinceReferenceDate*2)+1)/2
+                    Capsule().fill(Theme.accent.opacity(0.10))
+                        .overlay(alignment:.leading) {Capsule().fill(LinearGradient(colors:[.cyan,Theme.accent],startPoint:.leading,endPoint:.trailing)).frame(width:max(24,proxy.size.width*0.3)).offset(x:(proxy.size.width*0.7)*fraction)}
+                        .clipShape(Capsule())
+                }.frame(height:3)
+            }.accessibilityLabel("正在处理")
+        }.padding(12).appGlass(RoundedRectangle(cornerRadius:14)).aiActivity(true,cornerRadius:14)
+    }
 }
 struct AccountPreset: Codable, Identifiable {
     var name: String, type: String, currency: String, region: String
@@ -89,7 +170,7 @@ struct ToolbarControls: ToolbarContent {
     var body: some ToolbarContent {
         ToolbarItemGroup(placement:.topBarTrailing) {
             Button { sheet = .wallet } label: { Image(systemName:"creditcard").font(.system(size:19,weight:.regular)) }.accessibilityLabel("卡包与资产")
-            Button { sheet = .profile } label: { Image(systemName:"person.crop.circle").font(.system(size:23,weight:.regular)) }.accessibilityLabel("个人详情")
+            Button { sheet = .profile } label: { ProfilePortrait(size:30) }.accessibilityLabel("个人详情")
         }
     }
 }

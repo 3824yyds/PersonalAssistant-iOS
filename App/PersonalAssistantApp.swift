@@ -26,19 +26,27 @@ struct MainTabs: View {
     @State var tab = 0
     @State var expanded = false
     @State var sheet: RootSheet?
+    @StateObject private var keyboard = KeyboardVisibility()
     let tabs = [("笔记","note.text"),("账本","book.closed"),("提醒","bell"),("助理","bubble.left.and.bubble.right")]
     var body: some View {
         ZStack {
             Theme.background(scheme).ignoresSafeArea()
-            TabView(selection:$tab) {
-                NavigationStack { NotesView().toolbar { ToolbarControls(sheet:$sheet) } }.tag(0)
-                NavigationStack { LedgerView().toolbar { ToolbarControls(sheet:$sheet) } }.tag(1)
-                NavigationStack { RemindersView().toolbar { ToolbarControls(sheet:$sheet) } }.tag(2)
-                NavigationStack { ConversationView().toolbar { ToolbarControls(sheet:$sheet) } }.tag(3)
-            }.toolbar(.hidden,for:.tabBar)
+            // One navigation container avoids TabView applying keyboard insets a second time.
+            NavigationStack {
+                Group {
+                    switch tab {
+                    case 1: LedgerView()
+                    case 2: RemindersView()
+                    case 3: ConversationView()
+                    default: NotesView()
+                    }
+                }.toolbar { ToolbarControls(sheet:$sheet) }
+            }
             if expanded { Color.black.opacity(0.14).ignoresSafeArea().onTapGesture { animate { expanded=false } } }
         }
         .safeAreaInset(edge:.bottom,spacing:0) {
+            if !keyboard.visible {
+            AppGlassGroup {
             HStack(spacing:0) {
                 ForEach(0..<tabs.count,id:\.self) { i in
                     Button { expanded=false; tab=i } label: {
@@ -46,9 +54,9 @@ struct MainTabs: View {
                     }.buttonStyle(.plain).accessibilityAddTraits(tab==i ? .isSelected:[])
                 }
                 Button { animate { expanded.toggle() }; UIImpactFeedbackGenerator(style:.light).impactOccurred() } label: {
-                    Image(systemName:"plus").font(.system(size:22,weight:.regular)).rotationEffect(.degrees(expanded ? 45:0)).frame(width:44,height:44).background(Theme.accent,in:Circle()).foregroundStyle(.white)
+                    Image(systemName:"plus").font(.system(size:22,weight:.regular)).rotationEffect(.degrees(expanded ? 45:0)).frame(width:44,height:44).appGlass(Circle(),interactive:true,tinted:true).foregroundStyle(.white)
                 }.buttonStyle(.plain).accessibilityLabel(expanded ? "收起快捷操作":"展开快捷操作").padding(.leading,8).padding(.trailing,16)
-            }.padding(.vertical,6).background(Theme.panel(scheme))
+            }.padding(.vertical,6).padding(.leading,8).appGlass(Capsule())
                 .overlay(alignment:.bottomTrailing) {
                     if expanded {
                         VStack(spacing:10) {
@@ -58,7 +66,11 @@ struct MainTabs: View {
                         }.padding(.trailing,16).padding(.bottom,66).transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
                     }
                 }
+                .padding(.horizontal,12).padding(.bottom,4)
+            }
+            }
         }
+        .onChange(of:keyboard.visible) { _,visible in if visible {expanded=false} }
         .sheet(item:$sheet) { value in
             NavigationStack {
                 switch value { case .note:NoteEditor();case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }
@@ -66,7 +78,7 @@ struct MainTabs: View {
         }
     }
     func quick(_ icon:String,_ title:String,_ target:RootSheet)->some View {
-        Button { expanded=false; sheet=target } label: {Image(systemName:icon).font(.system(size:19,weight:.regular)).frame(width:44,height:44).background(Theme.panel(scheme),in:Circle()).foregroundStyle(Theme.accent).shadow(color:.black.opacity(0.08),radius:8,y:2)}.buttonStyle(.plain).accessibilityLabel(title)
+        Button { expanded=false; sheet=target } label: {Image(systemName:icon).font(.system(size:19,weight:.regular)).frame(width:44,height:44).appGlass(Circle(),interactive:true).foregroundStyle(Theme.accent)}.buttonStyle(.plain).accessibilityLabel(title)
     }
     func animate(_ body:()->Void) { withAnimation(reduceMotion ? nil:Theme.normal,body) }
 }
@@ -75,24 +87,28 @@ struct UnlockView: View {
     @EnvironmentObject var store: AppStore
     @State var password = ""
     @State var confirmation = ""
-    @State var showPassword = false
+    @FocusState private var passwordFocused: Bool
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                Image("LoginWallpaper").resizable().scaledToFill().frame(width:proxy.size.width,height:proxy.size.height).clipped().ignoresSafeArea()
+                // Paint the physical screen, including both safe areas; the form alone avoids the keyboard.
+                GeometryReader { background in
+                    Image("LoginWallpaper").resizable().scaledToFill()
+                        .frame(width:background.size.width,height:background.size.height).clipped()
+                }.ignoresSafeArea().accessibilityIdentifier("unlock.wallpaper")
                 ScrollView {
                     VStack(spacing:14) {
-                        Spacer(minLength:proxy.size.height*0.34)
+                        Spacer(minLength:passwordFocused ? 24:max(24,proxy.size.height*0.28))
                         if !store.hasVault { Text("创建你的私人资料库").font(.headline).foregroundStyle(.black.opacity(0.8)) }
-                        SecureField(store.hasVault ? "资料库密码":"设置密码（至少12个字符）",text:$password).textContentType(store.hasVault ? .password:.newPassword).padding(14).background(.white.opacity(0.88),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black)
-                        if !store.hasVault { SecureField("再次输入密码",text:$confirmation).textContentType(.newPassword).padding(14).background(.white.opacity(0.88),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black) }
+                        SecureField(store.hasVault ? "资料库密码":"设置密码（至少12个字符）",text:$password).textContentType(store.hasVault ? .password:.newPassword).focused($passwordFocused).padding(14).background(.white.opacity(0.92),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black)
+                        if !store.hasVault { SecureField("再次输入密码",text:$confirmation).textContentType(.newPassword).focused($passwordFocused).padding(14).background(.white.opacity(0.92),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black) }
                         Button {
                             if !store.hasVault && password != confirmation { store.error="两次密码不一致"; return }
                             Task { await store.unlock(password:password,creating:!store.hasVault); password="";confirmation="" }
-                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity).padding(14) }.buttonStyle(.borderedProminent).disabled(store.busy || password.isEmpty)
+                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity).padding(14).foregroundStyle(password.isEmpty ? Color.black.opacity(0.4):.white).background(password.isEmpty ? Color.white.opacity(0.65):Theme.accent,in:RoundedRectangle(cornerRadius:14)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
                         if store.hasVault && store.biometricEnabled { Button("使用 Face ID / 系统解锁") { Task {await store.unlockBiometric()} }.foregroundStyle(.black.opacity(0.75)).padding(8) }
                         if !store.hasVault { Text("密码用于加密备份，请妥善保存。创建后可在个人详情导入 Android 完整备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
-                    }.padding(.horizontal,32).padding(.bottom,80).frame(minHeight:proxy.size.height)
+                    }.padding(.horizontal,32).padding(.bottom,32).frame(minHeight:proxy.size.height,alignment:.bottom)
                 }.scrollDismissesKeyboard(.interactively)
             }
         }

@@ -14,6 +14,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var title = "新对话"
     var updated = Date()
     var messages: [ChatMessage] = []
+    var finance: Bool? = nil
 }
 
 @MainActor final class AppStore: ObservableObject {
@@ -23,6 +24,8 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     @Published var sessions: [ChatSession] = []
     @Published var messages: [ChatMessage] = []
     @Published var activeSessionID = UUID().uuidString
+    @Published var financeMode = false
+    @Published var chatDraft = ""
     @Published var assistantBusy = false
     @Published var cloudEnabled = true
     @Published var hasVault = false
@@ -55,6 +58,9 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
                     let salt = try VaultCrypto.random(32), key = try VaultCrypto.derive(password:password,salt:salt)
                     var d = Document(); var a = Item.make(["name":.string("现金"),"currency":.string("CNY"),"type":.string("cash"),"openingDate":.int(1)])
                     a.set("openingCents",Int64(0)); d.accounts = [a]
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
+                    #endif
                     try PrivateFiles.write(VaultCrypto.encrypt(d.encoded(),key:key,salt:salt))
                     return (d,key,salt)
                 }
@@ -87,7 +93,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; messages = []; sessions = []; chatDraft="";key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {
@@ -142,7 +148,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
         sessions.removeAll { $0.updated < Date().addingTimeInterval(-Double(retention)*86400) }
         if !messages.isEmpty {
             let existing = sessions.first { $0.id == activeSessionID }
-            let s = ChatSession(id:activeSessionID,title:existing?.title ?? String((messages.first { $0.role == "user" }?.content ?? "新对话").prefix(24)),updated:Date(),messages:messages)
+            let s = ChatSession(id:activeSessionID,title:existing?.title ?? String((messages.first { $0.role == "user" }?.content ?? "新对话").prefix(24)),updated:Date(),messages:messages,finance:financeMode)
             sessions.removeAll { $0.id == s.id }; sessions.insert(s,at:0)
         }
     }
@@ -161,5 +167,5 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
             }
         } catch { self.error = "历史对话未能读取，当前资料库不受影响" }
     }
-    func newChat() async {snapshotCurrentHistory();messages=[];activeSessionID=UUID().uuidString;await persistHistory()}
+    func newChat(finance:Bool?=nil) async {cancelReply();snapshotCurrentHistory();messages=[];activeSessionID=UUID().uuidString;if let finance {financeMode=finance};await persistHistory()}
 }

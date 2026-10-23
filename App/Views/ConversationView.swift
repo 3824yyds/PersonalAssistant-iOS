@@ -9,8 +9,8 @@ struct ConversationView:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @StateObject var speech=SpeechService()
-    @State var input=""
-    @State var finance=false
+    var input:String {get {store.chatDraft} nonmutating set {store.chatDraft=newValue}}
+    var finance:Bool {store.financeMode}
     @State var tools=false
     @State var history=false
     @State var modelMenu=false
@@ -21,8 +21,8 @@ struct ConversationView:View {
     var body:some View {
         VStack(spacing:0) {
             HStack(spacing:12) {
-                Picker("对话模式",selection:$finance) {Text("聊天").tag(false);Text("财务咨询").tag(true)}.pickerStyle(.segmented).disabled(store.assistantBusy)
-                Button {history=true} label:{Image(systemName:"clock.arrow.circlepath").font(.system(size:19)).frame(width:36,height:36)}.accessibilityLabel("历史对话")
+                Picker("对话模式",selection:Binding(get:{finance},set:{value in Task {await store.newChat(finance:value)}})) {Text("聊天").tag(false);Text("财务咨询").tag(true)}.pickerStyle(.segmented).disabled(store.assistantBusy)
+                Button {focused=false;history=true} label:{Image(systemName:"clock.arrow.circlepath").font(.system(size:19)).frame(width:36,height:36)}.accessibilityLabel("历史对话")
             }.padding(.horizontal,16).padding(.bottom,10)
             GeometryReader {geometry in
                 ScrollViewReader {proxy in
@@ -39,34 +39,44 @@ struct ConversationView:View {
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }
-            if tools {HStack(spacing:12) {Button {finance=false;tools=false} label:{Label("聊天",systemImage:"bubble.left.and.bubble.right")};Button {finance=true;tools=false} label:{Label("财务咨询",systemImage:"chart.bar.xaxis")};Spacer()}.font(.subheadline).padding(16).background(Theme.panel(scheme))}
-            if speech.recording {HStack {Image(systemName:"waveform").foregroundStyle(Theme.accent);Text(speech.text.isEmpty ? "正在听…":speech.text).font(.subheadline).lineLimit(3);Spacer();Button("完成") {speech.finish()};Button {speech.cancel()} label:{Image(systemName:"xmark")}}.padding(12).background(Theme.panel(scheme))}
-            HStack(alignment:.bottom,spacing:8) {
-                Button {tools.toggle()} label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy)
-                TextField(finance ? "问问你的财务状况…":"发消息…",text:$input,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused)
-                Button {Task {if speech.recording {speech.finish()}else{await speech.start()}}} label:{Image(systemName:"mic").font(.system(size:20)).frame(width:34,height:42)}.accessibilityLabel("语音输入").disabled(store.assistantBusy)
-                Button {
-                    if store.assistantBusy {store.cancelReply()}else{send()}
-                } label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
-            }.padding(.horizontal,8).padding(.vertical,4).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
-        }.background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        }.safeAreaInset(edge:.bottom,spacing:0) {composer}
+            .background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar {if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
             } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}}
             .onAppear {store.speech=speech;speech.onFinal={text in input+=(input.isEmpty ? "":" ")+text};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
             .onChange(of:speech.error) {_,error in if let error {store.error=error;speech.error=nil}}
-            .onChange(of:finance) {_,_ in Task {await store.newChat()}}
-            .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in store.messages=session.messages;store.activeSessionID=session.id;history=false}}.environmentObject(store)}
+            .onDisappear {speech.cancel()}
+            .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
+    }
+    var composer:some View {
+        VStack(spacing:0) {
+            if speech.recording {HStack {AIOrb(active:true).frame(width:26,height:26);Text(speech.text.isEmpty ? "正在听…":speech.text).font(.subheadline).lineLimit(3);Spacer();Button("完成") {speech.finish()};Button {speech.cancel()} label:{Image(systemName:"xmark")}.accessibilityLabel("取消语音输入")}.padding(12).appGlass(RoundedRectangle(cornerRadius:18)).aiActivity(true,cornerRadius:18).padding(.horizontal,12).padding(.bottom,8)}
+            HStack(alignment:.bottom,spacing:8) {
+                Menu {
+                    Button("聊天",systemImage:"bubble.left.and.bubble.right") {Task {await store.newChat(finance:false)}}
+                    Button("财务咨询",systemImage:"chart.bar.xaxis") {Task {await store.newChat(finance:true)}}
+                    Divider()
+                    Button("新对话",systemImage:"square.and.pencil") {Task {await store.newChat()}}
+                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}
+                } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy)
+                TextField(finance ? "问问你的财务状况…":"发消息…",text:$store.chatDraft,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused).accessibilityIdentifier("chat.input")
+                Button {Task {if speech.recording {speech.finish()}else{await speech.start()}}} label:{Image(systemName:"mic").font(.system(size:20)).frame(width:34,height:42)}.accessibilityLabel("语音输入").disabled(store.assistantBusy)
+                Button {
+                    if store.assistantBusy {store.cancelReply()}else{send()}
+                } label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
+            }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
+        }.background(Theme.background(scheme))
     }
     var welcome:some View {
         VStack(alignment:.leading,spacing:22) {
-            AIOrb().frame(width:48,height:48).padding(.top,34)
+            AIOrb().frame(width:44,height:44).padding(.top,12)
             Text(finance ? "一起理清你的财务":"今天想聊点什么？").font(.system(size:23,weight:.semibold))
             let suggestions=finance ? ["分析我本月的收支","我的信用卡还款压力大吗？","帮我制定月度预算","我有哪些财务风险？"]:["你是谁？","帮我润色一段文字","这个应用怎么记账？","帮我写一段代码"]
             ForEach(suggestions,id:\.self) {text in Button {input=text;send()} label:{HStack {Text(text).font(.system(size:14));Spacer();Image(systemName:"arrow.up.left").font(.caption)}.padding(14).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14))}.buttonStyle(.plain)}
             if store.cloudEnabled && store.hasAPIKey {Text(finance ? "云端已开启：问题、近期对话和相关财务资料会原文发送至 DeepSeek，可在个人详情关闭。":"云端已开启：问题和近期对话会发送至 DeepSeek，可在个人详情关闭。").font(.caption2).foregroundStyle(.secondary)}
-        }.padding(.bottom,24)
+        }.padding(.bottom,16)
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
     func send() {
@@ -96,9 +106,9 @@ struct ChatBubble:View {
             VStack(alignment:.leading,spacing:8) {
                 if message.role != "user" {Text(message.source).font(.system(size:10)).foregroundStyle(.secondary)}
                 VStack(alignment:.leading,spacing:10) {
-                    if message.content.isEmpty && working {ProcessingBar(label:"正在思考")}
+                    if message.content.isEmpty && working {Text("正在思考…").font(.subheadline).foregroundStyle(.secondary).padding(.vertical,4)}
                     else {MarkdownBody(text:message.content)}
-                }.padding(13).background(message.role=="user" ? Theme.accent.opacity(0.09):Theme.panel(scheme),in:RoundedRectangle(cornerRadius:17,style:.continuous)).clipShape(RoundedRectangle(cornerRadius:17,style:.continuous))
+                }.padding(13).background(message.role=="user" ? Theme.accent.opacity(0.09):Theme.panel(scheme),in:RoundedRectangle(cornerRadius:17,style:.continuous)).clipShape(RoundedRectangle(cornerRadius:17,style:.continuous)).aiActivity(working,cornerRadius:17)
                 if message.role != "user" && !working {Button {UIPasteboard.general.string=message.content;UIImpactFeedbackGenerator(style:.light).impactOccurred()} label:{Image(systemName:"doc.on.doc").font(.system(size:13)).frame(width:32,height:30)}.foregroundStyle(.secondary).accessibilityLabel("复制回答")}
             }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             if message.role != "user" {Spacer(minLength:6)}
@@ -128,6 +138,7 @@ struct MarkdownBody:View {
     }
 }
 struct ChatHistoryView:View {
+    @Environment(\.colorScheme) var scheme
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var select:(ChatSession)->Void
@@ -138,8 +149,8 @@ struct ChatHistoryView:View {
     var sessions:[ChatSession] {store.sessions.filter {query.isEmpty || ($0.title+$0.messages.map(\.content).joined()).localizedCaseInsensitiveContains(query)}}
     var body:some View {List {
         Button("新对话",systemImage:"plus") {Task {await store.newChat();dismiss()}}
-        ForEach(sessions) {s in Button {select(s)} label:{VStack(alignment:.leading,spacing:6) {Text(s.title).font(.subheadline).foregroundStyle(.primary);Text(s.messages.last?.content ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(2)}}.contextMenu {Button("重命名",systemImage:"pencil") {renaming=s;title=s.title;rename=true}}.swipeActions(allowsFullSwipe:false) {Button(role:.destructive) {store.sessions.removeAll {$0.id==s.id};if store.activeSessionID==s.id {store.messages=[];store.activeSessionID=UUID().uuidString};Task {await store.saveHistory()}} label:{Label("删除",systemImage:"trash")}}}
-    }.searchable(text:$query,prompt:"搜索标题和对话").navigationTitle("历史对话").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {dismiss()}}}
+        ForEach(sessions) {s in Button {select(s)} label:{VStack(alignment:.leading,spacing:6) {Text(s.title).font(.subheadline).foregroundStyle(.primary);Text(s.messages.last?.content ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(2)}}.buttonStyle(.plain).contextMenu {Button("重命名",systemImage:"pencil") {renaming=s;title=s.title;rename=true}}.swipeActions(allowsFullSwipe:false) {Button(role:.destructive) {store.sessions.removeAll {$0.id==s.id};if store.activeSessionID==s.id {store.messages=[];store.activeSessionID=UUID().uuidString};Task {await store.saveHistory()}} label:{Label("删除",systemImage:"trash")}}}
+    }.scrollContentBackground(.hidden).background(Theme.background(scheme)).searchable(text:$query,prompt:"搜索标题和对话").navigationTitle("历史对话").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {dismiss()}}}
         .alert("重命名对话",isPresented:$rename) {TextField("标题",text:$title);Button("取消",role:.cancel) {};Button("保存") {if let s=renaming,let i=store.sessions.firstIndex(where:{$0.id==s.id}),!title.isEmpty {store.sessions[i].title=String(title.prefix(100));Task {await store.saveHistory()}}}}
     }
 }

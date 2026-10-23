@@ -18,17 +18,25 @@ jobs:
         run: swift test
   ios-smoke:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        ios: [18, 26]
     steps:
       - uses: actions/checkout@v4
+      - name: Select iOS 26 toolchain
+        run: python3 Scripts/select-xcode.py
       - run: python3 Scripts/generate_project.py
       - name: Select an installed iPhone simulator
         run: |
           python3 - <<'PY'
           import json,subprocess,os
           devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
-          candidates=[d for runtime,ds in devices.items() if 'iOS' in runtime for d in ds if d['name'].startswith('iPhone')]
+          candidates=[d for runtime,ds in devices.items() if 'iOS-${{ matrix.ios }}-' in runtime for d in ds if d['name'].startswith('iPhone')]
+          candidates.sort(key=lambda d:('Max' in d['name'],'Plus' in d['name'],'Pro' in d['name'],d['name']))
           assert candidates,'No available iPhone simulator'
+          print('Simulator:',candidates[0]['name'])
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
           PY
       - name: iOS crypto, migration and UI smoke tests
@@ -44,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: iOS-test-results
+          name: iOS-test-results-${{ matrix.ios }}
           path: build/
           retention-days: 7
   ipa:
@@ -53,6 +61,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      - name: Select iOS 26 toolchain
+        run: python3 Scripts/select-xcode.py
       - id: toolchain
         run: echo "sdk=$(xcrun --sdk iphoneos --show-sdk-build-version)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
@@ -67,7 +77,7 @@ jobs:
         run: bash Scripts/build-ipa.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PersonalAssistant-iOS-3.5.1-unsigned
+          name: PersonalAssistant-iOS-3.5.1-build2-unsigned
           path: |
             build/*.ipa
             build/*.verification.json
