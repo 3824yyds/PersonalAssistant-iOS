@@ -74,9 +74,13 @@ struct ConversationView:View {
     }
     var composer:some View {
         HStack(alignment:.bottom,spacing:8) {
-            Button {
-                focused=false;voiceMode.toggle()
-                if voiceMode {Task {_=await speech.prepare()}}
+            Menu {
+                Section("对话") {
+                    Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
+                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
+                }
+            } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
+            if voiceMode {Task {_=await speech.prepare()}}
             } label:{Image(systemName:voiceMode ? "keyboard":"waveform").font(.system(size:20)).frame(width:36,height:42)}
                 .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || speech.finishing)
             if voiceMode {
@@ -90,13 +94,9 @@ struct ConversationView:View {
             } else {
                 TextField(finance ? "问问你的财务状况…":"发消息…",text:$store.chatDraft,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused).accessibilityIdentifier("chat.input")
             }
-            Menu {
-                Section("对话") {
-                    Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
-                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
-                }
-            } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
-            if !voiceMode || store.assistantBusy {
+            Button {
+                focused=false;voiceMode.toggle()
+                if (!voiceMode && !input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty) || store.assistantBusy {
                 Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
             }
         }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
