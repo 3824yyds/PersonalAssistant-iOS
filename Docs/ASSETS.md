@@ -10,3 +10,7 @@
 汇丰 World Debit 横向卡面以汇丰官方产品图为参考，使用绘图工具重新构图为钱包横向比例。机构名称、尾号与卡组织由界面叠加，不烘焙在背景中。
 来源：https://www.hsbc.com.hk/debit-cards/products/mastercard-debit-card/
 官方图：https://www.hsbc.com.hk/content/dam/hsbc/hk/images/mass/debit-card/card-face/17578-hsbc-world-debit-mastercard-640x1024.jpg
+
+## Build 3 个人头像
+
+小猫、小熊、狐狸、猫头鹰按用户要求分别使用绘图工具重新绘制，各为独立方形满幅作品，头部居中且保持直立。应用统一进行正圆裁切，不在素材中预画圆框。资源采用 512px JPEG；仅进行常规尺寸与编码转换，未拼接成合图。

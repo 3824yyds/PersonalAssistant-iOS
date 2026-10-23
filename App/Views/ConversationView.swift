@@ -47,7 +47,12 @@ struct ConversationView:View {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
             } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.semibold)).foregroundStyle(.primary)}}}
-            .onAppear {store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
+            .onAppear {
+                #if DEBUG
+                DebugFixtures.showThinking(in:store)
+                #endif
+                store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}
+            }
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
             .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}

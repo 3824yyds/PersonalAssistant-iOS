@@ -93,6 +93,9 @@ struct NoteEditor:View {
     func load() {
         guard !draftLoaded else{return};draftLoaded=true
         if let n=note {noteID=n.id;title=n.text("title");bodyText=n.text("body");folder=n.text("folder",fallback:"收件箱")}
+        #if DEBUG
+        if DebugFixtures.motion {title="周末计划";bodyText="想去公园走走，和朋友吃顿饭，也留一点时间休息。";working=true}
+        #endif
         savedTitle=title;savedBody=bodyText
         let key=store.key,id=note?.id ?? "new"
         if let bytes=try? PrivateFiles.boundedRead(PrivateFiles.url("note-draft.pavault")),let plain=try? VaultCrypto.decrypt(bytes,key:key),let draft=try? JSONDecoder().decode(Item.self,from:plain),draft.text("slot")==id,draft.int("baseUpdatedAt")==((note?.int("updatedAt")) ?? 0) {recovery=draft;recoverPrompt=true}

@@ -2,6 +2,12 @@
 import Foundation
 
 enum DebugFixtures {
+    static var motion:Bool {ProcessInfo.processInfo.arguments.contains("--ui-motion-fixture")}
+    @MainActor static func showThinking(in store:AppStore) {
+        guard motion else {return}
+        store.messages=[ChatMessage(role:"user",content:"帮我整理一下周末计划"),ChatMessage(role:"assistant",content:"可以把周末安排分成出行、休息和准备三部分。",source:"云端回答")]
+        store.assistantBusy=true
+    }
     static func document()->Document {
         var d=Document()
         let names=["中国工商银行","中国银行","汇丰银行","招商银行"]

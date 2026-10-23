@@ -8,7 +8,8 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             Group { if store.document != nil { MainTabs() } else { UnlockView() } }
-                .environmentObject(store).tint(Theme.accent).preferredColorScheme(store.theme)
+                .environmentObject(store).tint(Theme.accent)
+                .background {AppearanceWindow(appearance:store.document==nil ? .light:store.appearance).frame(width:0,height:0).allowsHitTesting(false)}
                 .alert("提示",isPresented:Binding(get:{store.error != nil},set:{if !$0 {store.error=nil}})) { Button("知道了",role:.cancel) {store.error=nil} } message: {Text(store.error ?? "")}
                 .onChange(of:phase) { _,next in
                     if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.cancelReply() }
@@ -27,10 +28,11 @@ struct MainTabs: View {
     @State var expanded = false
     @State var sheet: RootSheet?
     @StateObject private var keyboard = KeyboardVisibility()
-    let tabs = [("笔记","note.text"),("账本","book.closed"),("提醒","bell"),("助理","bubble.left.and.bubble.right")]
     var body: some View {
         ZStack(alignment:.bottomTrailing) {
-            Theme.background(scheme).ignoresSafeArea()
+            Theme.background(scheme)
+                .overlay {Color.black.opacity(expanded ? 0.14:0)}
+                .ignoresSafeArea().allowsHitTesting(false)
             VStack(spacing:0) {
             ZStack {
             // One navigation container avoids TabView applying keyboard insets a second time.
@@ -44,20 +46,10 @@ struct MainTabs: View {
                     }
                 }.toolbar { ToolbarControls(sheet:$sheet) }
             }.id(tab)
-            if expanded { Color.black.opacity(0.14).ignoresSafeArea().onTapGesture { animate { expanded=false } } }
-            }
+            if expanded { Color.black.opacity(0.14).contentShape(Rectangle()).onTapGesture { animate { expanded=false } } }
+            }.clipped()
             if !keyboard.visible {
-            HStack(spacing:0) {
-                ForEach(0..<tabs.count,id:\.self) { i in
-                    Button { expanded=false; tab=i } label: {
-                        VStack(spacing:4) { Image(systemName:tabs[i].1).font(.system(size:18)); Text(tabs[i].0).font(.system(size:10,weight:tab==i ? .semibold:.regular)) }.frame(maxWidth:.infinity,minHeight:46).foregroundStyle(tab==i ? Theme.accent:.secondary)
-                    }.buttonStyle(.plain).accessibilityAddTraits(tab==i ? .isSelected:[])
-                }
-                if tab != 3 {Button { animate { expanded.toggle() }; UIImpactFeedbackGenerator(style:.light).impactOccurred() } label: {
-                    Image(systemName:"plus").font(.system(size:22,weight:.regular)).rotationEffect(.degrees(expanded ? 45:0)).frame(width:44,height:44).appGlass(Circle(),interactive:true,tinted:true).foregroundStyle(.white)
-                }.buttonStyle(.plain).accessibilityLabel(expanded ? "收起快捷操作":"展开快捷操作").padding(.leading,8).padding(.trailing,16)}
-            }.padding(.vertical,6).padding(.leading,8).padding(.trailing,tab==3 ? 8:0).appGlass(Capsule())
-                .padding(.horizontal,12).padding(.bottom,4)
+            MainNavigation(selection:$tab,expanded:$expanded)
             }
             }
             if expanded && !keyboard.visible {
@@ -65,7 +57,7 @@ struct MainTabs: View {
                     quick("note.text","新建笔记",.note)
                     quick("plus.forwardslash.minus","记一笔",.entry)
                     quick("bell","新建提醒",.reminder)
-                }}.padding(.trailing,28).padding(.bottom,70)
+                }}.padding(.trailing,24).padding(.bottom,70)
                     .transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
                     .zIndex(1)
             }
@@ -108,23 +100,34 @@ struct UnlockView: View {
                         .frame(width:background.size.width,height:background.size.height).clipped()
                 }.ignoresSafeArea().accessibilityIdentifier("unlock.wallpaper")
                 ScrollView {
-                    VStack(spacing:14) {
-                        Spacer(minLength:passwordFocused ? 24:max(24,proxy.size.height*0.28))
-                        if !store.hasVault { Text("创建你的私人资料库").font(.headline).foregroundStyle(.black.opacity(0.8)) }
-                        SecureField(store.hasVault ? "资料库密码":"设置密码（至少12个字符）",text:$password).textContentType(store.hasVault ? .password:.newPassword).focused($passwordFocused).padding(14).background(.white.opacity(0.92),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black)
-                        if !store.hasVault { SecureField("再次输入密码",text:$confirmation).textContentType(.newPassword).focused($passwordFocused).padding(14).background(.white.opacity(0.92),in:RoundedRectangle(cornerRadius:14)).foregroundStyle(.black) }
+                    VStack(spacing:0) {
+                        Color.clear.frame(height:passwordFocused ? 24:proxy.size.height*0.36).accessibilityHidden(true)
+                    VStack(spacing:12) {
+                        if !store.hasVault {Text("创建你的私人资料库").font(.headline).foregroundStyle(.black.opacity(0.8)).padding(.bottom,8)}
+                        passwordField(store.hasVault ? "资料库密码":"设置密码（至少12个字符）",text:$password,confirmation:false)
+                        if !store.hasVault {passwordField("再次输入密码",text:$confirmation,confirmation:true)}
                         Button {
                             if !store.hasVault && password != confirmation { store.error="两次密码不一致"; return }
                             Task { await store.unlock(password:password,creating:!store.hasVault); password="";confirmation="" }
-                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity).padding(14).foregroundStyle(password.isEmpty ? Color.black.opacity(0.4):.white).background(password.isEmpty ? Color.white.opacity(0.65):Theme.accent,in:RoundedRectangle(cornerRadius:14)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
+                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity,minHeight:48).foregroundStyle(password.isEmpty ? Color.black.opacity(0.48):.white).background(password.isEmpty ? Color.white.opacity(0.72):Theme.accent,in:RoundedRectangle(cornerRadius:16)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
                         if store.hasVault {Button {
                             if store.biometricEnabled {Task {await store.unlockBiometric()}}
                             else {store.error="请先使用密码解锁，再到个人详情启用 Face ID / 系统解锁"}
-                        } label:{VStack(spacing:6) {Image(systemName:"faceid").font(.system(size:28,weight:.regular)).frame(width:58,height:58).appGlass(Circle(),interactive:true);Text("Face ID 解锁").font(.caption)}}.buttonStyle(.plain).foregroundStyle(.black.opacity(0.8)).accessibilityLabel("Face ID 解锁").disabled(store.busy).padding(.top,4)}
+                        } label:{Image(systemName:"faceid").font(.system(size:26,weight:.regular)).frame(width:54,height:54).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).foregroundStyle(.black.opacity(0.78)).accessibilityLabel("Face ID 解锁").disabled(store.busy).padding(.top,12)}
                         if !store.hasVault { Text("密码用于加密备份，请妥善保存。请定期在个人详情导出加密备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
-                    }.padding(.horizontal,32).padding(.bottom,32).frame(minHeight:proxy.size.height,alignment:.bottom)
+                    }.frame(maxWidth:340).frame(maxWidth:.infinity).accessibilityIdentifier("unlock.controls")
+                        Spacer(minLength:24)
+                    }.padding(.horizontal,28).padding(.bottom,24).frame(minHeight:proxy.size.height,alignment:.top)
                 }.scrollDismissesKeyboard(.interactively)
             }
         }
+    }
+    func passwordField(_ title:String,text:Binding<String>,confirmation:Bool)->some View {
+        HStack(spacing:10) {
+            Image(systemName:confirmation ? "checkmark.shield":"lock").font(.system(size:16,weight:.regular)).foregroundStyle(.black.opacity(0.46)).accessibilityHidden(true)
+            SecureField(title,text:text).textContentType(store.hasVault ? .password:.newPassword).focused($passwordFocused).font(.system(size:16)).foregroundStyle(.black).tint(Theme.accent)
+        }.padding(.horizontal,16).frame(height:52)
+            .background(.white.opacity(0.9),in:RoundedRectangle(cornerRadius:16))
+            .overlay {RoundedRectangle(cornerRadius:16).strokeBorder(.white.opacity(0.65),lineWidth:0.5)}
     }
 }

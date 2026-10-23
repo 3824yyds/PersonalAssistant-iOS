@@ -12,7 +12,7 @@ struct ProfilePortrait:View {
         Group {
             if preset=="custom",let image {Image(uiImage:image).resizable().scaledToFill()}
             else {Image("Profile"+(["cat","bear","fox","owl"].contains(preset) ? preset.capitalized:"Cat")).resizable().scaledToFill()}
-        }.frame(width:size,height:size).clipShape(Circle()).accessibilityHidden(true)
+        }.frame(width:size,height:size).clipShape(Circle()).aspectRatio(1,contentMode:.fit).accessibilityHidden(true)
             .task(id:encoded) {
                 guard encoded.count<=3_000_000,let data=Data(base64Encoded:encoded) else {image=nil;return}
                 image=await Task.detached(priority:.userInitiated) {AvatarImage.thumbnail(data)}.value

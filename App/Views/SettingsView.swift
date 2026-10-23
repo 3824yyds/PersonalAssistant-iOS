@@ -79,12 +79,14 @@ struct LocalModelView:View {
 
 struct AppearanceView:View {
     @EnvironmentObject var store:AppStore
+    @Environment(\.colorScheme) var scheme
     @State var iconError:String?
     var body:some View {Form {
-        Picker("外观",selection:Binding(get:{store.current.settings.text("theme",fallback:"system")},set:{v in Task {await store.setting("theme",.string(v))}})) {Text("跟随系统").tag("system");Text("浅色").tag("light");Text("纯黑深色").tag("dark")}
+        Picker("外观",selection:Binding(get:{store.appearance.rawValue},set:{store.selectAppearance($0)})) {Text("跟随系统").tag("system");Text("浅色").tag("light");Text("纯黑深色").tag("dark")}.accessibilityIdentifier("appearance.mode")
         Section("应用图标") {HStack(spacing:18) {icon("Sunshine",nil);icon("Sky","AppIconSky");icon("Peach","AppIconPeach")}.padding(.vertical,8)}
         Section {Text("字体会响应 iOS 的文字大小与辅助功能设置。").font(.caption).foregroundStyle(.secondary)}
-    }.navigationTitle("外观与图标").navigationBarTitleDisplayMode(.inline)}
+    }.scrollContentBackground(.hidden).background(Theme.background(scheme)).accessibilityIdentifier("appearance.form")
+        .navigationTitle("外观与图标").navigationBarTitleDisplayMode(.inline)}
     func icon(_ name:String,_ alternate:String?)->some View {Button {UIApplication.shared.setAlternateIconName(alternate) {error in if let error {Task {@MainActor in store.present(error)}}else{UserDefaults.standard.set(name,forKey:"appIcon")}}} label:{Image("Launcher"+name).resizable().scaledToFit().frame(width:64,height:64).clipShape(RoundedRectangle(cornerRadius:15))}.buttonStyle(.plain).accessibilityLabel(name+"图标")}
 }
 
@@ -107,7 +109,7 @@ struct MemoryView:View {
 
 struct AboutView:View {
     var body:some View {List {
-        Section("个人助理 · iOS 3.5.1 (2)") {Text("记录生活，理清财务。为 iPhone 设计的笔记、账本与智能助理。")}
+        Section("个人助理 · iOS 3.5.1 (3)") {Text("记录生活，理清财务。为 iPhone 设计的笔记、账本与智能助理。")}
         Section("使用与隐私") {
             Text("笔记、账本和个人头像在本机加密保存。请定期导出加密备份，并妥善保管资料库密码。")
             Text("卡包展示你记录的账户与交易，余额随账本更新，不连接银行账户或提供支付服务。")

@@ -37,6 +37,7 @@ struct VoiceCaptureState:Equatable {
     @Published var hasAPIKey = false
     @Published var biometricEnabled = UserDefaults.standard.bool(forKey:"biometricEnabled")
     @Published var model = "deepseek-chat"
+    @Published private(set) var appearance=AppAppearance(rawValue:UserDefaults.standard.string(forKey:"appAppearance") ?? "system") ?? .system
     var key = Data(), salt = Data()
     var epoch = UUID()
     var activeTask: Task<Void,Never>?
@@ -48,7 +49,19 @@ struct VoiceCaptureState:Equatable {
     }
     var current: Document { document ?? Document() }
     var currency: String { current.currency }
-    var theme: ColorScheme? { switch current.settings.text("theme") { case "dark":return .dark; case "light":return .light; default:return nil } }
+    func selectAppearance(_ value:String) {
+        guard let selected=AppAppearance(rawValue:value) else {return}
+        appearance=selected
+        UserDefaults.standard.set(value,forKey:"appAppearance")
+        for scene in UIApplication.shared.connectedScenes.compactMap({$0 as? UIWindowScene}) {
+            for window in scene.windows {window.overrideUserInterfaceStyle=selected.style}
+        }
+    }
+    private func restoreAppearance(_ document:Document) {
+        if UserDefaults.standard.string(forKey:"appAppearance")==nil {
+            selectAppearance(document.settings.text("theme",fallback:"system"))
+        }
+    }
     func present(_ error: Error) { if !(error is CancellationError) { self.error = error.localizedDescription } }
     func unlock(password: String, creating: Bool = false) async {
         guard !busy else { return }; busy = true; defer { busy = false }
@@ -76,6 +89,7 @@ struct VoiceCaptureState:Equatable {
             guard unlockEpoch==epoch else {return}
             key = result.1; salt = result.2; var d = result.0; d.accounts = Finance.accounts(d); document = d; hasVault = true
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat")
+            restoreAppearance(d)
             Keychain.delete("attempts"); epoch = UUID(); await loadHistory()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
@@ -93,6 +107,7 @@ struct VoiceCaptureState:Equatable {
             let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:saved)).validated()
             key = saved; salt = try VaultCrypto.salt(encrypted); var next = d; next.accounts = Finance.accounts(d); document = next
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat"); epoch = UUID(); await loadHistory()
+            restoreAppearance(d)
         } catch { present(error) }
     }
     func lock() {
@@ -118,6 +133,7 @@ struct VoiceCaptureState:Equatable {
         } catch { present(error); return false }
     }
     func setting(_ key: String, _ value: JSONValue) async {
+        if key=="theme",case .string(let choice)=value {selectAppearance(choice)}
         await commit { var s = $0.settings; s.raw[key] = value; $0.settings = s }
     }
     func setAPIKey(_ value: String) {

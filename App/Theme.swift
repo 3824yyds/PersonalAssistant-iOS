@@ -70,7 +70,7 @@ struct AppGlass<S:Shape>:ViewModifier {
 }
 extension View {
     func appGlass<S:Shape>(_ shape:S,interactive:Bool=false,tinted:Bool=false)->some View {modifier(AppGlass(shape:shape,interactive:interactive,tinted:tinted))}
-    func aiActivity(_ active:Bool,cornerRadius:CGFloat=17)->some View {overlay {AIActivityOutline(active:active,radius:cornerRadius).allowsHitTesting(false).accessibilityHidden(true)}}
+    func aiActivity(_ active:Bool,cornerRadius:CGFloat=17)->some View {overlay {AIFlowEffect(active:active,radius:cornerRadius).allowsHitTesting(false).accessibilityHidden(true)}}
 }
 struct AppGlassGroup<Content:View>:View {
     @ViewBuilder var content:()->Content
@@ -105,16 +105,31 @@ struct AIOrb: View {
         }.accessibilityLabel(active ? "AI 正在处理":"智能助理")
     }
 }
-struct AIActivityOutline:View {
+enum AIMotion {
+    static let colors=[Color(red:0.24,green:0.48,blue:1),Color(red:0.15,green:0.72,blue:0.9),Color(red:0.32,green:0.76,blue:0.59),Color(red:0.98,green:0.71,blue:0.35),Color(red:0.79,green:0.43,blue:0.85)]
+}
+/// Soft, contained fields of light; no spinning outline or moving hard edge.
+struct AIFlowEffect:View {
     var active:Bool
     var radius:CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduced
+    @Environment(\.colorScheme) private var scheme
     var body:some View {
         if active {
             TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
-                let angle=reduced ? 0:timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:4)*90
-                RoundedRectangle(cornerRadius:radius,style:.continuous)
-                    .strokeBorder(AngularGradient(colors:[Theme.accent.opacity(0.08),.cyan.opacity(0.7),Theme.accent.opacity(0.9),.white.opacity(0.75),Theme.accent.opacity(0.08)],center:.center,angle:.degrees(angle)),lineWidth:1.5)
+                let time=reduced ? 0:timeline.date.timeIntervalSinceReferenceDate
+                Canvas {context,size in
+                    let bounds=CGRect(origin:.zero,size:size)
+                    for index in 0..<AIMotion.colors.count {
+                        let phase=time*0.46+Double(index)*1.4
+                        let x=size.width*(CGFloat(index)/4*0.8+0.1+CGFloat(sin(phase))*0.12)
+                        let y=size.height*(0.75+CGFloat(cos(phase*0.8))*0.25)
+                        let reach=max(42,min(size.width*0.56,180))
+                        let color=AIMotion.colors[index].opacity(scheme == .dark ? 0.48:0.34)
+                        context.fill(Path(bounds),with:.radialGradient(Gradient(colors:[color,color.opacity(0.2),.clear]),center:CGPoint(x:x,y:y),startRadius:0,endRadius:reach))
+                    }
+                }.mask {RoundedRectangle(cornerRadius:radius,style:.continuous).stroke(lineWidth:16).blur(radius:10)}
+                    .clipShape(RoundedRectangle(cornerRadius:radius,style:.continuous))
             }
         }
     }
@@ -127,9 +142,9 @@ struct ProcessingBar: View {
             HStack(spacing:8) {AIOrb(active:true).frame(width:22,height:22);Text(label).font(.caption).foregroundStyle(.secondary);Spacer()}
             TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
                 GeometryReader {proxy in
-                    let fraction=reduced ? 0.5:(sin(timeline.date.timeIntervalSinceReferenceDate*2)+1)/2
+                    let fraction=reduced ? 0.5:timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:2.4)/2.4
                     Capsule().fill(Theme.accent.opacity(0.10))
-                        .overlay(alignment:.leading) {Capsule().fill(LinearGradient(colors:[.cyan,Theme.accent],startPoint:.leading,endPoint:.trailing)).frame(width:max(24,proxy.size.width*0.3)).offset(x:(proxy.size.width*0.7)*fraction)}
+                        .overlay(alignment:.leading) {Capsule().fill(LinearGradient(colors:[.clear]+AIMotion.colors+[.clear],startPoint:.leading,endPoint:.trailing)).frame(width:max(24,proxy.size.width*0.48)).offset(x:proxy.size.width*(fraction*1.48-0.48))}
                         .clipShape(Capsule())
                 }.frame(height:3)
             }.accessibilityLabel("正在处理")
