@@ -53,7 +53,9 @@ jobs:
         if: always()
         with:
           name: iOS-test-results-${{ matrix.ios }}
-          path: build/
+          path: |
+            build/simulator-test.log
+            build/Screenshots/
           retention-days: 7
   ipa:
     needs: [core, ios-smoke]

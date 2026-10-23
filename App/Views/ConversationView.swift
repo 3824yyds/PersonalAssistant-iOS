@@ -39,7 +39,8 @@ struct ConversationView:View {
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }
-        }.safeAreaInset(edge:.bottom,spacing:0) {composer}
+            composer.layoutPriority(1)
+        }
             .background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar {if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}

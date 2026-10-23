@@ -31,6 +31,8 @@ struct MainTabs: View {
     var body: some View {
         ZStack {
             Theme.background(scheme).ignoresSafeArea()
+            VStack(spacing:0) {
+            ZStack {
             // One navigation container avoids TabView applying keyboard insets a second time.
             NavigationStack {
                 Group {
@@ -41,12 +43,10 @@ struct MainTabs: View {
                     default: NotesView()
                     }
                 }.toolbar { ToolbarControls(sheet:$sheet) }
-            }
+            }.id(tab)
             if expanded { Color.black.opacity(0.14).ignoresSafeArea().onTapGesture { animate { expanded=false } } }
-        }
-        .safeAreaInset(edge:.bottom,spacing:0) {
+            }
             if !keyboard.visible {
-            AppGlassGroup {
             HStack(spacing:0) {
                 ForEach(0..<tabs.count,id:\.self) { i in
                     Button { expanded=false; tab=i } label: {
@@ -59,11 +59,11 @@ struct MainTabs: View {
             }.padding(.vertical,6).padding(.leading,8).appGlass(Capsule())
                 .overlay(alignment:.bottomTrailing) {
                     if expanded {
-                        VStack(spacing:10) {
+                        AppGlassGroup {VStack(spacing:10) {
                             quick("note.text","新建笔记",.note)
                             quick("plus.forwardslash.minus","记一笔",.entry)
                             quick("bell","新建提醒",.reminder)
-                        }.padding(.trailing,16).padding(.bottom,66).transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
+                        }}.padding(.trailing,16).padding(.bottom,66).transition(.asymmetric(insertion:.move(edge:.bottom).combined(with:.opacity),removal:.opacity))
                     }
                 }
                 .padding(.horizontal,12).padding(.bottom,4)
@@ -107,7 +107,7 @@ struct UnlockView: View {
                             Task { await store.unlock(password:password,creating:!store.hasVault); password="";confirmation="" }
                         } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity).padding(14).foregroundStyle(password.isEmpty ? Color.black.opacity(0.4):.white).background(password.isEmpty ? Color.white.opacity(0.65):Theme.accent,in:RoundedRectangle(cornerRadius:14)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
                         if store.hasVault && store.biometricEnabled { Button("使用 Face ID / 系统解锁") { Task {await store.unlockBiometric()} }.foregroundStyle(.black.opacity(0.75)).padding(8) }
-                        if !store.hasVault { Text("密码用于加密备份，请妥善保存。创建后可在个人详情导入 Android 完整备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
+                        if !store.hasVault { Text("密码用于加密备份，请妥善保存。请定期在个人详情导出加密备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
                     }.padding(.horizontal,32).padding(.bottom,32).frame(minHeight:proxy.size.height,alignment:.bottom)
                 }.scrollDismissesKeyboard(.interactively)
             }

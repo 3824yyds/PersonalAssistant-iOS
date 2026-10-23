@@ -38,7 +38,7 @@ final class AppSmokeTests:XCTestCase {
         app.buttons["提醒"].firstMatch.tap();attach(app,"Reminders")
         app.buttons["助理"].firstMatch.tap();XCTAssertTrue(app.staticTexts["今天想聊点什么？"].waitForExistence(timeout:5));attach(app,"Assistant")
         let input=app.descendants(matching:.any).matching(identifier:"chat.input").firstMatch
-        XCTAssertTrue(input.waitForExistence(timeout:5));input.tap();input.typeText("1200")
+        XCTAssertTrue(input.waitForExistence(timeout:5));XCTAssertTrue(input.isHittable);input.tap();input.typeText("1200")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5));XCTAssertTrue(input.isHittable);XCTAssertTrue(app.buttons["发送"].isHittable)
         XCTAssertLessThanOrEqual(input.frame.maxY,app.keyboards.firstMatch.frame.minY+2)
         attach(app,"AssistantKeyboardVisibleInput")
