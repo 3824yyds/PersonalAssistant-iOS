@@ -78,8 +78,18 @@ struct MainTabs: View {
             }.environmentObject(store).interactiveDismissDisabled(store.busy)
         }
     }
-    func quick(_ icon:String,_ title:String,_ target:RootSheet)->some View {
-        Button { expanded=false; sheet=target } label: {Image(systemName:icon).font(.system(size:19,weight:.regular)).frame(width:44,height:44).appGlass(Circle(),interactive:true).foregroundStyle(Theme.accent)}.buttonStyle(.plain).accessibilityLabel(title)
+    @ViewBuilder func quick(_ icon:String,_ title:String,_ target:RootSheet)->some View {
+        if #available(iOS 26.0,*) {
+            Button {openQuick(target)} label:{Image(systemName:icon).font(.system(size:19,weight:.regular)).frame(width:24,height:24)}
+                .buttonStyle(.glass).buttonBorderShape(.circle).frame(width:44,height:44).contentShape(Circle()).accessibilityLabel(title)
+        } else {
+            Button {openQuick(target)} label:{Image(systemName:icon).font(.system(size:19,weight:.regular)).frame(width:44,height:44).appGlass(Circle(),interactive:true).foregroundStyle(Theme.accent)}.buttonStyle(.plain).accessibilityLabel(title)
+        }
+    }
+    func openQuick(_ target:RootSheet) {
+        expanded=false
+        // Finish removing the glass action surface before UIKit presents the editor sheet.
+        Task {try? await Task.sleep(nanoseconds:120_000_000);sheet=target}
     }
     func animate(_ body:()->Void) { withAnimation(reduceMotion ? nil:Theme.normal,body) }
 }

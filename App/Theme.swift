@@ -62,9 +62,9 @@ struct AppGlass<S:Shape>:ViewModifier {
     @Environment(\.colorScheme) private var scheme
     @ViewBuilder func body(content:Content)->some View {
         if #available(iOS 26.0,*),!reduceTransparency {
-            content.glassEffect(.regular.tint(tinted ? Theme.accent:.clear).interactive(interactive),in:shape)
+            content.contentShape(shape).glassEffect(.regular.tint(tinted ? Theme.accent:.clear).interactive(interactive),in:shape).contentShape(shape)
         } else {
-            content.background(tinted ? Theme.accent:Theme.panel(scheme),in:shape)
+            content.background(tinted ? Theme.accent:Theme.panel(scheme),in:shape).contentShape(shape)
         }
     }
 }
