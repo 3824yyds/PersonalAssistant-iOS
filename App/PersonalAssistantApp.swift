@@ -11,7 +11,7 @@ import SwiftUI
                 .environmentObject(store).tint(Theme.accent).preferredColorScheme(store.theme)
                 .alert("提示",isPresented:Binding(get:{store.error != nil},set:{if !$0 {store.error=nil}})) { Button("知道了",role:.cancel) {store.error=nil} } message: {Text(store.error ?? "")}
                 .onChange(of:phase) { _,next in
-                    if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.activeTask?.cancel() }
+                    if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.cancelReply() }
                     if next == .active, let date = backgroundAt, Date().timeIntervalSince(date)>60 { store.lock(); backgroundAt=nil }
                 }
         }
