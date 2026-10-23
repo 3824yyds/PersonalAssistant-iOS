@@ -10,7 +10,7 @@ enum AIService {
         request.httpMethod = "POST"; request.timeoutInterval = 60
         request.setValue("Bearer " + (try credential()),forHTTPHeaderField:"Authorization")
         request.setValue("application/json",forHTTPHeaderField:"Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject:["model":model,"messages":messages,"stream":true,"max_tokens":4096])
+        request.httpBody = try JSONSerialization.data(withJSONObject:["model":model,"messages":messages,"stream":true,"max_tokens":4096,"thinking":["type":"disabled"]])
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 60; configuration.timeoutIntervalForResource = 180
         let session = URLSession(configuration:configuration); defer { session.invalidateAndCancel() }
@@ -99,7 +99,7 @@ enum AIService {
                 return (try await self.cloud(messages:messages,model:model,onPartial:onPartial),"云端回答")
             }
             catch is CancellationError { throw CancellationError() }
-            catch { cloudFailure = error }
+            catch { cloudFailure = error;await onSources?([]) }
         }
         if let fast = localFast(question,finance:finance,document:document) { return (fast,cloudFailure == nil ? "本机回答":"本机回答 · 云端暂不可用") }
         if LocalModel.shared.available {

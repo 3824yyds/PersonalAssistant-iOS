@@ -26,6 +26,6 @@ struct WebSourcesView:View {
             }.padding(.top,10)
         } label:{
             Label("来源 · \(sources.count)",systemImage:"globe").font(.system(size:11,weight:.medium)).foregroundStyle(.secondary)
-        }.tint(.secondary).accessibilityIdentifier("chat.sources")
+        }.tint(.secondary).accessibilityElement(children:.contain)
     }
 }

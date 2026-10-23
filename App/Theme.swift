@@ -179,12 +179,3 @@ struct AccountIcon: View {
     var type: String = "bank"
     var body: some View { Image("Account\(Artwork.index(name,type))").resizable().interpolation(.high).scaledToFit().frame(width:36,height:36).accessibilityHidden(true) }
 }
-struct ToolbarControls: ToolbarContent {
-    @Binding var sheet: RootSheet?
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement:.topBarTrailing) {
-            Button { sheet = .wallet } label: { Image(systemName:"creditcard").font(.system(size:19,weight:.regular)) }.accessibilityLabel("卡包与资产")
-            Button { sheet = .profile } label: { ProfilePortrait(size:30) }.accessibilityLabel("个人详情")
-        }
-    }
-}

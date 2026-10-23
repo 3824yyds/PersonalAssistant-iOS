@@ -13,6 +13,10 @@ final class WebEvidenceTests:XCTestCase {
         let sources=[WebSource(title:"官方",url:"https://example.com/a(b)")]
         XCTAssertEqual(WebEvidence.cited("已证实[1] 未知[2] [0] 已有[1](https://example.org)",sources:sources),"已证实[1](https://example.com/a%28b%29) 未知[2] [0] 已有[1](https://example.org)")
     }
+    func testCodeSubscriptsRemainCodeInsteadOfSourceLinks() {
+        let source=WebSource(title:"官方",url:"https://example.com")
+        XCTAssertEqual(WebEvidence.cited("结论[1] `items[1]`\n```swift\nitems[1]\n```",sources:[source]),"结论[1](https://example.com) `items[1]`\n```swift\nitems[1]\n```")
+    }
     func testQueryIsNonblankAndWithinUnicodeScalarLimit() {
         XCTAssertEqual(WebEvidence.query("  今日新闻\n"),"今日新闻")
         XCTAssertEqual(WebEvidence.query(String(repeating:"🙂",count:200)).unicodeScalars.count,128)

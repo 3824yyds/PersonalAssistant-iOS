@@ -81,6 +81,14 @@ final class DeepSeekWebTests:XCTestCase {
         let pages=try await client().search("没有匹配的内容")
         XCTAssertTrue(pages.isEmpty)
     }
+    @MainActor func testCancelledSearchDoesNotContactServer() async throws {
+        WebProtocol.handler={_ in XCTFail("Cancelled searches must not be sent");return (200,Data(#"{"results":[]}"#.utf8))}
+        let client=client()
+        let pending=Task {try await client.search("最新消息")}
+        pending.cancel()
+        do {_=try await pending.value;XCTFail("Expected cancellation")}
+        catch {XCTAssertTrue(error is CancellationError)}
+    }
     func testOldMessagesDecodeWithoutSources() throws {
         let message=try JSONDecoder().decode(ChatMessage.self,from:Data(#"{"id":"old","role":"assistant","content":"旧对话","source":"云端回答"}"#.utf8))
         XCTAssertNil(message.sources)

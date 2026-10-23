@@ -22,7 +22,8 @@ struct WebPage:Decodable,Sendable {
     var date:String?
     var source:WebSource? {
         guard WebSource.validURL(url) != nil else {return nil}
-        return WebSource(title:String(title.prefix(200)),url:url,date:date.map {String($0.prefix(32))})
+        let heading=title.trimmingCharacters(in:.whitespacesAndNewlines)
+        return WebSource(title:String((heading.isEmpty ? (URL(string:url)?.host ?? "网页来源"):heading).prefix(200)),url:url,date:date.map {String($0.prefix(32))})
     }
     var text:String {
         for value in [content,summary,snippet] {
@@ -42,6 +43,15 @@ enum WebEvidence {
     }
     /// Only real, returned sources turn citation numbers into clickable links.
     static func cited(_ text:String,sources:[WebSource])->String {
+        // Code samples can contain array subscripts such as values[1], which are not citations.
+        text.components(separatedBy:"```").enumerated().map {block,part in
+            guard block%2==0 else {return part}
+            return part.components(separatedBy:"`").enumerated().map {index,span in
+                index%2==0 ? linkCitations(span,sources:sources):span
+            }.joined(separator:"`")
+        }.joined(separator:"```")
+    }
+    private static func linkCitations(_ text:String,sources:[WebSource])->String {
         guard let regex=try? NSRegularExpression(pattern:#"\[(\d{1,2})\](?!\()"#) else {return text}
         var result=text
         for match in regex.matches(in:text,range:NSRange(text.startIndex...,in:text)).reversed() {

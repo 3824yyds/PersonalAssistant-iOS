@@ -114,7 +114,9 @@ final class AppSmokeTests:XCTestCase {
             let header=app.buttons["卡包与资产"].frame.midY
             let middle=luminance(app,point:CGPoint(x:2,y:app.frame.height*0.5))
             XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:header)),middle,accuracy:0.015,"No rectangular header after scrolling \(page)")
-            XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:navigation.frame.midY)),middle,accuracy:0.015,"No rectangular footer after scrolling \(page)")
+            // Native glass casts a soft shadow outside the capsule; it must not brighten into an opaque strip.
+            XCTAssertLessThanOrEqual(luminance(app,point:CGPoint(x:2,y:navigation.frame.midY)),middle+0.01,"No opaque light footer after scrolling \(page)")
+            XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:app.frame.height-4)),middle,accuracy:0.015,"Page background continues through the bottom safe area")
             attach(app,page+"ScrolledClearChrome")
         }
         app.buttons["助理"].firstMatch.tap()

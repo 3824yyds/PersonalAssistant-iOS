@@ -35,6 +35,7 @@ final class DeepSeekWebClient {
         }
     }
     func json(_ path:String,_ body:[String:Any]) async throws -> Data {
+        try Task.checkCancellation()
         let (data,response)=try await session.data(for:request(path,body))
         try Task.checkCancellation();try check(response)
         guard data.count<=2*1024*1024 else {throw AppError.message("搜索结果过长，请缩小查询范围")}
@@ -44,7 +45,8 @@ final class DeepSeekWebClient {
         let query=WebEvidence.query(query)
         guard !query.isEmpty else {throw AppError.message("请输入搜索内容")}
         let data=try await json("/v1/tools/search",["query":query,"count":5,"need_content":true])
-        return WebEvidence.pages(try JSONDecoder().decode(WebSearchResponse.self,from:data).results)
+        guard let response=try? JSONDecoder().decode(WebSearchResponse.self,from:data) else {throw AppError.message("搜索结果格式异常，请重试")}
+        return WebEvidence.pages(response.results)
     }
     func fetch(_ url:String) async throws -> String {
         guard WebSource.validURL(url) != nil else {throw AppError.message("来源链接无效")}
@@ -54,6 +56,7 @@ final class DeepSeekWebClient {
     }
     func stream(_ messages:[[String:Any]],model:String,tools:Bool,
                 onPartial:(@MainActor @Sendable (String)->Void)?) async throws -> DeepSeekStreamMessage {
+        try Task.checkCancellation()
         guard !model.isEmpty,model.count<=100,model.range(of:#"^[A-Za-z0-9._-]+$"#,options:.regularExpression) != nil else {throw AppError.message("模型标识无效，请重新选择")}
         var body:[String:Any] = ["model":model,"messages":messages,"stream":true,"max_tokens":4096,"thinking":["type":"disabled"]]
         if tools {body["tools"]=[Self.tool];body["tool_choice"]="auto"}
