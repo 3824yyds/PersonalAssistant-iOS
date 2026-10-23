@@ -144,6 +144,20 @@ struct CardArtwork: Codable, Identifiable { var id:String, bank:String, title:St
 enum Artwork {
     static let accounts: [AccountPreset] = load("AccountPresets")
     static let cards: [CardArtwork] = load("CardArtwork")
+    static func issuer(account:Item,card:Item?)->String {
+        bank(account.text("name")) ?? bank(card?.text("institution") ?? "") ?? ((card?.text("institution").isEmpty==false) ? card!.text("institution"):account.text("name"))
+    }
+    static func cardArtwork(account:Item,card:Item?)->CardArtwork? {
+        let issuer=issuer(account:account,card:card),design=card?.text("design") ?? ""
+        if design=="minimal" {return nil}
+        if let chosen=cards.first(where:{$0.id==design && $0.bank==issuer && $0.kind==account.text("type")}) {return chosen}
+        return cards.first {$0.bank==issuer && $0.kind==account.text("type") && $0.network==(card?.text("network") ?? "unionpay")}
+    }
+    static func cardColors(issuer:String,credit:Bool)->[Color] {
+        if issuer.range(of:"汇丰|HSBC|工商|中国银行|招商|中信|华夏|民生",options:[.regularExpression,.caseInsensitive]) != nil {return [Color(red:0.48,green:0.04,blue:0.10),Color(red:0.82,green:0.16,blue:0.20)]}
+        if issuer.range(of:"农业|邮政|渣打|恒生|TD Bank|Standard",options:[.regularExpression,.caseInsensitive]) != nil {return [Color(red:0.02,green:0.27,blue:0.23),Color(red:0.06,green:0.51,blue:0.40)]}
+        return credit ? [Color(red:0.12,green:0.15,blue:0.22),Color(red:0.22,green:0.29,blue:0.39)]:[Color(red:0.12,green:0.28,blue:0.54),Color(red:0.31,green:0.49,blue:0.75)]
+    }
     static func bank(_ name:String)->String? {
         let aliases:[String:[String]]=["中国工商银行":["工商银行","工行"],"中国建设银行":["建设银行","建行"],"中国农业银行":["农业银行","农行"],"中国银行":["中行"],"中国邮政储蓄银行":["邮政储蓄银行","邮储银行","邮储"],"中国民生银行":["民生银行"],"招商银行":["招行"],"交通银行":["交行"],"上海浦东发展银行":["浦发银行"],"中国光大银行":["光大银行"]]
         let normalized=name.replacingOccurrences(of:" ",with:"")

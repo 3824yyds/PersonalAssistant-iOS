@@ -11,7 +11,7 @@ import SwiftUI
                 .environmentObject(store).tint(Theme.accent).preferredColorScheme(store.theme)
                 .alert("提示",isPresented:Binding(get:{store.error != nil},set:{if !$0 {store.error=nil}})) { Button("知道了",role:.cancel) {store.error=nil} } message: {Text(store.error ?? "")}
                 .onChange(of:phase) { _,next in
-                    if next == .background { backgroundAt = Date(); store.speech?.cancel(); store.activeTask?.cancel() }
+                    if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.activeTask?.cancel() }
                     if next == .active, let date = backgroundAt, Date().timeIntervalSince(date)>60 { store.lock(); backgroundAt=nil }
                 }
         }
@@ -69,6 +69,7 @@ struct MainTabs: View {
                 .padding(.horizontal,12).padding(.bottom,4)
             }
             }
+            if let voice=store.voiceCapture,let speech=store.speech {VoiceCaptureOverlay(speech:speech,state:voice).ignoresSafeArea().allowsHitTesting(false).zIndex(2)}
         }
         .onChange(of:keyboard.visible) { _,visible in if visible {expanded=false} }
         .sheet(item:$sheet) { value in
@@ -106,7 +107,10 @@ struct UnlockView: View {
                             if !store.hasVault && password != confirmation { store.error="两次密码不一致"; return }
                             Task { await store.unlock(password:password,creating:!store.hasVault); password="";confirmation="" }
                         } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity).padding(14).foregroundStyle(password.isEmpty ? Color.black.opacity(0.4):.white).background(password.isEmpty ? Color.white.opacity(0.65):Theme.accent,in:RoundedRectangle(cornerRadius:14)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
-                        if store.hasVault && store.biometricEnabled { Button("使用 Face ID / 系统解锁") { Task {await store.unlockBiometric()} }.foregroundStyle(.black.opacity(0.75)).padding(8) }
+                        if store.hasVault {Button {
+                            if store.biometricEnabled {Task {await store.unlockBiometric()}}
+                            else {store.error="请先使用密码解锁，再到个人详情启用 Face ID / 系统解锁"}
+                        } label:{VStack(spacing:6) {Image(systemName:"faceid").font(.system(size:28,weight:.regular)).frame(width:58,height:58).appGlass(Circle(),interactive:true);Text("Face ID 解锁").font(.caption)}}.buttonStyle(.plain).foregroundStyle(.black.opacity(0.8)).accessibilityLabel("Face ID 解锁").disabled(store.busy).padding(.top,4)}
                         if !store.hasVault { Text("密码用于加密备份，请妥善保存。请定期在个人详情导出加密备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
                     }.padding(.horizontal,32).padding(.bottom,32).frame(minHeight:proxy.size.height,alignment:.bottom)
                 }.scrollDismissesKeyboard(.interactively)

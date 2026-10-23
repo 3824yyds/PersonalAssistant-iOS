@@ -16,6 +16,10 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var messages: [ChatMessage] = []
     var finance: Bool? = nil
 }
+struct VoiceCaptureState:Equatable {
+    var action:VoiceReleaseAction = .send
+    var finishing=false
+}
 
 @MainActor final class AppStore: ObservableObject {
     @Published private(set) var document: Document?
@@ -26,6 +30,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     @Published var activeSessionID = UUID().uuidString
     @Published var financeMode = false
     @Published var chatDraft = ""
+    @Published var voiceCapture:VoiceCaptureState?
     @Published var assistantBusy = false
     @Published var cloudEnabled = true
     @Published var hasVault = false
@@ -93,7 +98,7 @@ struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; chatDraft="";key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; messages = []; sessions = []; chatDraft="";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {

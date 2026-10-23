@@ -61,7 +61,8 @@ struct WalletStackLayout:Layout {
 
 struct CardFace:View {
     var account:Item,card:Item?
-    var art:CardArtwork? {Artwork.cards.first {$0.id==card?.text("design")}}
+    var art:CardArtwork? {Artwork.cardArtwork(account:account,card:card)}
+    var issuer:String {Artwork.issuer(account:account,card:card)}
     var body:some View {
         GeometryReader {proxy in
             Group {
@@ -69,16 +70,19 @@ struct CardFace:View {
                     Image(art.id).resizable().interpolation(.high).scaledToFill()
                         .frame(width:proxy.size.width,height:proxy.size.height).clipped()
                 } else {
-                    LinearGradient(colors:account.text("type")=="credit" ? [Color(red:0.12,green:0.15,blue:0.22),Color(red:0.22,green:0.29,blue:0.39)]:[Color(red:0.16,green:0.36,blue:0.65),Color(red:0.35,green:0.55,blue:0.78)],startPoint:.topLeading,endPoint:.bottomTrailing)
+                    LinearGradient(colors:Artwork.cardColors(issuer:issuer,credit:account.text("type")=="credit"),startPoint:.topLeading,endPoint:.bottomTrailing)
                         .overlay(alignment:.trailing) {Circle().stroke(.white.opacity(0.08),lineWidth:50).frame(width:250,height:250).offset(x:80,y:70).allowsHitTesting(false)}
                         .overlay(alignment:.topLeading) {
                             VStack(alignment:.leading,spacing:8) {
-                                HStack(spacing:9) {AccountIcon(name:account.text("name"),type:account.text("type"));Text(account.text("name")).font(.system(size:16,weight:.semibold)).lineLimit(1).minimumScaleFactor(0.75)}
+                                HStack(spacing:9) {AccountIcon(name:issuer,type:account.text("type"));Text(issuer).font(.system(size:16,weight:.semibold)).lineLimit(1).minimumScaleFactor(0.75)}
                                 Text(account.text("type")=="credit" ? "CREDIT":"DEBIT").font(.system(size:9,weight:.medium)).tracking(3)
                             }.foregroundStyle(.white).padding(18)
                         }
                 }
             }.frame(width:proxy.size.width,height:proxy.size.height)
+                .overlay(alignment:.topLeading) {if art != nil {
+                    HStack(spacing:8) {AccountIcon(name:issuer,type:account.text("type"));Text(issuer).font(.system(size:15,weight:.semibold)).lineLimit(1).minimumScaleFactor(0.75)}.foregroundStyle(.white).shadow(color:.black.opacity(0.7),radius:3).padding(16)
+                }}
                 .overlay(alignment:.bottomTrailing) {
                     HStack(alignment:.center,spacing:10) {
                         if let card,!card.text("lastFour").isEmpty {Text("•••• "+card.text("lastFour")).font(.system(size:13,weight:.semibold,design:.monospaced)).shadow(color:.black.opacity(0.4),radius:2).accessibilityIdentifier("card.lastFour.\(account.id)")}
@@ -93,7 +97,9 @@ struct NetworkMark:View {
     var body:some View {Group {
         if network=="mastercard" {ZStack {Circle().fill(Color(red:0.92,green:0,blue:0.1)).offset(x:-8);Circle().fill(Color(red:0.98,green:0.62,blue:0.1)).blendMode(.plusLighter).offset(x:8)}.frame(width:36,height:23)}
         else if network=="visa" {Text("VISA").font(.system(size:18,weight:.heavy,design:.rounded)).italic()}
-        else if network=="unionpay" {Text("银联").font(.system(size:12,weight:.bold)).padding(.horizontal,5).padding(.vertical,3).background(LinearGradient(colors:[.red,.blue,.teal],startPoint:.leading,endPoint:.trailing),in:RoundedRectangle(cornerRadius:3))}
+        else if network=="unionpay" {Image("NetworkUnionPay").resizable().scaledToFit().frame(width:38,height:25)}
+        else if network=="unionpay_mastercard" {HStack(spacing:5) {NetworkMark(network:"unionpay");NetworkMark(network:"mastercard")}}
+        else if network=="unionpay_visa" {HStack(spacing:5) {NetworkMark(network:"unionpay");NetworkMark(network:"visa")}}
         else if network=="amex" {Text("AMEX").font(.system(size:11,weight:.bold)).padding(4).background(.blue,in:RoundedRectangle(cornerRadius:3))}
     }.accessibilityHidden(true)}
 }
@@ -181,8 +187,8 @@ struct AccountEditor:View {
             }
             if type=="bank" || type=="credit" {Section("卡片") {
                 TextField("卡号后四位",text:$lastFour).keyboardType(.numberPad)
-                Picker("卡组织",selection:$network) {Text("银联").tag("unionpay");Text("Visa").tag("visa");Text("Mastercard").tag("mastercard");Text("American Express").tag("amex");Text("无").tag("")}
-                Picker("卡面",selection:$design) {Text("简约卡面").tag("");ForEach(availableArt) {Text($0.title).tag($0.id)}}
+                Picker("卡组织",selection:$network) {Text("银联").tag("unionpay");Text("Visa").tag("visa");Text("Mastercard").tag("mastercard");Text("银联 / Mastercard").tag("unionpay_mastercard");Text("银联 / Visa").tag("unionpay_visa");Text("American Express").tag("amex");Text("无").tag("")}
+                Picker("卡面",selection:$design) {Text("自动匹配").tag("");Text("机构主题").tag("minimal");ForEach(availableArt) {Text($0.title).tag($0.id)}}
                 TextField("开户行 / 支行",text:$branch)
             }}
             if type=="credit" {Section("账单与还款") {
@@ -202,11 +208,11 @@ struct AccountEditor:View {
         guard let a=account else {currency=store.currency;return};name=a.text("name");currency=a.text("currency",fallback:"CNY");type=a.text("type",fallback:"bank");opening=Money.amount(a.int("openingCents"));archived=a.bool("archived")
         if let c=store.current.wallet.items("cards").first(where:{$0.text("accountId")==a.id}) {institution=c.text("institution");lastFour=c.text("lastFour");network=c.text("network",fallback:"unionpay");design=c.text("design");limit=Money.amount(c.int("limitCents"));statement=Money.amount(c.int("statementCents"));statementMonth=c.text("statementMonth",fallback:Clock.month());statementDay=max(1,Int(c.int("statementDay",fallback:1)));repaymentDay=max(1,Int(c.int("repaymentDay",fallback:20)));branch=c.text("branch");memo=c.text("memo")}
     }
-    func clearIncompatibleArt() {if loaded && !availableArt.contains(where:{$0.id==design}) {design=""}}
+    func clearIncompatibleArt() {if loaded && design != "minimal" && !availableArt.contains(where:{$0.id==design}) {design=""}}
     func save() {do {
         guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, name.count<=100,lastFour.isEmpty || lastFour.range(of:#"^[0-9]{4}$"#,options:.regularExpression) != nil else {throw AppError.message("请核对账户名称及卡号后四位")}
         var a=account ?? Item.make();a.set("name",name.trimmingCharacters(in:.whitespacesAndNewlines));a.set("currency",currency);a.set("type",type);a.set("openingCents",try Money.parse(opening,signed:true,allowZero:true));a.set("openingDate",account?.int("openingDate",fallback:1) ?? 1);a.set("archived",archived)
-        var c=store.current.wallet.items("cards").first {$0.text("accountId")==a.id} ?? Item();c.set("accountId",a.id);c.set("institution",issuer.isEmpty ? name:issuer);c.set("lastFour",lastFour);c.set("network",network);c.set("design",availableArt.contains(where:{$0.id==design}) ? design:"");c.set("branch",branch);c.set("memo",memo)
+        var c=store.current.wallet.items("cards").first {$0.text("accountId")==a.id} ?? Item();c.set("accountId",a.id);c.set("institution",issuer.isEmpty ? name:issuer);c.set("lastFour",lastFour);c.set("network",network);c.set("design",design=="minimal" || availableArt.contains(where:{$0.id==design}) ? design:"");c.set("branch",branch);c.set("memo",memo)
         if type=="credit" {
             guard Clock.date(statementMonth+"-01") != nil else {throw AppError.message("账单月份格式应为 YYYY-MM")}
             c.set("limitCents",try Money.parse(limit,allowZero:true));c.set("statementCents",try Money.parse(statement,allowZero:true));c.set("statementMonth",statementMonth);c.set("statementDay",Int64(statementDay));c.set("repaymentDay",Int64(repaymentDay))

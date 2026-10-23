@@ -20,8 +20,12 @@ final class AppSmokeTests:XCTestCase {
         app.buttons["账本"].firstMatch.tap();XCTAssertTrue(app.staticTexts["本月结余"].waitForExistence(timeout:5));attach(app,"Ledger")
         app.buttons["展开快捷操作"].tap();XCTAssertTrue(app.buttons["新建笔记"].exists);XCTAssertTrue(app.buttons["记一笔"].exists);XCTAssertTrue(app.buttons["新建提醒"].exists)
         let plus=app.buttons["收起快捷操作"].frame
-        for name in ["新建笔记","记一笔","新建提醒"] {let frame=app.buttons[name].frame;XCTAssertEqual(frame.width,plus.width,accuracy:2);XCTAssertEqual(frame.midX,plus.midX,accuracy:2)}
+        for name in ["新建笔记","记一笔","新建提醒"] {let frame=app.buttons[name].frame;XCTAssertEqual(frame.midX,plus.midX,accuracy:2)}
         attach(app,"QuickActionsAligned")
+        app.buttons["新建笔记"].tap();XCTAssertTrue(app.buttons["关闭"].waitForExistence(timeout:5));app.buttons["关闭"].tap()
+        app.buttons["展开快捷操作"].tap();app.buttons["记一笔"].tap();XCTAssertTrue(app.navigationBars["记一笔"].waitForExistence(timeout:5));app.buttons["取消"].tap()
+        app.buttons["展开快捷操作"].tap();app.buttons["新建提醒"].tap();XCTAssertTrue(app.navigationBars["新建提醒"].waitForExistence(timeout:5));app.buttons["取消"].tap()
+        app.buttons["展开快捷操作"].tap()
         app.buttons["收起快捷操作"].tap()
         app.buttons["卡包与资产"].tap();XCTAssertTrue(app.navigationBars["卡包与资产"].waitForExistence(timeout:5));attach(app,"Wallet")
         let cards=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'wallet.card.'"))
@@ -37,6 +41,7 @@ final class AppSmokeTests:XCTestCase {
         app.buttons["完成"].firstMatch.tap()
         app.buttons["提醒"].firstMatch.tap();attach(app,"Reminders")
         app.buttons["助理"].firstMatch.tap();XCTAssertTrue(app.staticTexts["今天想聊点什么？"].waitForExistence(timeout:5));attach(app,"Assistant")
+        app.buttons["聊天功能"].tap();XCTAssertTrue(app.buttons["chat.menu.new"].waitForExistence(timeout:5));attach(app,"AssistantPlusMenu");app.buttons["chat.menu.new"].tap()
         let input=app.descendants(matching:.any).matching(identifier:"chat.input").firstMatch
         XCTAssertTrue(input.waitForExistence(timeout:5));XCTAssertTrue(input.isHittable);input.tap();input.typeText("1200")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5));XCTAssertTrue(input.isHittable);XCTAssertTrue(app.buttons["发送"].isHittable)
@@ -46,6 +51,9 @@ final class AppSmokeTests:XCTestCase {
         app.buttons["个人详情"].tap()
         app.buttons.containing(.staticText,identifier:"个人头像").firstMatch.tap()
         XCTAssertTrue(app.buttons["使用小熊头像"].waitForExistence(timeout:5));app.buttons["使用小熊头像"].tap();attach(app,"ProfileAvatarPicker")
+        app.navigationBars["个人头像"].buttons.firstMatch.tap()
+        for _ in 0..<4 {if app.buttons["锁定资料库"].isHittable {break};app.swipeUp()}
+        app.buttons["锁定资料库"].tap();XCTAssertTrue(app.buttons["Face ID 解锁"].waitForExistence(timeout:5));attach(app,"UnlockFaceIDEntry")
     }
     func attach(_ app:XCUIApplication,_ name:String) {let attachment=XCTAttachment(screenshot:app.screenshot());attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)}
 }

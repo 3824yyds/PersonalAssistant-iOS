@@ -11,7 +11,12 @@ struct ConversationView:View {
     @StateObject var speech=SpeechService()
     var input:String {get {store.chatDraft} nonmutating set {store.chatDraft=newValue}}
     var finance:Bool {store.financeMode}
-    @State var tools=false
+    @State var voiceMode=false
+    @State var holding=false
+    @State var gestureStarted=false
+    @State var voiceAction=VoiceReleaseAction.send
+    @State var pendingVoice:VoiceReleaseAction?
+    @Environment(\.scenePhase) private var scenePhase
     @State var history=false
     @State var modelMenu=false
     @State var follow=true
@@ -46,30 +51,68 @@ struct ConversationView:View {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
             } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}}
-            .onAppear {store.speech=speech;speech.onFinal={text in input+=(input.isEmpty ? "":" ")+text};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
-            .onChange(of:speech.error) {_,error in if let error {store.error=error;speech.error=nil}}
-            .onDisappear {speech.cancel()}
+            .onAppear {store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
+            .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
+            .onDisappear {cancelVoice()}
+            .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
     }
     var composer:some View {
-        VStack(spacing:0) {
-            if speech.recording {HStack {AIOrb(active:true).frame(width:26,height:26);Text(speech.text.isEmpty ? "正在听…":speech.text).font(.subheadline).lineLimit(3);Spacer();Button("完成") {speech.finish()};Button {speech.cancel()} label:{Image(systemName:"xmark")}.accessibilityLabel("取消语音输入")}.padding(12).appGlass(RoundedRectangle(cornerRadius:18)).aiActivity(true,cornerRadius:18).padding(.horizontal,12).padding(.bottom,8)}
-            HStack(alignment:.bottom,spacing:8) {
-                Menu {
-                    Button("聊天",systemImage:"bubble.left.and.bubble.right") {Task {await store.newChat(finance:false)}}
-                    Button("财务咨询",systemImage:"chart.bar.xaxis") {Task {await store.newChat(finance:true)}}
-                    Divider()
-                    Button("新对话",systemImage:"square.and.pencil") {Task {await store.newChat()}}
-                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}
-                } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy)
+        HStack(alignment:.bottom,spacing:8) {
+            Button {
+                focused=false;voiceMode.toggle()
+                if voiceMode {Task {_=await speech.prepare()}}
+            } label:{Image(systemName:voiceMode ? "keyboard":"waveform").font(.system(size:20)).frame(width:36,height:42)}
+                .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || speech.finishing)
+            if voiceMode {
+                Text(holding ? "松开发送文字":"按住 说话").font(.system(size:16,weight:.medium)).frame(maxWidth:.infinity,minHeight:42)
+                    .background(Theme.accent.opacity(holding ? 0.16:0.04),in:Capsule()).contentShape(Capsule())
+                    .gesture(voiceGesture).accessibilityLabel("按住说话").accessibilityAddTraits(.isButton)
+                    .accessibilityHint("左滑取消，右滑转文字。也可使用开始录音、完成录音和取消录音操作")
+                    .accessibilityAction(named:Text("开始录音")) {beginVoice()}
+                    .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
+                    .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
+            } else {
                 TextField(finance ? "问问你的财务状况…":"发消息…",text:$store.chatDraft,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused).accessibilityIdentifier("chat.input")
-                Button {Task {if speech.recording {speech.finish()}else{await speech.start()}}} label:{Image(systemName:"mic").font(.system(size:20)).frame(width:34,height:42)}.accessibilityLabel("语音输入").disabled(store.assistantBusy)
-                Button {
-                    if store.assistantBusy {store.cancelReply()}else{send()}
-                } label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
-            }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
-        }.background(Theme.background(scheme))
+            }
+            Menu {
+                Section("对话模式") {
+                    Button {if finance {Task {await store.newChat(finance:false)}}} label:{Label("聊天",systemImage:finance ? "bubble.left.and.bubble.right":"checkmark")}
+                    Button {if !finance {Task {await store.newChat(finance:true)}}} label:{Label("财务咨询",systemImage:finance ? "checkmark":"chart.bar.xaxis")}
+                }
+                Section("对话") {
+                    Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
+                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
+                }
+            } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
+            if !voiceMode {
+                Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
+            }
+        }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
     }
+    var voiceGesture:some Gesture {
+        DragGesture(minimumDistance:0,coordinateSpace:.global)
+            .onChanged {value in
+                if !gestureStarted {beginVoice()}
+                guard holding else {return}
+                let action=VoiceGesture.action(horizontal:value.translation.width,vertical:value.translation.height)
+                if voiceAction != action {voiceAction=action;store.voiceCapture=VoiceCaptureState(action:action);UISelectionFeedbackGenerator().selectionChanged()}
+            }
+            .onEnded {_ in gestureStarted=false;guard holding else {return};endVoice(voiceAction)}
+    }
+    func beginVoice() {
+        guard !store.assistantBusy,!speech.finishing else {return}
+        focused=false;holding=true;gestureStarted=true;voiceAction = .send;pendingVoice=nil
+        store.voiceCapture=VoiceCaptureState();UIImpactFeedbackGenerator(style:.light).impactOccurred()
+        Task {await speech.start();if !speech.recording && !speech.finishing {holding=false;store.voiceCapture=nil}}
+    }
+    func endVoice(_ action:VoiceReleaseAction) {
+        holding=false
+        if action == .cancel {cancelVoice();return}
+        guard speech.recording else {cancelVoice();return}
+        pendingVoice=action;store.voiceCapture=VoiceCaptureState(action:action,finishing:true);speech.finish()
+    }
+    func cancelVoice() {pendingVoice=nil;holding=false;gestureStarted=false;store.voiceCapture=nil;speech.cancel()}
     var welcome:some View {
         VStack(alignment:.leading,spacing:22) {
             AIOrb().frame(width:44,height:44).padding(.top,12)
@@ -84,7 +127,7 @@ struct ConversationView:View {
         let question=input.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !question.isEmpty,!store.assistantBusy else{return}
         guard question.count<=20000 else {store.error="消息过长，请分段发送";return}
-        input="";focused=false;tools=false;follow=true
+        input="";focused=false;follow=true
         let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model
         store.messages.append(ChatMessage(role:"user",content:question))
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
@@ -94,7 +137,7 @@ struct ConversationView:View {
                 let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model) {partial in guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial}
                 try Task.checkCancellation();guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
             }catch is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
-            catch {if store.epoch==epoch {store.messages.removeAll {$0.id==answerID};store.present(error)}}
+            catch {if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};store.present(error)}}
         }
     }
 }

@@ -3,6 +3,27 @@ import CryptoKit
 @testable import PersonalAssistant
 
 final class VaultTests:XCTestCase {
+    func testKnownBankAutomaticallyGetsMatchingCardArtwork() {
+        let a=Item(["name":.string("中国银行"),"type":.string("bank")]),c=Item(["network":.string("mastercard")])
+        XCTAssertEqual(Artwork.cardArtwork(account:a,card:c)?.id,"cn_40")
+        let hsbc=Item(["name":.string("汇丰银行"),"type":.string("bank")])
+        XCTAssertEqual(Artwork.cardArtwork(account:hsbc,card:c)?.id,"hsbc_world")
+    }
+    func testIncompatibleBankArtworkIsNotDisplayed() {
+        let a=Item(["name":.string("中国银行"),"type":.string("bank")]),c=Item(["design":.string("cn_200"),"institution":.string("中国工商银行"),"network":.string("unionpay")])
+        XCTAssertEqual(Artwork.cardArtwork(account:a,card:c)?.id,"cn_42")
+    }
+    func testSelectedArtworkAndInstitutionThemeAreRespected() {
+        let a=Item(["name":.string("中国银行"),"type":.string("bank")])
+        XCTAssertEqual(Artwork.cardArtwork(account:a,card:Item(["design":.string("cn_41"),"network":.string("mastercard")]))?.id,"cn_41")
+        XCTAssertNil(Artwork.cardArtwork(account:a,card:Item(["design":.string("minimal"),"network":.string("mastercard")])))
+    }
+    func testOldChatHistoryDecodesWithoutModeAndNewModeRoundTrips() throws {
+        let source=Data("{\"id\":\"legacy\",\"title\":\"你好\",\"updated\":0,\"messages\":[]}".utf8)
+        XCTAssertNil(try JSONDecoder().decode(ChatSession.self,from:source).finance)
+        let session=ChatSession(finance:true)
+        XCTAssertEqual(try JSONDecoder().decode(ChatSession.self,from:JSONEncoder().encode(session)).finance,true)
+    }
     @MainActor func testCancellingReplyInvalidatesOnlyPendingOutput() {
         let store=AppStore();store.messages=[ChatMessage(role:"user",content:"你好"),ChatMessage(role:"assistant",content:"")];store.activeReplyID="old";store.assistantBusy=true
         store.cancelReply();XCTAssertNil(store.activeReplyID);XCTAssertFalse(store.assistantBusy);XCTAssertEqual(store.messages.count,1)

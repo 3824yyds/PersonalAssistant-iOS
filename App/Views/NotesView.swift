@@ -55,6 +55,7 @@ struct NoteEditor:View {
     @State var replace=false
     @State var undo:(String,String)?
     @State var task:Task<Void,Never>?
+    @State var operationID=UUID()
     @State var draftTask:Task<Void,Never>?
     @State var draftLoaded=false
     @State var recovery:Item?
@@ -72,10 +73,10 @@ struct NoteEditor:View {
                 if tools {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.transition(.move(edge:.bottom).combined(with:.opacity))}
                 HStack {
                     Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb(active:working).frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true).aiActivity(working,cornerRadius:24)}.buttonStyle(.plain)
-                    if working {Button("取消") {task?.cancel();working=false}.font(.caption)}
+                    if working {Button("取消") {cancelOperation()}.font(.caption)}
                     Spacer()
                     if undo != nil {Button {if let previous=undo {title=previous.0;bodyText=previous.1;undo=nil}} label:{Image(systemName:"arrow.uturn.backward")}.accessibilityLabel("撤销采用")}
-                    Button {if VNDocumentCameraViewController.isSupported {scanner=true} else {store.error="这台设备不支持文稿扫描"}} label:{Image(systemName:"text.viewfinder").frame(width:38,height:38)}.accessibilityLabel("拍照识字")
+                    Button {if VNDocumentCameraViewController.isSupported {scanner=true} else {store.error="这台设备不支持文稿扫描"}} label:{Image(systemName:"text.viewfinder").frame(width:38,height:38)}.accessibilityLabel("拍照识字").disabled(working)
                 }.padding(.horizontal,16)
             }.padding(.vertical,8)}
         }.background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
@@ -83,7 +84,7 @@ struct NoteEditor:View {
             .interactiveDismissDisabled(working || title != savedTitle || bodyText != savedBody)
             .confirmationDialog("保存笔记后再关闭？",isPresented:$confirmClose,titleVisibility:.visible) {Button("保存并关闭") {save()}.disabled(working || title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty);Button("放弃更改",role:.destructive) {draftTask?.cancel();try? FileManager.default.removeItem(at:PrivateFiles.url("note-draft.pavault"));dismiss()};Button("继续编辑",role:.cancel) {}}
             .onAppear {load()}.onChange(of:title) {_,_ in scheduleDraft()}.onChange(of:bodyText) {_,_ in scheduleDraft()}
-            .onDisappear {task?.cancel();draftTask?.cancel()}
+            .onDisappear {cancelOperation();draftTask?.cancel()}
             .confirmationDialog("找到未保存的笔记草稿",isPresented:$recoverPrompt,titleVisibility:.visible) {Button("恢复草稿") {if let n=recovery {title=n.text("title");bodyText=n.text("body")}};Button("保留已保存内容",role:.cancel) {}}
             .sheet(isPresented:$preview) {NavigationStack {ScrollView {VStack(alignment:.leading,spacing:18) {if replace {Text(resultTitle).font(.title3.weight(.semibold))};MarkdownBody(text:resultBody);if !evidence.isEmpty {Divider();DisclosureGroup("查看原文依据") {VStack(alignment:.leading,spacing:12) {ForEach(Array(evidence.enumerated()),id:\.offset) {_,quote in Text(quote).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)}}.padding(.top,8)}}}.frame(maxWidth:.infinity,alignment:.leading).padding(20)}.navigationTitle(replace ? "润色预览":"整理预览").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {preview=false}};ToolbarItem(placement:.confirmationAction) {Button("采用") {undo=(title,bodyText);if replace {title=resultTitle;bodyText=resultBody}else{bodyText+="\n\n"+resultBody};preview=false}}}}}
             .sheet(isPresented:$scanner) {DocumentScanner {images in scanner=false;task=Task {working=true;defer{working=false};do {let result=try await OCRService.recognize(images);bodyText+=(bodyText.isEmpty ? "":"\n")+result}catch{store.present(error)}}} onCancel:{scanner=false}}
@@ -97,7 +98,8 @@ struct NoteEditor:View {
         if let bytes=try? PrivateFiles.boundedRead(PrivateFiles.url("note-draft.pavault")),let plain=try? VaultCrypto.decrypt(bytes,key:key),let draft=try? JSONDecoder().decode(Item.self,from:plain),draft.text("slot")==id,draft.int("baseUpdatedAt")==((note?.int("updatedAt")) ?? 0) {recovery=draft;recoverPrompt=true}
     }
     func scheduleDraft() {
-        guard draftLoaded,!recoverPrompt,store.document != nil else{return};dirty=true;draftTask?.cancel()
+        guard draftLoaded,!recoverPrompt,store.document != nil else{return};draftTask?.cancel()
+        guard title != savedTitle || bodyText != savedBody else {return};dirty=true
         let draft=Item(["slot":.string(note?.id ?? "new"),"baseUpdatedAt":.int(note?.int("updatedAt") ?? 0),"title":.string(title),"body":.string(bodyText)]),key=store.key,salt=store.salt
         draftTask=Task {do {try await Task.sleep(nanoseconds:750_000_000);try Task.checkCancellation();let plain=try JSONEncoder().encode(draft);try PrivateFiles.write(VaultCrypto.encrypt(plain,key:key,salt:salt),name:"note-draft.pavault")}catch{}}
     }
@@ -107,16 +109,18 @@ struct NoteEditor:View {
         Task {if await store.commit({$0.upsert(n,in:"notes")}) {draftTask?.cancel();try? FileManager.default.removeItem(at:PrivateFiles.url("note-draft.pavault"));dismiss()}}
     }
     func run(_ mode:String) {
+        guard !working else {return}
         guard !bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {store.error="请先填写笔记正文";return}
         guard store.cloudEnabled && store.hasAPIKey else {store.error="笔记润色与整理使用云端，请先在个人详情配置 DeepSeek 并开启云端智能";return}
         let epoch=store.epoch,source=bodyText,originalTitle=title,model=store.model
-        working=true;evidence=[]
-        task=Task {defer{working=false};do {
+        let operation=UUID();operationID=operation;working=true;evidence=[]
+        task=Task {defer{if operationID==operation {working=false}};do {
             if mode=="润色" {let result=try await AIService.polish(title:originalTitle,body:source,model:model);try Task.checkCancellation();guard store.epoch==epoch else{return};resultTitle=result.0;resultBody=result.1;replace=true}
             else {let result=try await AIService.noteAction(source,mode:mode,model:model);try Task.checkCancellation();guard store.epoch==epoch else{return};resultTitle=mode;resultBody=result.body;evidence=result.evidence;replace=false}
             preview=true
-        }catch{store.present(error)}}
+        }catch{if operationID==operation,store.epoch==epoch {store.present(error)}}}
     }
+    func cancelOperation() {operationID=UUID();task?.cancel();task=nil;working=false}
 }
 
 enum OCRService {
