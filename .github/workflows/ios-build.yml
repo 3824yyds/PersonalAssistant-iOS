@@ -1,0 +1,60 @@
+name: iOS build and unsigned IPA
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Core finance and migration tests
+        run: swift test
+  ios-smoke:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 Scripts/generate_project.py
+      - name: Select an installed iPhone simulator
+        run: |
+          python3 - <<'PY'
+          import json,subprocess,os
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          candidates=[d for runtime,ds in devices.items() if 'iOS' in runtime for d in ds if d['name'].startswith('iPhone')]
+          assert candidates,'No available iPhone simulator'
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
+          PY
+      - name: iOS crypto, migration and UI smoke tests
+        run: |
+          mkdir -p build
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Tests.xcresult CODE_SIGNING_ALLOWED=NO test > build/simulator-test.log 2>&1 || { tail -n 160 build/simulator-test.log; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iOS-test-results
+          path: build/
+          retention-days: 7
+  ipa:
+    needs: [core, ios-smoke]
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Metal runtime and device IPA
+        run: bash Scripts/build-ipa.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PersonalAssistant-iOS-3.5.1-unsigned
+          path: |
+            build/*.ipa
+            build/*.verification.json
+            build/SHA256SUMS.txt
+            build/device-build.log
+          retention-days: 14

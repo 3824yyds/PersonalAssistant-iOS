@@ -1,0 +1,8 @@
+build/
+NativeBuild/
+.build/
+.DS_Store
+*.p12
+*.mobileprovision
+*.p8
+xcuserdata/
