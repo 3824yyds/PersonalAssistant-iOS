@@ -63,11 +63,18 @@ struct CardArtwork: Codable, Identifiable { var id:String, bank:String, title:St
 enum Artwork {
     static let accounts: [AccountPreset] = load("AccountPresets")
     static let cards: [CardArtwork] = load("CardArtwork")
+    static func bank(_ name:String)->String? {
+        let aliases:[String:[String]]=["中国工商银行":["工商银行","工行"],"中国建设银行":["建设银行","建行"],"中国农业银行":["农业银行","农行"],"中国银行":["中行"],"中国邮政储蓄银行":["邮政储蓄银行","邮储银行","邮储"],"中国民生银行":["民生银行"],"招商银行":["招行"],"交通银行":["交行"],"上海浦东发展银行":["浦发银行"],"中国光大银行":["光大银行"]]
+        let normalized=name.replacingOccurrences(of:" ",with:"")
+        for (bank,short) in aliases where ([bank]+short).contains(where:{normalized.contains($0)}) {return bank}
+        return accounts.first {$0.type=="bank" && $0.name==name}?.name
+    }
     static func load<T: Decodable>(_ name: String) -> T where T: ExpressibleByArrayLiteral {
         guard let url = Bundle.main.url(forResource:name,withExtension:"json"), let data = try? Data(contentsOf:url), let value = try? JSONDecoder().decode(T.self,from:data) else { return [] }; return value
     }
     static func index(_ name:String,_ type:String)->Int {
-        if let i = accounts.firstIndex(where:{$0.name == name}) { return i }
+        let canonical=bank(name) ?? name
+        if let i = accounts.firstIndex(where:{$0.name == canonical}) { return i }
         if let match = accounts.enumerated().filter({$0.offset>=3 && (name.contains($0.element.name) || $0.element.name.contains(name))}).max(by:{$0.element.name.count<$1.element.name.count}) { return match.offset }
         return type == "cash" ? 0:type == "credit" ? 2:type == "wallet" ? 98:1
     }

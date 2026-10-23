@@ -135,7 +135,10 @@ struct AccountEditor:View {
     @State var branch=""
     @State var archived=false
     @State var presets=false
-    var availableArt:[CardArtwork] {Artwork.cards.filter {$0.bank==name && $0.kind==type && $0.network==network}}
+    @State var loaded=false
+    @State var institution=""
+    var issuer:String {Artwork.bank(name) ?? Artwork.bank(institution) ?? institution}
+    var availableArt:[CardArtwork] {Artwork.cards.filter {$0.bank==issuer && $0.kind==type && $0.network==network}}
     var body:some View {
         Form {
             Section("账户") {
@@ -161,17 +164,18 @@ struct AccountEditor:View {
             Section {TextField("备注",text:$memo,axis:.vertical);if account != nil {Toggle("归档账户",isOn:$archived)}}
         }.navigationTitle(account==nil ? "新建账户":"编辑账户").navigationBarTitleDisplayMode(.inline)
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy)}}
-            .onAppear {load()}.onChange(of:name) {_,_ in design=""}.onChange(of:network) {_,_ in design=""}.onChange(of:type) {_,_ in design=""}
-            .sheet(isPresented:$presets) {AccountPresetsView {p in name=p.name;currency=p.currency;type=p.type;design="";presets=false}}
+            .onAppear {if !loaded {load();DispatchQueue.main.async {loaded=true}}}.onChange(of:name) {_,_ in clearIncompatibleArt()}.onChange(of:network) {_,_ in clearIncompatibleArt()}.onChange(of:type) {_,_ in clearIncompatibleArt()}
+            .sheet(isPresented:$presets) {AccountPresetsView {p in name=p.name;institution=p.name;if account==nil {currency=p.currency};type=p.type;design="";presets=false}}
     }
     func load() {
         guard let a=account else {currency=store.currency;return};name=a.text("name");currency=a.text("currency",fallback:"CNY");type=a.text("type",fallback:"bank");opening=Money.amount(a.int("openingCents"));archived=a.bool("archived")
-        if let c=store.current.wallet.items("cards").first(where:{$0.text("accountId")==a.id}) {lastFour=c.text("lastFour");network=c.text("network",fallback:"unionpay");design=c.text("design");limit=Money.amount(c.int("limitCents"));statement=Money.amount(c.int("statementCents"));statementMonth=c.text("statementMonth",fallback:Clock.month());statementDay=Int(c.int("statementDay",fallback:1));repaymentDay=Int(c.int("repaymentDay",fallback:20));branch=c.text("branch");memo=c.text("memo")}
+        if let c=store.current.wallet.items("cards").first(where:{$0.text("accountId")==a.id}) {institution=c.text("institution");lastFour=c.text("lastFour");network=c.text("network",fallback:"unionpay");design=c.text("design");limit=Money.amount(c.int("limitCents"));statement=Money.amount(c.int("statementCents"));statementMonth=c.text("statementMonth",fallback:Clock.month());statementDay=max(1,Int(c.int("statementDay",fallback:1)));repaymentDay=max(1,Int(c.int("repaymentDay",fallback:20)));branch=c.text("branch");memo=c.text("memo")}
     }
+    func clearIncompatibleArt() {if loaded && !availableArt.contains(where:{$0.id==design}) {design=""}}
     func save() {do {
         guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty, name.count<=100,lastFour.isEmpty || lastFour.range(of:#"^[0-9]{4}$"#,options:.regularExpression) != nil else {throw AppError.message("请核对账户名称及卡号后四位")}
         var a=account ?? Item.make();a.set("name",name.trimmingCharacters(in:.whitespacesAndNewlines));a.set("currency",currency);a.set("type",type);a.set("openingCents",try Money.parse(opening,signed:true,allowZero:true));a.set("openingDate",account?.int("openingDate",fallback:1) ?? 1);a.set("archived",archived)
-        var c=store.current.wallet.items("cards").first {$0.text("accountId")==a.id} ?? Item();c.set("accountId",a.id);c.set("institution",name);c.set("lastFour",lastFour);c.set("network",network);c.set("design",availableArt.contains(where:{$0.id==design}) ? design:"");c.set("branch",branch);c.set("memo",memo)
+        var c=store.current.wallet.items("cards").first {$0.text("accountId")==a.id} ?? Item();c.set("accountId",a.id);c.set("institution",issuer.isEmpty ? name:issuer);c.set("lastFour",lastFour);c.set("network",network);c.set("design",availableArt.contains(where:{$0.id==design}) ? design:"");c.set("branch",branch);c.set("memo",memo)
         if type=="credit" {
             guard Clock.date(statementMonth+"-01") != nil else {throw AppError.message("账单月份格式应为 YYYY-MM")}
             c.set("limitCents",try Money.parse(limit,allowZero:true));c.set("statementCents",try Money.parse(statement,allowZero:true));c.set("statementMonth",statementMonth);c.set("statementDay",Int64(statementDay));c.set("repaymentDay",Int64(repaymentDay))

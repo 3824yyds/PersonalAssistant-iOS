@@ -53,7 +53,7 @@ enum Keychain {
             guard let access = SecAccessControlCreateWithFlags(nil,kSecAttrAccessibleWhenUnlockedThisDeviceOnly,.userPresence,&error) else { throw AppError.message("设备身份认证不可用") }
             query[kSecAttrAccessControl as String] = access
         } else { query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly }
-        let old = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:name]
+        let old: [String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:name]
         SecItemDelete(old as CFDictionary)
         guard SecItemAdd(query as CFDictionary,nil) == errSecSuccess else { throw AppError.message("无法保存到系统钥匙串") }
     }
