@@ -105,7 +105,7 @@ struct NoteEditor:View {
                 }.padding(.horizontal,16)
             }.padding(.vertical,8)}
         }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
-            .toolbar {ToolbarItem(placement:.cancellationAction) {Button("关闭") {if proposal != nil {proposal=nil}else if title != savedTitle || bodyText != savedBody {confirmClose=true}else{dismiss()}}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy || working || proposal != nil || title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)}}
+            .toolbar {ToolbarItem(placement:.cancellationAction) {Button("关闭") {proposal=nil;if title != savedTitle || bodyText != savedBody {confirmClose=true}else{dismiss()}}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy || working || proposal != nil || title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)}}
             .interactiveDismissDisabled(working || proposal != nil || title != savedTitle || bodyText != savedBody)
             .confirmationDialog("保存笔记后再关闭？",isPresented:$confirmClose,titleVisibility:.visible) {Button("保存并关闭") {save()}.disabled(working || title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty);Button("放弃更改",role:.destructive) {draftTask?.cancel();try? FileManager.default.removeItem(at:PrivateFiles.url("note-draft.pavault"));dismiss()};Button("继续编辑",role:.cancel) {}}
             .onAppear {load()}.onChange(of:title) {_,_ in scheduleDraft()}.onChange(of:bodyText) {_,_ in scheduleDraft()}

@@ -149,7 +149,10 @@ final class AppSmokeTests:XCTestCase {
             else {XCTAssertTrue(adopted?.hasPrefix((original ?? "")+"\n\n")==true);XCTAssertTrue(adopted?.contains("## "+mode)==true)}
             app.buttons["撤销采用"].tap();XCTAssertEqual(body.value as? String,original)
         }
+        app.buttons["AI 工具"].tap();app.buttons["润色"].tap()
+        XCTAssertTrue(app.buttons["note.proposal.adopt"].waitForExistence(timeout:5))
         app.buttons["关闭"].tap()
+        XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:5),"Closing an unadopted proposal returns to the original page")
     }
     func testWebAnswersHaveCompactExpandableSources() {
         continueAfterFailure=false
