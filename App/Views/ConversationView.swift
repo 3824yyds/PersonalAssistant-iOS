@@ -128,7 +128,7 @@ struct ConversationView:View {
         VStack(spacing:18) {
             AIOrb(active:true,colorful:true).frame(width:44,height:44).accessibilityIdentifier("assistant.orb")
             Text(finance ? "一起理清你的财务":"今天心情怎么样？").font(.system(size:28,weight:.regular)).multilineTextAlignment(.center).frame(maxWidth:290)
-        }.frame(maxWidth:.infinity).accessibilityIdentifier("assistant.greeting")
+        }.frame(maxWidth:.infinity).accessibilityElement(children:.contain).accessibilityIdentifier("assistant.greeting")
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
     func send() {

@@ -34,6 +34,7 @@ struct MainTabs: View {
             Theme.background(scheme)
                 .overlay {Color.black.opacity(expanded ? 0.14:0)}
                 .ignoresSafeArea().allowsHitTesting(false)
+            if tab==3 {ConversationBackground().ignoresSafeArea().allowsHitTesting(false)}
             VStack(spacing:0) {
             ZStack {
             // One navigation container avoids TabView applying keyboard insets a second time.

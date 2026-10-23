@@ -103,7 +103,7 @@ struct AIOrb: View {
                     clouds.fill(cloud,with:.color(color.opacity(i%2==0 ? 0.82:0.65)))
                 }
             }.clipShape(Circle())
-        }.accessibilityLabel(active ? "AI 正在处理":"智能助理")
+        }.accessibilityElement(children:.ignore).accessibilityLabel(active ? "AI 正在处理":"智能助理")
     }
 }
 enum AIMotion {
