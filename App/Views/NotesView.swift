@@ -70,9 +70,9 @@ struct NoteEditor:View {
             }.scrollDismissesKeyboard(.interactively)
             AppGlassGroup {VStack(spacing:10) {
                 if working {ProcessingBar(label:"正在整理笔记").padding(.horizontal,16)}
-                if tools {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.transition(.move(edge:.bottom).combined(with:.opacity))}
+                if tools && !working {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.transition(.move(edge:.bottom).combined(with:.opacity))}
                 HStack {
-                    Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb(active:working).frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true).aiActivity(working,cornerRadius:24)}.buttonStyle(.plain)
+                    if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb(active:working).frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true).aiActivity(working,cornerRadius:24)}.buttonStyle(.plain)}
                     if working {Button("取消") {cancelOperation()}.font(.caption)}
                     Spacer()
                     if undo != nil {Button {if let previous=undo {title=previous.0;bodyText=previous.1;undo=nil}} label:{Image(systemName:"arrow.uturn.backward")}.accessibilityLabel("撤销采用")}

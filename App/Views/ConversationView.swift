@@ -25,10 +25,6 @@ struct ConversationView:View {
     @FocusState var focused:Bool
     var body:some View {
         VStack(spacing:0) {
-            HStack(spacing:12) {
-                Picker("对话模式",selection:Binding(get:{finance},set:{value in Task {await store.newChat(finance:value)}})) {Text("聊天").tag(false);Text("财务咨询").tag(true)}.pickerStyle(.segmented).disabled(store.assistantBusy)
-                Button {focused=false;history=true} label:{Image(systemName:"clock.arrow.circlepath").font(.system(size:19)).frame(width:36,height:36)}.accessibilityLabel("历史对话")
-            }.padding(.horizontal,16).padding(.bottom,10)
             GeometryReader {geometry in
                 ScrollViewReader {proxy in
                     ScrollView {
@@ -50,7 +46,7 @@ struct ConversationView:View {
             .toolbar {if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
-            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}}
+            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.semibold)).foregroundStyle(.primary)}}}
             .onAppear {store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}}
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
             .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}

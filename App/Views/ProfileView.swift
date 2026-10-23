@@ -58,7 +58,7 @@ struct ProfileView:View {
             }
             Section {
                 PhotosPicker(selection:$photo,matching:.images,photoLibrary:.shared()) {Label(loading ? "正在处理照片…":"从相册选择",systemImage:"photo")}.disabled(loading || store.busy)
-                if !store.current.settings.text("profilePng").isEmpty {Button("使用上次的照片") {selectionID=UUID();Task {await store.setting("profileAvatar",.string("custom"))}}}
+                if store.current.settings.text("profileAvatar") != "custom",!store.current.settings.text("profilePng").isEmpty {Button("使用上次的照片") {selectionID=UUID();Task {await store.setting("profileAvatar",.string("custom"))}}}
             } footer:{Text("头像保存在本机加密资料库中。")}
         }.navigationTitle("个人头像").navigationBarTitleDisplayMode(.inline)
             .onChange(of:photo) {_,item in

@@ -53,10 +53,10 @@ struct MainTabs: View {
                         VStack(spacing:4) { Image(systemName:tabs[i].1).font(.system(size:18)); Text(tabs[i].0).font(.system(size:10,weight:tab==i ? .semibold:.regular)) }.frame(maxWidth:.infinity,minHeight:46).foregroundStyle(tab==i ? Theme.accent:.secondary)
                     }.buttonStyle(.plain).accessibilityAddTraits(tab==i ? .isSelected:[])
                 }
-                Button { animate { expanded.toggle() }; UIImpactFeedbackGenerator(style:.light).impactOccurred() } label: {
+                if tab != 3 {Button { animate { expanded.toggle() }; UIImpactFeedbackGenerator(style:.light).impactOccurred() } label: {
                     Image(systemName:"plus").font(.system(size:22,weight:.regular)).rotationEffect(.degrees(expanded ? 45:0)).frame(width:44,height:44).appGlass(Circle(),interactive:true,tinted:true).foregroundStyle(.white)
-                }.buttonStyle(.plain).accessibilityLabel(expanded ? "收起快捷操作":"展开快捷操作").padding(.leading,8).padding(.trailing,16)
-            }.padding(.vertical,6).padding(.leading,8).appGlass(Capsule())
+                }.buttonStyle(.plain).accessibilityLabel(expanded ? "收起快捷操作":"展开快捷操作").padding(.leading,8).padding(.trailing,16)}
+            }.padding(.vertical,6).padding(.leading,8).padding(.trailing,tab==3 ? 8:0).appGlass(Capsule())
                 .padding(.horizontal,12).padding(.bottom,4)
             }
             }
