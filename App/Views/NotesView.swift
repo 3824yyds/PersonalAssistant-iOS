@@ -122,7 +122,9 @@ struct NoteEditor:View {
     }
     func scheduleDraft() {
         guard draftLoaded,!recoverPrompt,store.document != nil else{return};draftTask?.cancel()
-        guard title != savedTitle || bodyText != savedBody else {return};dirty=true
+        guard title != savedTitle || bodyText != savedBody else {
+            try? FileManager.default.removeItem(at:PrivateFiles.url("note-draft.pavault"));dirty=false;return
+        };dirty=true
         let draft=Item(["slot":.string(note?.id ?? "new"),"baseUpdatedAt":.int(note?.int("updatedAt") ?? 0),"title":.string(title),"body":.string(bodyText)]),key=store.key,salt=store.salt
         draftTask=Task {do {try await Task.sleep(nanoseconds:750_000_000);try Task.checkCancellation();let plain=try JSONEncoder().encode(draft);try PrivateFiles.write(VaultCrypto.encrypt(plain,key:key,salt:salt),name:"note-draft.pavault")}catch{}}
     }

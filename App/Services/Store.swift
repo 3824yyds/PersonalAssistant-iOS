@@ -87,7 +87,12 @@ struct VoiceCaptureState:Equatable {
                 return (d,key,salt)
             }.value
             guard unlockEpoch==epoch else {return}
-            key = result.1; salt = result.2; var d = result.0; d.accounts = Finance.accounts(d); document = d; hasVault = true
+            key = result.1; salt = result.2; var d = result.0
+            #if DEBUG
+            // Each UI test receives its own deterministic in-memory content, even after relaunch.
+            if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
+            #endif
+            d.accounts = Finance.accounts(d); document = d; hasVault = true
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = d.settings.text("model",fallback:"deepseek-chat")
             restoreAppearance(d)
             Keychain.delete("attempts"); epoch = UUID(); await loadHistory()
