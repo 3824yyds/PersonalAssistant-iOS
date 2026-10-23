@@ -6,6 +6,7 @@ private struct BottomPreference:PreferenceKey {
     static func reduce(value:inout CGFloat,nextValue:()->CGFloat) {value=nextValue()}
 }
 struct ConversationView:View {
+    var onBack:(()->Void)?
     @EnvironmentObject var store:AppStore
     @Environment(\.colorScheme) var scheme
     @StateObject var speech=SpeechService()
@@ -29,7 +30,7 @@ struct ConversationView:View {
                 ScrollViewReader {proxy in
                     ScrollView {
                         LazyVStack(alignment:.leading,spacing:22) {
-                            if store.messages.isEmpty {welcome}
+                            if store.messages.isEmpty {welcome.frame(minHeight:max(0,geometry.size.height-32))}
                             ForEach(store.messages) {message in ChatBubble(message:message,working:store.assistantBusy && message.id==store.messages.last?.id)}
                             Color.clear.frame(height:1).id("latest").background(GeometryReader {g in Color.clear.preference(key:BottomPreference.self,value:g.frame(in:.named("conversationScroll")).minY)})
                         }.padding(16)
@@ -40,13 +41,15 @@ struct ConversationView:View {
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }
-            composer.layoutPriority(1)
+            VStack(spacing:8) {modePicker;composer}.layoutPriority(1)
         }
-            .background(Theme.background(scheme)).navigationTitle("").navigationBarTitleDisplayMode(.inline)
-            .toolbar {if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
+            .background {ConversationBackground()}.navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement:.topBarLeading) {Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:18)).frame(minWidth:28,minHeight:28)}.accessibilityLabel("返回")}
+                if !finance {ToolbarItem(placement:.topBarLeading) {Menu {
                 ForEach(availableModels,id:\.self) {m in Button {Task {await store.setting("model",.string(m))}} label:{HStack {Text(modelLabel(m));if store.model==m {Image(systemName:"checkmark")}}}}
                 Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
-            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.semibold));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.semibold)).foregroundStyle(.primary)}}}
+            } label:{HStack(spacing:4) {Text(modelLabel(store.model)).font(.system(size:15,weight:.medium));Image(systemName:"chevron.down").font(.system(size:9,weight:.semibold))}}.disabled(store.assistantBusy)}}else{ToolbarItem(placement:.topBarLeading) {Text("财务咨询").font(.system(size:15,weight:.medium)).foregroundStyle(.primary)}}}
             .onAppear {
                 #if DEBUG
                 DebugFixtures.showThinking(in:store)
@@ -57,6 +60,17 @@ struct ConversationView:View {
             .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
+    }
+    var modePicker:some View {
+        HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
+    }
+    func mode(_ title:String,finance target:Bool)->some View {
+        Button {focused=false;if finance != target {Task {await store.newChat(finance:target)}}} label:{
+            Text(title).font(.system(size:13,weight:finance==target ? .medium:.regular)).foregroundStyle(.primary)
+                .padding(.horizontal,18).frame(height:32)
+                .background {if finance==target {Capsule().fill(Theme.panel(scheme)).overlay {Capsule().strokeBorder(.primary.opacity(0.08),lineWidth:0.5)}}}
+        }.buttonStyle(.plain).accessibilityIdentifier(target ? "chat.mode.finance":"chat.mode.chat")
+            .accessibilityAddTraits(finance==target ? .isSelected:[]).disabled(store.assistantBusy || holding || speech.finishing)
     }
     var composer:some View {
         HStack(alignment:.bottom,spacing:8) {
@@ -77,10 +91,6 @@ struct ConversationView:View {
                 TextField(finance ? "问问你的财务状况…":"发消息…",text:$store.chatDraft,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused).accessibilityIdentifier("chat.input")
             }
             Menu {
-                Section("对话模式") {
-                    Button {if finance {Task {await store.newChat(finance:false)}}} label:{Label("聊天",systemImage:finance ? "bubble.left.and.bubble.right":"checkmark")}
-                    Button {if !finance {Task {await store.newChat(finance:true)}}} label:{Label("财务咨询",systemImage:finance ? "checkmark":"chart.bar.xaxis")}
-                }
                 Section("对话") {
                     Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
@@ -115,13 +125,10 @@ struct ConversationView:View {
     }
     func cancelVoice() {pendingVoice=nil;holding=false;gestureStarted=false;store.voiceCapture=nil;speech.cancel()}
     var welcome:some View {
-        VStack(alignment:.leading,spacing:22) {
-            AIOrb().frame(width:44,height:44).padding(.top,12)
-            Text(finance ? "一起理清你的财务":"今天想聊点什么？").font(.system(size:23,weight:.semibold))
-            let suggestions=finance ? ["分析我本月的收支","我的信用卡还款压力大吗？","帮我制定月度预算","我有哪些财务风险？"]:["你是谁？","帮我润色一段文字","这个应用怎么记账？","帮我写一段代码"]
-            ForEach(suggestions,id:\.self) {text in Button {input=text;send()} label:{HStack {Text(text).font(.system(size:14));Spacer();Image(systemName:"arrow.up.left").font(.caption)}.padding(14).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14))}.buttonStyle(.plain)}
-            if store.cloudEnabled && store.hasAPIKey {Text(finance ? "云端已开启：问题、近期对话和相关财务资料会原文发送至 DeepSeek，可在个人详情关闭。":"云端已开启：问题和近期对话会发送至 DeepSeek，可在个人详情关闭。").font(.caption2).foregroundStyle(.secondary)}
-        }.padding(.bottom,16)
+        VStack(spacing:18) {
+            AIOrb(active:true,colorful:true).frame(width:44,height:44).accessibilityIdentifier("assistant.orb")
+            Text(finance ? "一起理清你的财务":"今天心情怎么样？").font(.system(size:28,weight:.regular)).multilineTextAlignment(.center).frame(maxWidth:290)
+        }.frame(maxWidth:.infinity).accessibilityIdentifier("assistant.greeting")
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
     func send() {
@@ -151,13 +158,22 @@ struct ChatBubble:View {
             VStack(alignment:.leading,spacing:8) {
                 if message.role != "user" {Text(message.source).font(.system(size:10)).foregroundStyle(.secondary)}
                 VStack(alignment:.leading,spacing:10) {
-                    if message.content.isEmpty && working {Text("正在思考…").font(.subheadline).foregroundStyle(.secondary).padding(.vertical,4)}
-                    else {MarkdownBody(text:message.content)}
-                }.padding(13).background(message.role=="user" ? Theme.accent.opacity(0.09):Theme.panel(scheme),in:RoundedRectangle(cornerRadius:17,style:.continuous)).clipShape(RoundedRectangle(cornerRadius:17,style:.continuous)).aiActivity(working,cornerRadius:17)
+                    if message.content.isEmpty && working {Text("正在思考…").font(.subheadline).aiText(revealing:true).padding(.vertical,4)}
+                    else {MarkdownBody(text:message.content).aiText(revealing:working && message.role != "user")}
+                }.padding(message.role=="user" ? 13:0)
+                    .background(message.role=="user" ? Theme.accent.opacity(0.09):.clear,in:RoundedRectangle(cornerRadius:17,style:.continuous))
                 if message.role != "user" && !working {Button {UIPasteboard.general.string=message.content;UIImpactFeedbackGenerator(style:.light).impactOccurred()} label:{Image(systemName:"doc.on.doc").font(.system(size:13)).frame(width:32,height:30)}.foregroundStyle(.secondary).accessibilityLabel("复制回答")}
             }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             if message.role != "user" {Spacer(minLength:6)}
         }.contextMenu {Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content}}
+    }
+}
+struct ConversationBackground:View {
+    @Environment(\.colorScheme) private var scheme
+    var body:some View {
+        GeometryReader {proxy in Theme.background(scheme).overlay(alignment:.bottom) {
+            Rectangle().fill(LinearGradient(colors:[.clear,Color(red:0.55,green:0.78,blue:1).opacity(scheme == .dark ? 0.10:0.32)],startPoint:.top,endPoint:.bottom)).frame(height:proxy.size.height*0.58)
+        }}.ignoresSafeArea(edges:.bottom).allowsHitTesting(false)
     }
 }
 struct MarkdownBody:View {

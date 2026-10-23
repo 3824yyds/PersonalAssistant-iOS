@@ -25,6 +25,7 @@ struct MainTabs: View {
     @Environment(\.colorScheme) var scheme
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var tab = 0
+    @State private var previousTab=0
     @State var expanded = false
     @State var sheet: RootSheet?
     @StateObject private var keyboard = KeyboardVisibility()
@@ -41,14 +42,14 @@ struct MainTabs: View {
                     switch tab {
                     case 1: LedgerView()
                     case 2: RemindersView()
-                    case 3: ConversationView()
+                    case 3: ConversationView(onBack:{tab=previousTab})
                     default: NotesView()
                     }
                 }.toolbar { ToolbarControls(sheet:$sheet) }
             }.id(tab)
             if expanded { Color.black.opacity(0.14).contentShape(Rectangle()).onTapGesture { animate { expanded=false } } }
             }.clipped()
-            if !keyboard.visible {
+            if !keyboard.visible && tab != 3 {
             MainNavigation(selection:$tab,expanded:$expanded)
             }
             }
@@ -64,6 +65,7 @@ struct MainTabs: View {
             if let voice=store.voiceCapture,let speech=store.speech {VoiceCaptureOverlay(speech:speech,state:voice).ignoresSafeArea().allowsHitTesting(false).zIndex(2)}
         }
         .onChange(of:keyboard.visible) { _,visible in if visible {expanded=false} }
+        .onChange(of:tab) {old,new in if new==3 && old != 3 {previousTab=old}}
         .sheet(item:$sheet) { value in
             NavigationStack {
                 switch value { case .note:NoteEditor();case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }

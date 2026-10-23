@@ -70,7 +70,7 @@ struct AppGlass<S:Shape>:ViewModifier {
 }
 extension View {
     func appGlass<S:Shape>(_ shape:S,interactive:Bool=false,tinted:Bool=false)->some View {modifier(AppGlass(shape:shape,interactive:interactive,tinted:tinted))}
-    func aiActivity(_ active:Bool,cornerRadius:CGFloat=17)->some View {overlay {AIFlowEffect(active:active,radius:cornerRadius).allowsHitTesting(false).accessibilityHidden(true)}}
+    func aiText(revealing:Bool=false,initial:Bool=false)->some View {modifier(AITextReveal(active:revealing,initial:initial))}
 }
 struct AppGlassGroup<Content:View>:View {
     @ViewBuilder var content:()->Content
@@ -82,6 +82,7 @@ struct AppGlassGroup<Content:View>:View {
 /// Blue-and-white cloud sphere, drawn at the displayed resolution with no bitmap edges.
 struct AIOrb: View {
     var active=false
+    var colorful=false
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body:some View {
         TimelineView(.animation(minimumInterval:1.0/30,paused:!active || reduced)) { timeline in
@@ -98,7 +99,7 @@ struct AIOrb: View {
                     let y=side*(0.48+CGFloat(cos(phase*0.83+Double(i)))*0.23)
                     let width=side*(i%2==0 ? 0.88:0.64)
                     let cloud=Path(ellipseIn:CGRect(x:x-width/2,y:y-side*0.23,width:width,height:side*0.46))
-                    let color:Color=i%2==0 ? .white:Color(red:0.18,green:0.51,blue:0.96)
+                    let color:Color=colorful ? AIMotion.colors[i%AIMotion.colors.count]:(i%2==0 ? .white:Color(red:0.18,green:0.51,blue:0.96))
                     clouds.fill(cloud,with:.color(color.opacity(i%2==0 ? 0.82:0.65)))
                 }
             }.clipShape(Circle())
@@ -108,47 +109,10 @@ struct AIOrb: View {
 enum AIMotion {
     static let colors=[Color(red:0.24,green:0.48,blue:1),Color(red:0.15,green:0.72,blue:0.9),Color(red:0.32,green:0.76,blue:0.59),Color(red:0.98,green:0.71,blue:0.35),Color(red:0.79,green:0.43,blue:0.85)]
 }
-/// Soft, contained fields of light; no spinning outline or moving hard edge.
-struct AIFlowEffect:View {
-    var active:Bool
-    var radius:CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduced
-    @Environment(\.colorScheme) private var scheme
-    var body:some View {
-        if active {
-            TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
-                let time=reduced ? 0:timeline.date.timeIntervalSinceReferenceDate
-                Canvas {context,size in
-                    let bounds=CGRect(origin:.zero,size:size)
-                    for index in 0..<AIMotion.colors.count {
-                        let phase=time*0.46+Double(index)*1.4
-                        let x=size.width*(CGFloat(index)/4*0.8+0.1+CGFloat(sin(phase))*0.12)
-                        let y=size.height*(0.75+CGFloat(cos(phase*0.8))*0.25)
-                        let reach=max(42,min(size.width*0.56,180))
-                        let color=AIMotion.colors[index].opacity(scheme == .dark ? 0.48:0.34)
-                        context.fill(Path(bounds),with:.radialGradient(Gradient(colors:[color,color.opacity(0.2),.clear]),center:CGPoint(x:x,y:y),startRadius:0,endRadius:reach))
-                    }
-                }.mask {RoundedRectangle(cornerRadius:radius,style:.continuous).stroke(lineWidth:16).blur(radius:10)}
-                    .clipShape(RoundedRectangle(cornerRadius:radius,style:.continuous))
-            }
-        }
-    }
-}
 struct ProcessingBar: View {
     var label:String
-    @Environment(\.accessibilityReduceMotion) private var reduced
     var body:some View {
-        VStack(alignment:.leading,spacing:10) {
-            HStack(spacing:8) {AIOrb(active:true).frame(width:22,height:22);Text(label).font(.caption).foregroundStyle(.secondary);Spacer()}
-            TimelineView(.animation(minimumInterval:1.0/24,paused:reduced)) {timeline in
-                GeometryReader {proxy in
-                    let fraction=reduced ? 0.5:timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy:2.4)/2.4
-                    Capsule().fill(Theme.accent.opacity(0.10))
-                        .overlay(alignment:.leading) {Capsule().fill(LinearGradient(colors:[.clear]+AIMotion.colors+[.clear],startPoint:.leading,endPoint:.trailing)).frame(width:max(24,proxy.size.width*0.48)).offset(x:proxy.size.width*(fraction*1.48-0.48))}
-                        .clipShape(Capsule())
-                }.frame(height:3)
-            }.accessibilityLabel("正在处理")
-        }.padding(12).appGlass(RoundedRectangle(cornerRadius:14)).aiActivity(true,cornerRadius:14)
+        HStack(spacing:8) {AIOrb(active:true).frame(width:18,height:18);Text(label).font(.caption).foregroundStyle(.secondary);Spacer()}.padding(10)
     }
 }
 struct AccountPreset: Codable, Identifiable {

@@ -11,9 +11,14 @@ final class AppSmokeTests:XCTestCase {
         } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));app.buttons["助理"].firstMatch.tap()
         XCTAssertTrue(app.buttons["停止回复"].waitForExistence(timeout:5));attach(app,"AIFlowChat");app.buttons["停止回复"].tap()
-        app.buttons["笔记"].firstMatch.tap();app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
+        app.buttons["返回"].firstMatch.tap();app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
         XCTAssertTrue(app.staticTexts["正在整理笔记"].waitForExistence(timeout:5));attach(app,"AIFlowNote")
-        app.buttons["取消"].tap();XCTAssertFalse(app.staticTexts["正在整理笔记"].exists);app.buttons["关闭"].tap()
+        let skeleton=app.descendants(matching:.any).matching(identifier:"note.body.skeleton").firstMatch
+        XCTAssertTrue(skeleton.waitForExistence(timeout:5))
+        let counted=expectation(for:NSPredicate(format:"label == %@","正在处理，共 3 行"),evaluatedWith:skeleton);wait(for:[counted],timeout:4)
+        app.buttons["取消"].tap();XCTAssertFalse(app.staticTexts["正在整理笔记"].exists)
+        XCTAssertEqual(app.descendants(matching:.any).matching(identifier:"note.body").firstMatch.value as? String,"想去公园走走。\n和朋友吃顿饭。\n也留一点时间休息。")
+        app.buttons["关闭"].tap()
     }
     func testCreateVaultAndNavigateMainScreens() {
         continueAfterFailure=false
@@ -60,7 +65,12 @@ final class AppSmokeTests:XCTestCase {
         XCTAssertTrue(lastCard.isHittable);attach(app,"WalletFourthCard")
         app.buttons["完成"].firstMatch.tap()
         app.buttons["提醒"].firstMatch.tap();attach(app,"Reminders")
-        app.buttons["助理"].firstMatch.tap();XCTAssertTrue(app.staticTexts["今天想聊点什么？"].waitForExistence(timeout:5));attach(app,"Assistant")
+        app.buttons["助理"].firstMatch.tap();XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5));attach(app,"Assistant")
+        XCTAssertTrue(app.buttons["返回"].exists)
+        let orb=app.descendants(matching:.any).matching(identifier:"assistant.orb").firstMatch
+        XCTAssertTrue(orb.exists);let firstOrb=orb.screenshot().pngRepresentation
+        Thread.sleep(forTimeInterval:0.4);XCTAssertNotEqual(firstOrb,orb.screenshot().pngRepresentation)
+        XCTAssertEqual(app.buttons.matching(identifier:"chat.mode.chat").count,1);XCTAssertEqual(app.buttons.matching(identifier:"chat.mode.finance").count,1)
         XCTAssertFalse(app.segmentedControls["对话模式"].exists);XCTAssertFalse(app.buttons["展开快捷操作"].exists)
         app.buttons["聊天功能"].tap();XCTAssertTrue(app.buttons["chat.menu.new"].waitForExistence(timeout:5));attach(app,"AssistantPlusMenu");app.buttons["chat.menu.new"].tap()
         let input=app.descendants(matching:.any).matching(identifier:"chat.input").firstMatch

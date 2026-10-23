@@ -43,6 +43,7 @@ struct NoteEditor:View {
     @State var folder="收件箱"
     @State var tools=false
     @State var working=false
+    @State private var aiMode:String?
     @State var scanner=false
     @State var dirty=false
     @State var resultTitle=""
@@ -64,15 +65,17 @@ struct NoteEditor:View {
         VStack(spacing:0) {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
-                    TextField("标题",text:$title,axis:.vertical).font(.system(size:21,weight:.semibold)).lineLimit(1...4).accessibilityIdentifier("note.title")
-                    TextField("记录你的想法…",text:$bodyText,axis:.vertical).font(.system(size:15)).lineSpacing(7).frame(minHeight:320,alignment:.topLeading).accessibilityIdentifier("note.body")
+                    if working && aiMode=="润色" {TextSkeleton(text:title,font:UIFont.systemFont(ofSize:21,weight:.semibold),lineSpacing:0).accessibilityIdentifier("note.title.skeleton")}
+                    else {TextField("标题",text:$title,axis:.vertical).font(.system(size:21,weight:.semibold)).lineLimit(1...4).accessibilityIdentifier("note.title").disabled(working)}
+                    if working && aiMode != nil {TextSkeleton(text:bodyText).frame(minHeight:320,alignment:.topLeading).accessibilityIdentifier("note.body.skeleton")}
+                    else {TextField("记录你的想法…",text:$bodyText,axis:.vertical).font(.system(size:15)).lineSpacing(7).frame(minHeight:320,alignment:.topLeading).accessibilityIdentifier("note.body").disabled(working)}
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively)
             AppGlassGroup {VStack(spacing:10) {
                 if working {ProcessingBar(label:"正在整理笔记").padding(.horizontal,16)}
                 if tools && !working {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.transition(.move(edge:.bottom).combined(with:.opacity))}
                 HStack {
-                    if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb(active:working).frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true).aiActivity(working,cornerRadius:24)}.buttonStyle(.plain)}
+                    if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb().frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain)}
                     if working {Button("取消") {cancelOperation()}.font(.caption)}
                     Spacer()
                     if undo != nil {Button {if let previous=undo {title=previous.0;bodyText=previous.1;undo=nil}} label:{Image(systemName:"arrow.uturn.backward")}.accessibilityLabel("撤销采用")}
@@ -86,7 +89,7 @@ struct NoteEditor:View {
             .onAppear {load()}.onChange(of:title) {_,_ in scheduleDraft()}.onChange(of:bodyText) {_,_ in scheduleDraft()}
             .onDisappear {cancelOperation();draftTask?.cancel()}
             .confirmationDialog("找到未保存的笔记草稿",isPresented:$recoverPrompt,titleVisibility:.visible) {Button("恢复草稿") {if let n=recovery {title=n.text("title");bodyText=n.text("body")}};Button("保留已保存内容",role:.cancel) {}}
-            .sheet(isPresented:$preview) {NavigationStack {ScrollView {VStack(alignment:.leading,spacing:18) {if replace {Text(resultTitle).font(.title3.weight(.semibold))};MarkdownBody(text:resultBody);if !evidence.isEmpty {Divider();DisclosureGroup("查看原文依据") {VStack(alignment:.leading,spacing:12) {ForEach(Array(evidence.enumerated()),id:\.offset) {_,quote in Text(quote).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)}}.padding(.top,8)}}}.frame(maxWidth:.infinity,alignment:.leading).padding(20)}.navigationTitle(replace ? "润色预览":"整理预览").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {preview=false}};ToolbarItem(placement:.confirmationAction) {Button("采用") {undo=(title,bodyText);if replace {title=resultTitle;bodyText=resultBody}else{bodyText+="\n\n"+resultBody};preview=false}}}}}
+            .sheet(isPresented:$preview) {NavigationStack {ScrollView {VStack(alignment:.leading,spacing:18) {if replace {Text(resultTitle).font(.title3.weight(.semibold)).aiText(initial:true)};MarkdownBody(text:resultBody).aiText(initial:true);if !evidence.isEmpty {Divider();DisclosureGroup("查看原文依据") {VStack(alignment:.leading,spacing:12) {ForEach(Array(evidence.enumerated()),id:\.offset) {_,quote in Text(quote).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)}}.padding(.top,8)}}}.frame(maxWidth:.infinity,alignment:.leading).padding(20)}.navigationTitle(replace ? "润色预览":"整理预览").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {preview=false}};ToolbarItem(placement:.confirmationAction) {Button("采用") {undo=(title,bodyText);if replace {title=resultTitle;bodyText=resultBody}else{bodyText+="\n\n"+resultBody};preview=false}}}}}
             .sheet(isPresented:$scanner) {DocumentScanner {images in scanner=false;task=Task {working=true;defer{working=false};do {let result=try await OCRService.recognize(images);bodyText+=(bodyText.isEmpty ? "":"\n")+result}catch{store.present(error)}}} onCancel:{scanner=false}}
     }
     func aiButton(_ mode:String,_ icon:String)->some View {Button {run(mode)} label:{Label(mode,systemImage:icon).font(.caption).padding(.horizontal,12).padding(.vertical,9).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain).disabled(working)}
@@ -94,7 +97,7 @@ struct NoteEditor:View {
         guard !draftLoaded else{return};draftLoaded=true
         if let n=note {noteID=n.id;title=n.text("title");bodyText=n.text("body");folder=n.text("folder",fallback:"收件箱")}
         #if DEBUG
-        if DebugFixtures.motion {title="周末计划";bodyText="想去公园走走，和朋友吃顿饭，也留一点时间休息。";working=true}
+        if DebugFixtures.motion {title="周末计划";bodyText="想去公园走走。\n和朋友吃顿饭。\n也留一点时间休息。";working=true;aiMode="润色"}
         #endif
         savedTitle=title;savedBody=bodyText
         let key=store.key,id=note?.id ?? "new"
@@ -116,14 +119,14 @@ struct NoteEditor:View {
         guard !bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {store.error="请先填写笔记正文";return}
         guard store.cloudEnabled && store.hasAPIKey else {store.error="笔记润色与整理使用云端，请先在个人详情配置 DeepSeek 并开启云端智能";return}
         let epoch=store.epoch,source=bodyText,originalTitle=title,model=store.model
-        let operation=UUID();operationID=operation;working=true;evidence=[]
-        task=Task {defer{if operationID==operation {working=false}};do {
+        let operation=UUID();operationID=operation;aiMode=mode;working=true;evidence=[]
+        task=Task {defer{if operationID==operation {working=false;aiMode=nil}};do {
             if mode=="润色" {let result=try await AIService.polish(title:originalTitle,body:source,model:model);try Task.checkCancellation();guard store.epoch==epoch else{return};resultTitle=result.0;resultBody=result.1;replace=true}
             else {let result=try await AIService.noteAction(source,mode:mode,model:model);try Task.checkCancellation();guard store.epoch==epoch else{return};resultTitle=mode;resultBody=result.body;evidence=result.evidence;replace=false}
             preview=true
         }catch{if operationID==operation,store.epoch==epoch {store.present(error)}}}
     }
-    func cancelOperation() {operationID=UUID();task?.cancel();task=nil;working=false}
+    func cancelOperation() {operationID=UUID();task?.cancel();task=nil;working=false;aiMode=nil}
 }
 
 enum OCRService {

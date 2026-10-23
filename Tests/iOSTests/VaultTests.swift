@@ -1,8 +1,21 @@
 import XCTest
 import CryptoKit
+import UIKit
 @testable import PersonalAssistant
 
 final class VaultTests:XCTestCase {
+    func testSkeletonPreservesExplicitBlankAndTrailingLines() {
+        let result=SkeletonTextLayout.measure("第一行\n\n第三行\n",width:300,font:.systemFont(ofSize:15),lineSpacing:7)
+        XCTAssertEqual(result.lineCount,4)
+        XCTAssertGreaterThan(result.height,60)
+    }
+    func testSkeletonMeasuresWrappingAndDoesNotTruncateLongText() {
+        let source=String(repeating:"这段正文包含中文、English 和表情🙂，需要根据实际显示宽度换行。",count:60)
+        let narrow=SkeletonTextLayout.measure(source,width:100,font:.systemFont(ofSize:15),lineSpacing:7)
+        let wide=SkeletonTextLayout.measure(source,width:320,font:.systemFont(ofSize:15),lineSpacing:7)
+        XCTAssertGreaterThan(narrow.lineCount,wide.lineCount);XCTAssertGreaterThan(wide.lineCount,60)
+        XCTAssertTrue(narrow.bars.allSatisfy {$0.maxX<=100.1})
+    }
     func testKnownBankAutomaticallyGetsMatchingCardArtwork() {
         let a=Item(["name":.string("中国银行"),"type":.string("bank")]),c=Item(["network":.string("mastercard")])
         XCTAssertEqual(Artwork.cardArtwork(account:a,card:c)?.id,"cn_40")
