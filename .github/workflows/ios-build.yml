@@ -39,6 +39,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
           PY
       - name: Wait for simulator startup
+        if: matrix.ios == 18
         run: |
           xcrun simctl boot "$SIMULATOR_ID" || true
           xcrun simctl bootstatus "$SIMULATOR_ID" -b

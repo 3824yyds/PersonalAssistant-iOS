@@ -20,8 +20,10 @@ final class Build5Tests:XCTestCase {
         let app=launch();app.buttons["卡包与资产"].tap();app.buttons["贷款与还款"].tap()
         let row=app.buttons["loan.row.00000000-0000-0000-0000-000000000201"];XCTAssertTrue(row.waitForExistence(timeout:5));row.tap()
         app.buttons["loan.edit"].tap();XCTAssertTrue(app.textFields["loan.name"].waitForExistence(timeout:5));app.buttons["取消"].tap()
+        let editorClosed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.textFields["loan.name"])
+        XCTAssertEqual(XCTWaiter.wait(for:[editorClosed],timeout:5),.completed)
         let installment=app.buttons["loan.installment.1"]
-        for _ in 0..<4 {if installment.isHittable {break};app.swipeUp()}
+        XCTAssertTrue(installment.waitForExistence(timeout:5))
         installment.tap()
         replace(app.textFields["loan.payment.principal"],"100.00");replace(app.textFields["loan.payment.interest"],"0.00");replace(app.textFields["loan.payment.fee"],"10000.00")
         app.buttons["loan.payment.save"].tap();XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout:8));XCTAssertTrue(app.alerts.firstMatch.label.contains("提示"));attach(app,"DebtInsufficientFunds");app.buttons["知道了"].tap()
