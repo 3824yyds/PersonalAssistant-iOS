@@ -50,7 +50,9 @@ struct ConversationView:View {
                             Color.clear.frame(height:1).id("latest").background(GeometryReader {g in Color.clear.preference(key:BottomPreference.self,value:g.frame(in:.named("conversationScroll")).minY)})
                         }.padding(16)
                     }.coordinateSpace(name:"conversationScroll").scrollDismissesKeyboard(.interactively)
-                        .onPreferenceChange(BottomPreference.self) {y in let nearBottom=y<geometry.size.height+80;if nearBottom != follow {follow=nearBottom}}
+                        .simultaneousGesture(DragGesture(minimumDistance:10).onChanged {_ in follow=false})
+                        // Content insertion must not look like the user scrolling away.
+                        .onPreferenceChange(BottomPreference.self) {y in if !follow,y<geometry.size.height+80 {follow=true}}
                         // Let insertion and keyboard layout settle before scrolling. Synchronous
                         // scrollTo during a lazy stack update can stall layout on iOS 26.
                         .task(id:store.messages.last) {
