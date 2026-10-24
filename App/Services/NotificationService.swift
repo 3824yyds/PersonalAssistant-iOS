@@ -20,7 +20,8 @@ enum NotificationService {
                 let content = UNMutableNotificationContent(); content.title = "个人助理"; content.body = "有一项提醒待处理，请打开应用查看"; content.sound = .default
                 if r.bool("loanReminder") {content.body="有一笔贷款需要还款，请打开应用查看"}
                 let date = Date(timeIntervalSince1970:Double(time)/1000)
-                let components = Calendar.current.dateComponents([.year,.month,.day,.hour,.minute],from:date)
+                var components = ReminderOperations.calendar(for:r).dateComponents([.year,.month,.day,.hour,.minute,.second],from:date)
+                components.timeZone=ReminderOperations.calendar(for:r).timeZone
                 center.add(UNNotificationRequest(identifier:id,content:content,trigger:UNCalendarNotificationTrigger(dateMatching:components,repeats:false)),withCompletionHandler:nil)
             }
         }

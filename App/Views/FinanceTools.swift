@@ -17,7 +17,7 @@ struct FinancialReportView:View {
         if store.cloudEnabled && store.hasAPIKey {Button("请 AI 深入分析") {analyze()}.buttonStyle(.borderedProminent).disabled(working)}
         if working {ProcessingBar(label:"正在分析财务状况")}
         if !cloud.isEmpty {Panel {MarkdownBody(text:cloud)}}
-    }.padding(16)}.navigationTitle("月度财务报告").navigationBarTitleDisplayMode(.inline).onAppear {currency=store.currency}.onDisappear {task?.cancel()}}
+    }.padding(16)}.appErrorScope().navigationTitle("月度财务报告").navigationBarTitleDisplayMode(.inline).onAppear {currency=store.currency}.onDisappear {task?.cancel()}}
     var months:[(String,Int64,Int64)] {(0..<6).reversed().map {offset in let date=Calendar.current.date(byAdding:.month,value:-offset,to:month) ?? month;let rs=Finance.select(store.current,month:date,currency:currency);let t=Totals(rs);return(Clock.month(date),t.income,t.netExpense)}}
     func analyze() {let d=store.current,selectedMonth=month,code=currency,model=store.model,epoch=store.epoch;working=true;task=Task {defer{working=false};do {let text=try await AIService.cloud(messages:[["role":"system","content":"你是专业个人财务规划助理。只根据提供数据分析，区分月度流水与当前余额，输出结论、关键风险、按优先级的行动和下月预算建议；结合地区和用户目标，不编造缺失资料。\n"+AIService.financeContext(d)],["role":"user","content":"请深入分析这份月报：\n"+Finance.report(d,month:selectedMonth,currency:code)]],model:model);try Task.checkCancellation();if store.epoch==epoch {cloud=text}}catch{store.present(error)}}}
 }
@@ -75,5 +75,5 @@ struct ExchangeView:View {
         Button {working=true;task=Task {defer{working=false};do {let result=try await RateService.lookup(base:base,quote:quote);rate=result.0;source=result.1}catch{store.present(error)}}} label:{HStack {Text("查询汇率");if working {ProgressView()}}}.disabled(working)
         if let rate,let number=Decimal(string:amount) {Text("≈ "+NSDecimalNumber(decimal:number*rate).rounding(accordingToBehavior:NSDecimalNumberHandler(roundingMode:.plain,scale:2,raiseOnExactness:false,raiseOnOverflow:false,raiseOnUnderflow:false,raiseOnDivideByZero:false)).stringValue+" "+quote).font(.title3.monospacedDigit());Text(source).font(.caption).foregroundStyle(.secondary)}
         Text("公开参考价用于估算，实际成交价以银行为准。查询不发送个人账目。").font(.caption).foregroundStyle(.secondary)
-    }.navigationTitle("汇率换算").navigationBarTitleDisplayMode(.inline).onChange(of:base) {_,_ in rate=nil}.onChange(of:quote) {_,_ in rate=nil}.onDisappear {task?.cancel()}}
+    }.appErrorScope().navigationTitle("汇率换算").navigationBarTitleDisplayMode(.inline).onChange(of:base) {_,_ in rate=nil}.onChange(of:quote) {_,_ in rate=nil}.onDisappear {task?.cancel()}}
 }

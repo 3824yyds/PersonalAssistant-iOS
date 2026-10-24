@@ -26,6 +26,7 @@ struct VoiceCaptureState:Equatable {
 
 @MainActor final class AppStore: ObservableObject {
     @Published private(set) var document: Document?
+    @Published private(set) var vaultBytes=0
     @Published var busy = false
     @Published var error: String?
     @Published var errorScopes:[UUID]=[]
@@ -78,7 +79,7 @@ struct VoiceCaptureState:Equatable {
         let attempts = (try? JSONDecoder().decode([String:Double].self,from:attemptData)) ?? [:]
         if (attempts["until"] ?? 0) > Date().timeIntervalSince1970 { error = "尝试次数较多，请稍后再试"; return }
         do {
-            let result: (Document,Data,Data) = try await Task.detached(priority:.userInitiated) {
+            let result: (Document,Data,Data,Int) = try await Task.detached(priority:.userInitiated) {
                 if creating {
                     guard !FileManager.default.fileExists(atPath:try PrivateFiles.url().path) else { throw AppError.message("资料库已经存在，请解锁") }
                     let salt = try VaultCrypto.random(32), key = try VaultCrypto.derive(password:password,salt:salt)
@@ -88,15 +89,16 @@ struct VoiceCaptureState:Equatable {
                     if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
                     #endif
                     d=try d.validated()
-                    try PrivateFiles.write(VaultCrypto.encrypt(d.encoded(),key:key,salt:salt))
-                    return (d,key,salt)
+                    let encrypted=try VaultCrypto.encrypt(d.encoded(),key:key,salt:salt)
+                    try PrivateFiles.write(encrypted)
+                    return (d,key,salt,encrypted.count)
                 }
                 let encrypted = try PrivateFiles.boundedRead(PrivateFiles.url()), salt = try VaultCrypto.salt(encrypted), key = try VaultCrypto.derive(password:password,salt:salt)
                 let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:key)).validated()
-                return (d,key,salt)
+                return (d,key,salt,encrypted.count)
             }.value
             guard unlockEpoch==epoch else {return}
-            key = result.1; salt = result.2; var d = result.0
+            key = result.1; salt = result.2; vaultBytes=result.3; var d = result.0
             #if DEBUG
             // Each UI test receives its own deterministic in-memory content, even after relaunch.
             if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
@@ -120,7 +122,7 @@ struct VoiceCaptureState:Equatable {
             guard let saved = try Keychain.read("vault-biometric",prompt:"解锁个人助理资料库") else { throw AppError.message("请先用密码解锁，并在设置中启用系统解锁") }
             let encrypted = try PrivateFiles.boundedRead(PrivateFiles.url())
             let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:saved)).validated()
-            key = saved; salt = try VaultCrypto.salt(encrypted); var next = d; next.accounts = Finance.accounts(d); next=Loans.refreshReminders(next);document = next
+            key = saved; salt = try VaultCrypto.salt(encrypted); vaultBytes=encrypted.count; var next = d; next.accounts = Finance.accounts(d); next=Loans.refreshReminders(next);document = next
             NotificationService.sync(next.records)
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(d.settings.text("model",fallback:"deepseek-flash")); epoch = UUID(); await loadHistory()
             restoreAppearance(d)
@@ -129,7 +131,7 @@ struct VoiceCaptureState:Equatable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];pendingChatActions=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; vaultBytes=0; messages = []; sessions = []; chatDraft="";chatImages=[];pendingChatActions=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {
@@ -137,13 +139,19 @@ struct VoiceCaptureState:Equatable {
         messages.removeAll {$0.role=="assistant" && $0.content.isEmpty}
     }
     @discardableResult func commit(_ change: (inout Document) throws -> Void) async -> Bool {
+        await persist(change,checkingBalances:true)
+    }
+    /// A full backup replaces unrelated historical account identities; ordinary writes always check cash.
+    private func persist(_ change:(inout Document)throws->Void,checkingBalances:Bool) async -> Bool {
         guard var next = document, !busy else { return false }
+        let previous=next
         busy = true; let token = epoch; let key = key, salt = salt; defer { busy = false }
         do {
             try change(&next); next=Loans.refreshReminders(next);next = try next.validated(); let snapshot = next
-            try await Task.detached(priority:.userInitiated) { try PrivateFiles.write(VaultCrypto.encrypt(snapshot.encoded(),key:key,salt:salt)) }.value
+            if checkingBalances {try Finance.validateCashChange(from:previous,to:next)}
+            let count=try await Task.detached(priority:.userInitiated) {let data=try VaultCrypto.encrypt(snapshot.encoded(),key:key,salt:salt);try PrivateFiles.write(data);return data.count}.value
             guard token == epoch, document != nil else { return false }
-            document = next; cloudEnabled = next.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(next.settings.text("model",fallback:"deepseek-flash"))
+            document = next; vaultBytes=count; cloudEnabled = next.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(next.settings.text("model",fallback:"deepseek-flash"))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             NotificationService.sync(next.records); return true
         } catch { present(error); return false }
@@ -172,7 +180,7 @@ struct VoiceCaptureState:Equatable {
                 let salt = try VaultCrypto.salt(data), key = try VaultCrypto.derive(password:password,salt:salt)
                 return try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(data,key:key)).validated()
             }.value
-            return await commit { $0 = imported; $0.accounts = Finance.accounts(imported) }
+            return await persist({ $0 = imported; $0.accounts = Finance.accounts(imported) },checkingBalances:false)
         } catch { present(error); return false }
     }
     func backup() async throws -> Data {

@@ -30,11 +30,16 @@ enum WealthOperations {
         let alert=Calendar.current.date(byAdding:.day,value:-Int(s.int("leadDays",fallback:3)),to:date) ?? date
         next.records.append(Item(["id":.string(id),"kind":.string("reminder"),"title":.string(s.text("name")+" · 续费或取消"),"body":.string("付款请在订阅管理中确认"),"category":.string(s.text("category",fallback:"订阅")),"currency":.string(account.text("currency",fallback:"CNY")),"account":.string(account.text("name")),"date":.int(Clock.milliseconds),"due":.int(Int64(date.timeIntervalSince1970*1000)),"alertAt":.int(max(1,Int64(alert.timeIntervalSince1970*1000))),"zone":.string(TimeZone.current.identifier)]));return next
     }
-    static func paySubscription(_ s:Item,in d:Document)->Document {
-        guard let a=d.accounts.first(where:{$0.id==s.text("accountId")}) else{return d}
-        var next=d;let due=subscriptionDue(s,in:d),id=stableID("subscription",s.id+":"+Clock.day(due))
-        guard !next.records.contains(where:{$0.id==id}) else{return d}
-        next.records.append(Item(["id":.string(id),"kind":.string("expense"),"title":.string(s.text("name")),"body":.string("订阅周期 "+Clock.day(due)),"cents":.int(s.int("cents")),"currency":.string(a.text("currency",fallback:"CNY")),"category":.string(s.text("category",fallback:"订阅")),"account":.string(a.text("name")),"date":.int(Clock.milliseconds),"wealthRef":.string("subscription:"+s.id)]))
+    static func paySubscription(_ s:Item,in d:Document,expectedDue:Date) throws ->Document {
+        let id=stableID("subscription",s.id+":"+Clock.day(expectedDue))
+        // A confirmation belongs to the displayed cycle, even after a previous save advanced it.
+        if d.records.contains(where:{$0.id==id}) {return d}
+        guard let current=d.wealth.items("subscriptions").first(where:{$0.id==s.id}),current==s,current.bool("active",fallback:true),
+              Clock.day(subscriptionDue(current,in:d))==Clock.day(expectedDue) else {throw AppError.message("订阅资料或待付周期已变化，请重新核对后确认")}
+        guard let a=d.accounts.first(where:{$0.id==s.text("accountId") && !$0.bool("archived")}),s.int("cents")>0 else {throw AppError.message("请核对订阅金额及可用扣款账户")}
+        var next=d
+        next.records.append(Item(["id":.string(id),"kind":.string("expense"),"title":.string(s.text("name")),"body":.string("订阅周期 "+Clock.day(expectedDue)),"cents":.int(s.int("cents")),"currency":.string(a.text("currency",fallback:"CNY")),"category":.string(s.text("category",fallback:"订阅")),"account":.string(a.text("name")),"date":.int(Clock.milliseconds),"wealthRef":.string("subscription:"+s.id)]))
+        try Finance.validateCashChange(from:d,to:next)
         return refreshSubscription(s,in:next)
     }
     static func envelope(_ e:Item,in d:Document)->(assigned:Int64,used:Int64,remaining:Int64) {
@@ -55,7 +60,7 @@ enum WealthOperations {
         var next=d;next.upsertWealth(entry,in:"splits")
         let own=entry.items("shares").filter {$0.text("member")==group.text("me")}.reduce(Int64(0)) {$0+$1.int("cents")},mine=entry.text("payer")==group.text("me")
         let rows:[(String,String,Int64)]=mine ? [("own","expense",own),("advance","advance_out",entry.int("cents")-own)]:[("own-due","expense",own),("payable","aa_payable",own)]
-        for (role,kind,amount) in rows where amount>0 {next.records.append(Item(["id":.string(stableID("split-"+role,entry.id)),"kind":.string(kind),"title":.string(entry.text("title")),"cents":.int(amount),"currency":.string(group.text("currency",fallback:"CNY")),"category":.string(kind=="expense" ? "AA消费":kind=="advance_out" ? "AA代垫":"AA应付"),"account":.string(a.text("name")),"date":.int(entry.int("date")),"wealthRef":.string("split:"+entry.id)]))};return next
+        for (role,kind,amount) in rows where amount>0 {next.records.append(Item(["id":.string(stableID("split-"+role,entry.id)),"kind":.string(kind),"title":.string(entry.text("title")),"cents":.int(amount),"currency":.string(group.text("currency",fallback:"CNY")),"category":.string(kind=="expense" ? "AA消费":kind=="advance_out" ? "AA代垫":"AA应付"),"account":.string(a.text("name")),"date":.int(entry.int("date")),"wealthRef":.string("split:"+entry.id)]))};try Finance.validateCashChange(from:d,to:next);return next
     }
     static func settle(_ entry:Item,group:Item,in d:Document) throws ->Document {
         let b=splitBalances(group,in:d),amount=entry.int("cents"),from=entry.text("from"),to=entry.text("to")
@@ -64,7 +69,7 @@ enum WealthOperations {
         if from==group.text("me") || to==group.text("me") {
             guard let a=d.accounts.first(where:{$0.id==entry.text("accountId")}),a.text("currency",fallback:"CNY")==group.text("currency",fallback:"CNY") else {throw AppError.message("请选择同币种收付账户")}
             next.records.append(Item(["id":.string(stableID("split-settlement",entry.id)),"kind":.string(to==group.text("me") ? "advance_in":"aa_settlement_out"),"title":.string(group.text("name")+" · "+from+" → "+to),"cents":.int(amount),"currency":.string(group.text("currency",fallback:"CNY")),"category":.string("AA结算"),"account":.string(a.text("name")),"date":.int(entry.int("date")),"wealthRef":.string("split:"+entry.id)]))
-        };return next
+        };try Finance.validateCashChange(from:d,to:next);return next
     }
     static func quantity(_ s:String) throws ->Decimal {guard s.range(of:#"^[0-9]{1,12}(\.[0-9]{1,6})?$"#,options:.regularExpression) != nil,let number=Decimal(string:s) else {throw AppError.message("数量与单价最多六位小数")};return number}
     static func cents(_ amount:Decimal)->Int64 {var a=amount,b=Decimal();NSDecimalRound(&b,&a,0,.plain);return NSDecimalNumber(decimal:b).int64Value}
@@ -90,6 +95,6 @@ enum WealthOperations {
         guard cash>0,cash<=Money.maximum else{throw AppError.message("交易现金金额无效")}
         var next=d;next.upsertWealth(t,in:"trades")
         next.records.append(Item(["id":.string(stableID("investment-trade",t.id)),"kind":.string(side=="buy" ? "investment_buy":side=="sell" ? "investment_sell":"income"),"title":.string(asset.text("name")+" · "+(side=="buy" ? "买入":side=="sell" ? "卖出":"分红")),"cents":.int(cash),"currency":.string(a.text("currency",fallback:"CNY")),"category":.string(side=="dividend" ? "投资分红":"投资交易"),"account":.string(a.text("name")),"date":.int(t.int("date")),"wealthRef":.string("trade:"+t.id)]))
-        return try syncPosition(asset.id,in:next)
+        next=try syncPosition(asset.id,in:next);try Finance.validateCashChange(from:d,to:next);return next
     }
 }

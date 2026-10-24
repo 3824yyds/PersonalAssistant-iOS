@@ -6,6 +6,9 @@ import LocalAuthentication
 
 enum VaultCrypto {
     static let maximum = 32*1024*1024, rounds: UInt32 = 600_000
+    static let overhead = 72
+    static var maximumPlaintext:Int {maximum-overhead}
+    static func capacityLabel(_ bytes:Int)->String {ByteCountFormatter.string(fromByteCount:Int64(max(0,bytes)),countStyle:.binary)}
     static let magic = Data([0x50,0x41,0x56,0x41,0x55,0x4c,0x54,0x01])
     static func random(_ count: Int) throws -> Data {
         var bytes = Data(count:count)
@@ -30,7 +33,8 @@ enum VaultCrypto {
         guard status == kCCSuccess else { throw AppError.message("密钥派生失败") }; return output
     }
     static func encrypt(_ plain: Data, key: Data, salt: Data) throws -> Data {
-        guard plain.count <= maximum-72, key.count == 32, salt.count == 32 else { throw AppError.message("资料过大或密钥无效") }
+        guard plain.count <= maximumPlaintext else { throw AppError.message("资料库容量不足：本次保存需要 \(capacityLabel(plain.count+overhead))，上限为 \(capacityLabel(maximum))。原有资料未改动，请先导出备份，再清理不需要的附件或缩小图片后重试。") }
+        guard key.count == 32, salt.count == 32 else { throw AppError.message("解锁密钥无效，请重新解锁资料库") }
         let nonce = try random(12), header = magic + Data([0,9,39,192]) + salt + nonce
         let sealed = try AES.GCM.seal(plain,using:SymmetricKey(data:key),nonce:AES.GCM.Nonce(data:nonce),authenticating:header)
         return header + sealed.ciphertext + sealed.tag

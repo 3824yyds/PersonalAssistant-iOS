@@ -113,10 +113,11 @@ final class VaultTests:XCTestCase {
         d=try WealthOperations.trade(t,in:d)
         XCTAssertEqual(Totals(d.records).expense,0);XCTAssertEqual(Finance.balance(account,in:d),89900);XCTAssertEqual(d.wallet.items("assets").first?.int("cents"),10000)
     }
-    func testSubscriptionPaymentIdempotence() {
-        var d=Document();let a=Item.make(["name":.string("现金"),"currency":.string("CNY")]);d.accounts=[a]
+    func testSubscriptionPaymentIdempotence() throws {
+        var d=Document();let a=Item.make(["name":.string("现金"),"currency":.string("CNY"),"openingCents":.int(1000)]);d.accounts=[a]
         let s=Item.make(["name":.string("会员"),"accountId":.string(a.id),"cents":.int(1000),"cycle":.string("monthly"),"firstDue":.string(Clock.day()),"active":.bool(true)])
-        d.upsertWealth(s,in:"subscriptions");d=WealthOperations.paySubscription(s,in:d)
+        d.upsertWealth(s,in:"subscriptions");let due=WealthOperations.subscriptionDue(s,in:d);d=try WealthOperations.paySubscription(s,in:d,expectedDue:due)
+        d=try WealthOperations.paySubscription(s,in:d,expectedDue:due)
         XCTAssertEqual(d.records.filter {$0.text("kind")=="expense"}.count,1)
         XCTAssertEqual(d.records.filter {$0.text("kind")=="reminder"}.count,1)
     }

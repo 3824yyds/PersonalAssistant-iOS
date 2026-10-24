@@ -129,12 +129,12 @@ struct RecordEditor: View {
             Section {
                 Picker("账户",selection:$accountID) {Text("请选择").tag("");ForEach(accounts) {a in Text(a.text("name")+" · "+a.text("currency",fallback:"CNY")).tag(a.id)}}.disabled(kind=="refund")
                 Picker("分类",selection:$category) {ForEach(Array(Set(Theme.categories+[category,"工资","贷款利息","贷款费用"])).sorted(),id:\.self) {Text($0).tag($0)}}
-                DatePicker("日期",selection:$date,displayedComponents:[.date,.hourAndMinute])
+                DatePicker("日期",selection:$date,in:...max(Date(),record?.date ?? Date()),displayedComponents:[.date,.hourAndMinute])
                 TextField("备注",text:$memo,axis:.vertical).lineLimit(2...5)
             }
             if let record, !linked {Section {Button("删除这笔记录",role:.destructive) {deleting=true}.confirmationDialog("删除这笔记录及关联退款？",isPresented:$deleting,titleVisibility:.visible) {Button("删除",role:.destructive) {Task {if await store.commit({$0=try Finance.deleteRecord(record.id,in:$0)}) {dismiss()}}}}} }
             if linked {Section {Text("该流水由贷款或资产工具维护，请返回对应功能处理，避免账目重复。").font(.caption).foregroundStyle(.secondary)}}
-        }.navigationTitle(kind=="refund" ? "记录退款":record==nil ? "记一笔":"编辑记录").navigationBarTitleDisplayMode(.inline)
+        }.appErrorScope().navigationTitle(kind=="refund" ? "记录退款":record==nil ? "记一笔":"编辑记录").navigationBarTitleDisplayMode(.inline)
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy || linked)}}
             .onAppear {if let r=record {title=r.text("title");amount=Money.amount(r.int("cents"));kind=r.text("kind");category=r.text("category",fallback:"其他");date=r.date;memo=r.text("body");accountID=accounts.first {$0.text("name")==r.text("account") && $0.text("currency",fallback:"CNY")==r.text("currency",fallback:"CNY")}?.id ?? ""} else {accountID=accounts.first(where:{$0.id==store.current.settings.text("defaultAccount")})?.id ?? accounts.first?.id ?? ""}}
     }
@@ -144,7 +144,7 @@ struct RecordEditor: View {
             guard let account=accounts.first(where:{$0.id==accountID}) else {throw AppError.message("请先在卡包中新建一个账户")}
             guard !title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {throw AppError.message("请填写这笔记录的名称")}
             var r=record ?? Item.make();r.set("kind",kind);r.set("title",title.trimmingCharacters(in:.whitespacesAndNewlines));r.set("cents",cents);r.set("currency",account.text("currency",fallback:"CNY"));r.set("account",account.text("name"));r.set("category",category);r.set("date",Int64(date.timeIntervalSince1970*1000));r.set("body",memo)
-            Task {if await store.commit({$0.upsert(r,in:"records")}) {dismiss()}}
+            Task {if await store.commit({$0=try Finance.saveRecord(r,in:$0)}) {dismiss()}}
         } catch {store.present(error)}
     }
 }
@@ -194,5 +194,5 @@ struct BudgetPanel: View {
         HStack {Text("月度预算").font(.headline);Spacer();Button("设置") {adding=true}}
         if budgets.isEmpty {Text("为本月花费设一个范围").font(.subheadline).foregroundStyle(.secondary)}
         ForEach(budgets) {b in let selected=records.filter {b.text("category").isEmpty || Finance.origin($0,in:store.current).text("category")==b.text("category")};let used=Totals(selected).netExpense;VStack(alignment:.leading,spacing:8) {HStack {Text(b.text("category").isEmpty ? "总预算":b.text("category")).font(.subheadline);Spacer();Text(Money.amount(used)+" / "+Money.amount(b.int("cents"))).font(.caption).monospacedDigit()};ProgressView(value:Double(max(0,used)),total:Double(max(1,b.int("cents")))).tint(used>b.int("cents") ? Theme.expense:Theme.accent);Text(used>b.int("cents") ? "已超出 "+Money.amount(used-b.int("cents")):"剩余 "+Money.amount(b.int("cents")-used)).font(.caption2).foregroundStyle(used>b.int("cents") ? Theme.expense:.secondary)}.padding(.vertical,6).onTapGesture {category=b.text("category");amount=Money.amount(b.int("cents"));adding=true}}
-    }.sheet(isPresented:$adding) {NavigationStack {Form {Picker("分类",selection:$category) {Text("总预算").tag("");ForEach(Theme.categories,id:\.self) {Text($0).tag($0)}};TextField("预算金额",text:$amount).keyboardType(.decimalPad);Text("\(Clock.month(month)) · \(currency)").foregroundStyle(.secondary)}.navigationTitle("预算").toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {adding=false}};ToolbarItem(placement:.confirmationAction) {Button("保存") {do {let cents=try Money.parse(amount);let c=category;Task {if await store.commit({d in var values=d.root.items("budgets");values.removeAll {$0.text("month")==Clock.month(month) && $0.text("currency")==currency && $0.text("category")==c};values.append(Item(["month":.string(Clock.month(month)),"currency":.string(currency),"category":.string(c),"cents":.int(cents)]));d.root.set("budgets",items:values)}) {adding=false}}}catch{store.present(error)}}}}}}}
+    }.sheet(isPresented:$adding) {NavigationStack {Form {Picker("分类",selection:$category) {Text("总预算").tag("");ForEach(Theme.categories,id:\.self) {Text($0).tag($0)}};TextField("预算金额",text:$amount).keyboardType(.decimalPad);Text("\(Clock.month(month)) · \(currency)").foregroundStyle(.secondary)}.appErrorScope().navigationTitle("预算").toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {adding=false}};ToolbarItem(placement:.confirmationAction) {Button("保存") {do {let cents=try Money.parse(amount);let c=category;Task {if await store.commit({d in var values=d.root.items("budgets");values.removeAll {$0.text("month")==Clock.month(month) && $0.text("currency")==currency && $0.text("category")==c};values.append(Item(["month":.string(Clock.month(month)),"currency":.string(currency),"category":.string(c),"cents":.int(cents)]));d.root.set("budgets",items:values)}) {adding=false}}}catch{store.present(error)}}}}}}}
 }

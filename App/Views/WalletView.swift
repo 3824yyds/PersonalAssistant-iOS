@@ -155,7 +155,7 @@ struct AccountsView:View {
     var body:some View {List {
         ForEach(store.current.accounts) {a in Button {editing=a} label:{HStack {AccountIcon(name:a.text("name"),type:a.text("type"));VStack(alignment:.leading,spacing:4) {Text(a.text("name")).foregroundStyle(.primary);Text(a.bool("archived") ? "已归档":a.text("currency",fallback:"CNY")).font(.caption).foregroundStyle(.secondary)};Spacer();Amount(cents:Finance.balance(a,in:store.current))}}}
         Section {Button("添加账户",systemImage:"plus") {creating=true};Button("账户转账",systemImage:"arrow.left.arrow.right") {transferring=true}}
-    }.navigationTitle("账户与余额").navigationBarTitleDisplayMode(.inline)
+    }.navigationTitle("账户与余额").navigationBarTitleDisplayMode(.inline).appErrorScope()
         .sheet(isPresented:$creating) {NavigationStack {AccountEditor()}.environmentObject(store)}
         .sheet(item:$editing) {a in NavigationStack {AccountEditor(account:a)}.environmentObject(store)}
         .sheet(isPresented:$transferring) {NavigationStack {TransferView()}.environmentObject(store)}
@@ -209,7 +209,7 @@ struct AccountEditor:View {
                 Stepper("还款日：\(repaymentDay)日",value:$repaymentDay,in:1...31)
             }}
             Section {TextField("备注",text:$memo,axis:.vertical);if account != nil {Toggle("归档账户",isOn:$archived)}}
-        }.navigationTitle(account==nil ? "新建账户":"编辑账户").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(account==nil ? "新建账户":"编辑账户").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy)}}
             .onAppear {if !loaded {load();DispatchQueue.main.async {loaded=true}}}.onChange(of:name) {_,_ in clearIncompatibleArt()}.onChange(of:network) {_,_ in clearIncompatibleArt()}.onChange(of:type) {_,_ in clearIncompatibleArt()}
             .sheet(isPresented:$presets) {AccountPresetsView {p in name=p.name;institution=p.name;if account==nil {currency=p.currency};type=p.type;design="";presets=false}}
@@ -255,7 +255,7 @@ struct TransferView:View {
     }.navigationTitle(repayment ? "信用卡还款":"账户转账").navigationBarTitleDisplayMode(.inline).toolbar {
         ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}}
         ToolbarItem(placement:.confirmationAction) {Button("确认") {do {let cents=try Money.parse(amount);Task {if await store.commit({d in if repayment {guard let credit=d.accounts.first(where:{$0.id==toID}) else {throw AppError.message("信用卡不存在")};d=try Finance.repay(d,credit:credit,from:fromID,cents:cents)} else {d=try Finance.transfer(d,from:fromID,to:toID,cents:cents,memo:memo)}}) {dismiss()}}}catch{store.present(error)}}.disabled(store.busy)}
-    }.onAppear {toID=to}}
+    }.onAppear {toID=to}.appErrorScope()}
 }
 
 struct AssetsView:View {

@@ -36,6 +36,8 @@ struct ConversationView:View {
     @AppStorage("chat.lastGreeting") private var lastGreeting=""
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @State var focused=false
+    @State private var composerVisible=false
+    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !modelMenu}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -58,14 +60,18 @@ struct ConversationView:View {
         }
             .background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar).appErrorScope()
             .onAppear {
-                refreshGreeting()
+                composerVisible=true;refreshGreeting()
                 #if DEBUG
                 DebugFixtures.showThinking(in:store);DebugFixtures.showSearchResults(in:store)
                 #endif
                 store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}
             }
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
-            .onDisappear {photoTask?.cancel();cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
+            .onDisappear {composerVisible=false;dismissComposer();photoTask?.cancel();cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
+            .onChange(of:sheet != nil) {_,presented in if presented {dismissComposer()}}
+            .onChange(of:history) {_,presented in if presented {dismissComposer()}}
+            .onChange(of:preferences) {_,presented in if presented {dismissComposer()}}
+            .onChange(of:openedItem != nil) {_,presented in if presented {dismissComposer()}}
             .onChange(of:store.model) {_,value in if !DeepSeekModels.supportsImages(value) {photoTask?.cancel();loadingPhotos=false;selectedPhotos=[];store.chatImages=[];photoPicker=false}}
             .photosPicker(isPresented:$photoPicker,selection:$selectedPhotos,maxSelectionCount:ChatImage.maximumCount,matching:.images)
             .onChange(of:selectedPhotos) {_,photos in loadPhotos(photos)}
@@ -77,8 +83,8 @@ struct ConversationView:View {
     }
     var header:some View {
         HStack(spacing:8) {
-            Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
-                Button {focused=false;modelMenu=true} label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
+            Button {dismissComposer();onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
+                Button {dismissComposer();modelMenu=true} label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
                     .popover(isPresented:$modelMenu,attachmentAnchor:.rect(.bounds),arrowEdge:.top) {modelChoices.presentationCompactAdaptation(.popover)}
                     .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
             Spacer(minLength:0)
@@ -96,7 +102,7 @@ struct ConversationView:View {
         HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
     }
     func mode(_ title:String,finance target:Bool)->some View {
-        Button {focused=false;if finance != target {Task {await store.newChat(finance:target)}}} label:{
+        Button {dismissComposer();if finance != target {Task {await store.newChat(finance:target)}}} label:{
             Text(title).font(.system(size:13,weight:finance==target ? .medium:.regular)).foregroundStyle(.primary)
                 .padding(.horizontal,18).frame(height:32)
                 .background {if finance==target {Capsule().fill(Theme.panel(scheme)).overlay {Capsule().strokeBorder(.primary.opacity(0.08),lineWidth:0.5)}}}
@@ -107,15 +113,15 @@ struct ConversationView:View {
         HStack(alignment:.bottom,spacing:8) {
             Menu {
                 if DeepSeekModels.supportsImages(store.model) {
-                    Section {Button("上传图片",systemImage:"photo") {focused=false;photoPicker=true}.accessibilityIdentifier("chat.menu.photos")} footer:{Text("最多 4 张。图片随消息发送给 DeepSeek Flash，并保存在本机加密聊天记录中。")}
+                    Section {Button("上传图片",systemImage:"photo") {dismissComposer();photoPicker=true}.accessibilityIdentifier("chat.menu.photos")} footer:{Text("最多 4 张。图片随消息发送给 DeepSeek Flash，并保存在本机加密聊天记录中。")}
                 }
                 Section {
                     Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
                 } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
-                    Button("回复风格",systemImage:"slider.horizontal.3") {focused=false;preferences=true}.accessibilityIdentifier("chat.menu.preferences")
-                    Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
-                    Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
+                    Button("回复风格",systemImage:"slider.horizontal.3") {dismissComposer();preferences=true}.accessibilityIdentifier("chat.menu.preferences")
+                    Button("新对话",systemImage:"square.and.pencil") {dismissComposer();Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
+                    Button("历史对话",systemImage:"clock.arrow.circlepath") {dismissComposer();history=true}.accessibilityIdentifier("chat.menu.history")
                 }
             } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
             if voiceMode {
@@ -127,10 +133,10 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
             } else {
-                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused},set:{focused=$0}),placeholder:finance ? "问问你的财务状况…":"发消息…")
+                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…")
             }
             Button {
-                focused=false;voiceMode.toggle()
+                dismissComposer();voiceMode.toggle()
                 if voiceMode {Task {_=await speech.prepare()}}
             } label:{Image(systemName:voiceMode ? "keyboard":"mic").font(.system(size:20)).frame(width:36,height:42)}
                 .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || holding || speech.finishing)
@@ -183,7 +189,7 @@ struct ConversationView:View {
     }
     func beginVoice() {
         guard !store.assistantBusy,!speech.finishing else {return}
-        focused=false;holding=true;gestureStarted=true;voiceAction = .send;pendingVoice=nil
+        dismissComposer();holding=true;gestureStarted=true;voiceAction = .send;pendingVoice=nil
         store.voiceCapture=VoiceCaptureState();UIImpactFeedbackGenerator(style:.light).impactOccurred()
         Task {await speech.start();if !speech.recording && !speech.finishing {holding=false;store.voiceCapture=nil}}
     }
@@ -208,8 +214,12 @@ struct ConversationView:View {
         if finance {lastFinanceGreeting=greeting} else {lastGreeting=greeting}
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
-    func send() {
+    private func dismissComposer() {
+        focused=false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
+    }
+    func send() {
+        dismissComposer()
         let images=store.chatImages
         var question=input.trimmingCharacters(in:.whitespacesAndNewlines)
         guard (!question.isEmpty || !images.isEmpty),!store.assistantBusy,!loadingPhotos else{return}

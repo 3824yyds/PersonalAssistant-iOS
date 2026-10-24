@@ -60,8 +60,8 @@ public enum Finance {
             return result
         }
         for account in after.accounts where account.text("type") != "credit" {
-            guard let old=before.accounts.first(where:{$0.id==account.id}) else {continue}
-            let oldEvents=events(old,before),newEvents=events(account,after)
+            let oldEvents=before.accounts.first(where:{$0.id==account.id}).map {events($0,before)} ?? [:]
+            let newEvents=events(account,after)
             if oldEvents==newEvents {continue}
             var oldBalance:Int64=0,newBalance:Int64=0
             for day in Set(oldEvents.keys).union(newEvents.keys).sorted() {
@@ -104,7 +104,17 @@ public enum Finance {
         }
         next.upsert(account, in: "accounts")
         if var c = card { c.set("accountId", account.id); next.upsertWallet(c, in: "cards") }
-        return try next.validated()
+        next=try next.validated();try validateCashChange(from:d,to:next);return next
+    }
+    /// Manual posted transactions use the same cash rule as loans and transfers.
+    /// Imported future transactions may be corrected without forcing their date to change.
+    public static func saveRecord(_ record:Item,in d:Document) throws ->Document {
+        let old=d.records.first(where:{$0.id==record.id})
+        guard ["expense","income","refund"].contains(record.text("kind")),record.text("loanId").isEmpty,record.text("wealthRef").isEmpty,
+              old?.text("loanId").isEmpty ?? true,old?.text("wealthRef").isEmpty ?? true else {throw AppError.message("这笔流水由贷款或资产管理生成，请在对应功能中处理")}
+        guard let account=d.accounts.first(where:{$0.text("name")==record.text("account") && $0.text("currency",fallback:"CNY")==record.text("currency",fallback:"CNY")}),!account.bool("archived") else {throw AppError.message("请选择可用的同币种账户")}
+        guard record.int("date")<=Clock.milliseconds || old?.int("date")==record.int("date") else {throw AppError.message("尚未发生的收支请先创建提醒，实际发生后再记账")}
+        var next=d;next.upsert(record,in:"records");next=try next.validated();try validateCashChange(from:d,to:next);return next
     }
     public static func transfer(_ d: Document, from: String, to: String, cents: Int64, memo: String = "转账") throws -> Document {
         guard from != to, let a = d.accounts.first(where: { $0.id == from }), let b = d.accounts.first(where: { $0.id == to }),
@@ -125,7 +135,7 @@ public enum Finance {
     public static func deleteRecord(_ id: String, in d: Document) throws -> Document {
         guard let record = d.records.first(where: { $0.id == id }) else { return d }
         guard record.text("loanId").isEmpty, record.text("wealthRef").isEmpty else { throw AppError.message("这笔流水由贷款或资产管理生成，请在对应功能中处理") }
-        var next = d; next.records.removeAll { $0.id == id || $0.text("linkId") == id }; return next
+        var next = d; next.records.removeAll { $0.id == id || $0.text("linkId") == id };try validateCashChange(from:d,to:next);return next
     }
     public static func report(_ d: Document, month: Date, currency: String) -> String {
         let rs = select(d, month: month, currency: currency), t = Totals(rs)

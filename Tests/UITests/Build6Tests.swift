@@ -3,7 +3,7 @@ import XCTest
 extension XCTestCase {
     func launchProduct(_ flags:[String]=[])->XCUIApplication {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture"]+flags;app.launch()
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture"]+flags;app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
             app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
             app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
@@ -18,13 +18,18 @@ extension XCTestCase {
         if old != field.placeholderValue {field.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:old.count))}
         field.typeText(value)
     }
+    func tapProductTab(_ title:String,in app:XCUIApplication) {
+        let tab=app.buttons[title].firstMatch
+        XCTAssertTrue(tab.waitForExistence(timeout:5))
+        tab.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+    }
     func sendChat(_ text:String,in app:XCUIApplication) {
         let input=app.textViews["chat.input"];XCTAssertTrue(input.waitForExistence(timeout:5));input.tap();input.typeText(text);app.buttons["发送"].tap()
     }
 }
 final class Build6Tests:XCTestCase {
     func testSavingPreviousResponseCreatesANoteWithoutCloudCredentials() {
-        let app=launchProduct();app.buttons["助理"].firstMatch.tap();sendChat("你好",in:app)
+        let app=launchProduct();tapProductTab("助理",in:app);sendChat("你好",in:app)
         XCTAssertTrue(app.buttons["chat.saveNote"].waitForExistence(timeout:8))
         sendChat("帮我把上面的回答保存到备忘录",in:app)
         XCTAssertTrue(app.buttons["chat.created.note"].waitForExistence(timeout:8));recordScreen(app,"PreviousReplySavedLocallyAsNote")
@@ -41,7 +46,7 @@ final class Build6Tests:XCTestCase {
         app.buttons["关闭"].tap()
     }
     func testModelPopoverHasNoRefreshAndSelectedMarkFollowsModelName() {
-        let app=launchProduct();app.buttons["助理"].firstMatch.tap();app.buttons["chat.model"].tap()
+        let app=launchProduct();tapProductTab("助理",in:app);app.buttons["chat.model"].tap()
         let flash=app.buttons["chat.model.option.deepseek-flash"]
         XCTAssertTrue(flash.waitForExistence(timeout:5));XCTAssertEqual(flash.value as? String,"已选择")
         XCTAssertFalse(app.buttons["刷新可用模型"].exists);recordScreen(app,"ModelSelectionTrailingCheckmark")
@@ -50,7 +55,7 @@ final class Build6Tests:XCTestCase {
         app.buttons["chat.model.option.deepseek-flash"].tap()
     }
     func testChatCreatesActualNotesIncomeExpenseAndReminderAndClarifiesAccount() {
-        let app=launchProduct(["--ui-action-fixture"]);app.buttons["助理"].firstMatch.tap()
+        let app=launchProduct(["--ui-action-fixture"]);tapProductTab("助理",in:app)
         sendChat("帮我创建一个备忘录，内容是模拟器创建备忘录",in:app)
         XCTAssertTrue(app.buttons["chat.created.note"].waitForExistence(timeout:10));app.buttons["chat.created.note"].tap()
         XCTAssertTrue(app.textViews["note.body"].waitForExistence(timeout:5));XCTAssertEqual(app.textViews["note.body"].value as? String,"准备好水和运动鞋。")
@@ -67,7 +72,7 @@ final class Build6Tests:XCTestCase {
         XCTAssertTrue(app.buttons["chat.created.reminder"].waitForExistence(timeout:10));XCTAssertTrue(app.buttons["chat.created.reminder"].label.contains("9:00"));recordScreen(app,"ChatRealCreationReceipts")
         app.buttons["chat.created.reminder"].tap();XCTAssertTrue(app.navigationBars["编辑提醒"].waitForExistence(timeout:5));app.buttons["取消"].tap()
         app.buttons["返回"].firstMatch.tap();XCTAssertTrue(app.staticTexts["模拟器创建备忘录"].waitForExistence(timeout:8))
-        app.buttons["账本"].firstMatch.tap();XCTAssertTrue(app.staticTexts["模拟器午饭"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["模拟器收入"].exists);recordScreen(app,"ChatEntriesInLedger")
-        app.buttons["提醒"].firstMatch.tap();XCTAssertTrue(app.staticTexts["模拟器喝水提醒"].waitForExistence(timeout:5))
+        tapProductTab("账本",in:app);XCTAssertTrue(app.staticTexts["模拟器午饭"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["模拟器收入"].exists);recordScreen(app,"ChatEntriesInLedger")
+        tapProductTab("提醒",in:app);XCTAssertTrue(app.staticTexts["模拟器喝水提醒"].waitForExistence(timeout:5))
     }
 }

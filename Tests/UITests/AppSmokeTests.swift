@@ -4,12 +4,12 @@ import UIKit
 final class AppSmokeTests:XCTestCase {
     func testSharedAIVisualStates() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-motion-fixture"];app.launch()
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-motion-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
             app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
             app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
         } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
-        XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));app.buttons["助理"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));tapProductTab("助理",in:app)
         XCTAssertTrue(app.buttons["停止回复"].waitForExistence(timeout:5));attach(app,"AIFlowChat");app.buttons["停止回复"].tap()
         app.buttons["返回"].firstMatch.tap();app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
         XCTAssertTrue(app.staticTexts["正在整理笔记"].waitForExistence(timeout:5));attach(app,"AIFlowNote")
@@ -22,7 +22,7 @@ final class AppSmokeTests:XCTestCase {
     }
     func testCreateVaultAndNavigateMainScreens() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture"]
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture"]
         app.launch()
         attach(app,"UnlockFullScreen")
         if app.buttons["创建资料库"].waitForExistence(timeout:10) {
@@ -36,7 +36,7 @@ final class AppSmokeTests:XCTestCase {
         }
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20))
         attach(app,"Notes")
-        app.buttons["账本"].firstMatch.tap();XCTAssertTrue(app.staticTexts["本月结余"].waitForExistence(timeout:5));attach(app,"Ledger")
+        tapProductTab("账本",in:app);XCTAssertTrue(app.staticTexts["本月结余"].waitForExistence(timeout:5));attach(app,"Ledger")
         let initialPlus=app.buttons["展开快捷操作"].frame
         let initialFooter=luminance(app,point:CGPoint(x:2,y:initialPlus.midY))
         app.buttons["展开快捷操作"].tap();XCTAssertTrue(app.buttons["新建笔记"].exists);XCTAssertTrue(app.buttons["记一笔"].exists);XCTAssertTrue(app.buttons["新建提醒"].exists)
@@ -64,8 +64,8 @@ final class AppSmokeTests:XCTestCase {
         for _ in 0..<5 {if lastCard.isHittable {break};app.swipeUp()}
         XCTAssertTrue(lastCard.isHittable);attach(app,"WalletFourthCard")
         app.buttons["完成"].firstMatch.tap()
-        app.buttons["提醒"].firstMatch.tap();attach(app,"Reminders")
-        app.buttons["助理"].firstMatch.tap();XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5));attach(app,"Assistant")
+        tapProductTab("提醒",in:app);attach(app,"Reminders")
+        tapProductTab("助理",in:app);XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5));attach(app,"Assistant")
         XCTAssertTrue(app.buttons["返回"].exists)
         let orb=app.descendants(matching:.any).matching(identifier:"assistant.orb").firstMatch
         XCTAssertTrue(orb.exists);let firstOrb=orb.screenshot().pngRepresentation
@@ -79,16 +79,17 @@ final class AppSmokeTests:XCTestCase {
         XCTAssertLessThanOrEqual(input.frame.maxY,app.keyboards.firstMatch.frame.minY+2)
         attach(app,"AssistantKeyboardVisibleInput")
         app.buttons["聊天功能"].tap();app.buttons["chat.menu.history"].tap();XCTAssertTrue(app.navigationBars["历史对话"].waitForExistence(timeout:5));app.buttons["完成"].firstMatch.tap()
+        let keyboardDismissed=expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:app.keyboards.firstMatch);wait(for:[keyboardDismissed],timeout:5)
         app.buttons["个人详情"].tap()
         app.buttons.containing(.staticText,identifier:"个人头像").firstMatch.tap()
         XCTAssertTrue(app.buttons["使用小熊头像"].waitForExistence(timeout:5));app.buttons["使用小熊头像"].tap();attach(app,"ProfileAvatarPicker")
         app.navigationBars["个人头像"].buttons.firstMatch.tap()
         app.buttons["外观与图标"].tap()
         app.buttons["appearance.mode"].tap();app.buttons["纯黑深色"].tap()
-        let dark=expectation(for:NSPredicate {_,_ in self.luminance(app,point:CGPoint(x:app.frame.midX,y:app.frame.height*0.82))<0.08},evaluatedWith:nil)
+        let dark=expectation(for:NSPredicate {_,_ in self.luminance(normalized:CGPoint(x:0.5,y:0.82))<0.08},evaluatedWith:nil)
         wait(for:[dark],timeout:4);attach(app,"AppearanceDarkImmediate")
         app.buttons["appearance.mode"].tap();app.buttons["浅色"].tap()
-        let light=expectation(for:NSPredicate {_,_ in self.luminance(app,point:CGPoint(x:app.frame.midX,y:app.frame.height*0.82))>0.9},evaluatedWith:nil)
+        let light=expectation(for:NSPredicate {_,_ in self.luminance(normalized:CGPoint(x:0.5,y:0.82))>0.9},evaluatedWith:nil)
         wait(for:[light],timeout:4);attach(app,"AppearanceLightImmediate")
         app.navigationBars["外观与图标"].buttons.firstMatch.tap()
         app.buttons["完成"].firstMatch.tap()
@@ -101,14 +102,14 @@ final class AppSmokeTests:XCTestCase {
     }
     func testScrolledChromeAndInlineProposals() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-scroll-fixture","--ui-proposal-fixture"];app.launch()
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-scroll-fixture","--ui-proposal-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
             app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
             app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
         } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20))
         for page in ["笔记","提醒","账本"] {
-            app.buttons[page].firstMatch.tap()
+            tapProductTab(page,in:app)
             app.swipeUp();app.swipeUp()
             let navigation=app.descendants(matching:.any).matching(identifier:"main.navigation").firstMatch
             let header=app.buttons["卡包与资产"].frame.midY
@@ -119,7 +120,7 @@ final class AppSmokeTests:XCTestCase {
             XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:app.frame.height-4)),middle,accuracy:0.015,"Page background continues through the bottom safe area")
             attach(app,page+"ScrolledClearChrome")
         }
-        app.buttons["助理"].firstMatch.tap()
+        tapProductTab("助理",in:app)
         XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5))
         let back=app.buttons["返回"],model=app.buttons["chat.model"]
         XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minX-back.frame.maxX,4)
@@ -156,12 +157,12 @@ final class AppSmokeTests:XCTestCase {
     }
     func testWebAnswersHaveCompactExpandableSources() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-search-fixture"];app.launch()
+        let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-search-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
             app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
             app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
         } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
-        XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));app.buttons["助理"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));tapProductTab("助理",in:app)
         XCTAssertTrue(app.staticTexts["联网搜索 · 2 个来源"].waitForExistence(timeout:5));attach(app,"WebAnswerCompact")
         app.buttons.containing(.staticText,identifier:"来源 · 2").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"chat.source.1").firstMatch.waitForExistence(timeout:5))
@@ -171,9 +172,15 @@ final class AppSmokeTests:XCTestCase {
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"chat.webSearch").firstMatch.waitForExistence(timeout:5));attach(app,"WebSearchMenu")
     }
     func luminance(_ app:XCUIApplication,point:CGPoint)->Double {
-        guard let image=UIImage(data:app.screenshot().pngRepresentation)?.cgImage else {XCTFail("Missing screenshot");return -1}
-        let x=point.x/app.frame.width*CGFloat(image.width),y=point.y/app.frame.height*CGFloat(image.height)
-        guard let pixel=image.cropping(to:CGRect(x:x,y:y,width:1,height:1)) else {XCTFail("Sample outside screen");return -1}
+        let frame=app.frame
+        guard frame.width>0,frame.height>0,point.x.isFinite,point.y.isFinite else {XCTFail("App geometry is unavailable");return .nan}
+        return luminance(normalized:CGPoint(x:(point.x-frame.minX)/frame.width,y:(point.y-frame.minY)/frame.height))
+    }
+    // Appearance transitions can temporarily invalidate the app accessibility frame.
+    // The screenshot is in screen coordinates, so normalized samples do not query that frame.
+    func luminance(normalized point:CGPoint)->Double {
+        guard let image=UIImage(data:XCUIScreen.main.screenshot().pngRepresentation)?.cgImage else {XCTFail("Missing screenshot");return .nan}
+        guard point.x.isFinite,point.y.isFinite,(0..<1).contains(point.x),(0..<1).contains(point.y),let pixel=image.cropping(to:CGRect(x:point.x*CGFloat(image.width),y:point.y*CGFloat(image.height),width:1,height:1)) else {XCTFail("Sample outside screen");return .nan}
         var bytes=[UInt8](repeating:0,count:4)
         let context=CGContext(data:&bytes,width:1,height:1,bitsPerComponent:8,bytesPerRow:4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.draw(pixel,in:CGRect(x:0,y:0,width:1,height:1))
