@@ -57,7 +57,7 @@ final class ProductAuditTests:XCTestCase {
     }
 
     func testLedgerIncomeEditingStatisticsCalendarBudgetAndTransfer() {
-        let app=launch();app.buttons["账本"].firstMatch.tap();app.buttons["展开快捷操作"].tap();app.buttons["记一笔"].tap()
+        let app=launch();tapProductTab("账本",in:app);app.buttons["展开快捷操作"].tap();app.buttons["记一笔"].tap()
         app.segmentedControls.buttons["收入"].tap();app.textFields["0.00"].tap();app.textFields["0.00"].typeText("50.00")
         app.textFields["这笔钱用在哪里"].tap();app.textFields["这笔钱用在哪里"].typeText("审计手动收入");app.buttons["保存"].tap()
         XCTAssertTrue(app.staticTexts["审计手动收入"].waitForExistence(timeout:8));app.staticTexts["审计手动收入"].tap()
@@ -113,11 +113,11 @@ final class ProductAuditTests:XCTestCase {
         app.textFields["数量"].tap();app.textFields["数量"].typeText("10");app.textFields["成交总额 / 分红金额"].tap();app.textFields["成交总额 / 分红金额"].typeText("100")
         choose(app,"本人收付账户","中国工商银行");app.buttons["保存"].tap()
         XCTAssertTrue(app.navigationBars["审计基金"].waitForExistence(timeout:8));recordScreen(app,"AuditInvestmentPurchase")
-        app.buttons["更新价格"].tap();fill(app.alerts.textFields.firstMatch,"11");app.alerts.buttons["保存"].tap();recordScreen(app,"AuditInvestmentRevalued")
+        app.buttons["更新价格"].tap();fill(app.textFields["单价"],"11");app.navigationBars["更新价格"].buttons["保存"].tap();recordScreen(app,"AuditInvestmentRevalued")
     }
 
     func testReminderReopenMonthEndAnchorAndUndo() {
-        let app=launch();app.buttons["提醒"].firstMatch.tap()
+        let app=launch();tapProductTab("提醒",in:app)
         let search=app.textFields["搜索提醒"];search.tap();search.typeText("审计一次性提醒");app.buttons["完成提醒"].firstMatch.tap()
         menu(app,"提醒筛选");app.buttons["查看已完成"].tap()
         XCTAssertTrue(app.staticTexts["审计一次性提醒"].waitForExistence(timeout:5));recordScreen(app,"AuditCompletedReminderBeforeReopen")
