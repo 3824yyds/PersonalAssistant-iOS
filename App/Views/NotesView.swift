@@ -57,8 +57,9 @@ struct NotesView:View {
             FloatingSearchField(text:$query,prompt:"搜索备忘录")
         }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
             .sheet(item:$editing) {note in NavigationStack {NoteEditor(note:note)}.environmentObject(store)}
-            .sheet(isPresented:$creating) {NavigationStack {NoteEditor()}.environmentObject(store)}
-            .alert("新建文件夹",isPresented:$addingFolder) {TextField("名称",text:$folderName);Button("取消",role:.cancel) {};Button("创建") {let name=folderName.trimmingCharacters(in:.whitespacesAndNewlines);guard !name.isEmpty,name.count<=100 else {return};Task {await store.commit {document in document.root.raw["noteFolders"] = .array(Array(Set(document.root.strings("noteFolders")+[name])).sorted().map(JSONValue.string))};folderFilter=name;folderName=""}}}
+            .sheet(isPresented:$creating) {NavigationStack {NoteEditor(initialFolder:store.noteFolder)}.environmentObject(store)}
+            .onChange(of:folderFilter) {_,value in store.noteFolder=value.isEmpty ? "收件箱":value}
+            .alert("新建文件夹",isPresented:$addingFolder) {TextField("名称",text:$folderName);Button("取消",role:.cancel) {};Button("创建") {let name=folderName.trimmingCharacters(in:.whitespacesAndNewlines);guard !name.isEmpty,name.count<=100 else {return};Task {if await store.commit({document in document.root.raw["noteFolders"] = .array(Array(Set(document.root.strings("noteFolders")+[name])).sorted().map(JSONValue.string))}) {folderFilter=name;folderName=""}}}}
             .confirmationDialog("永久删除这篇备忘录？",isPresented:Binding(get:{deleting != nil},set:{if !$0 {deleting=nil}}),titleVisibility:.visible) {Button("永久删除",role:.destructive) {guard let note=deleting else{return};Task {await store.commit {$0.notes.removeAll {$0.id==note.id}}};deleting=nil}}
     }
     private var heading:some View {VStack(alignment:.leading,spacing:4) {Text(pageTitle).font(.largeTitle.bold());Text("\(notes.count)个备忘录").font(.subheadline).foregroundStyle(.secondary)}.frame(maxWidth:.infinity,alignment:.leading)}
@@ -86,6 +87,7 @@ struct NoteEditor:View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var scheme
     var note:Item?
+    var initialFolder="收件箱"
     @State var noteID=UUID().uuidString.lowercased()
     @State var title=""
     @State var bodyText=""
@@ -131,7 +133,7 @@ struct NoteEditor:View {
     private var hasChanges:Bool {title != savedTitle || bodyText != savedBody || extras != savedExtras}
     private var canSave:Bool {!title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || checklist.contains {!$0.text("text").isEmpty} || !tables.isEmpty || !attachments.isEmpty}
     var body:some View {
-        drawingSheets
+        drawingSheets.appErrorScope()
             .sheet(item:$previewAttachment) {attachment in NoteAttachmentPreview(attachment:attachment)}
             .alert("文件夹",isPresented:$folderPrompt) {TextField("名称",text:$folder);Button("完成") {if folder.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {folder="收件箱"}}}
     }
@@ -172,7 +174,7 @@ struct NoteEditor:View {
                             .padding(.horizontal,20).padding(.vertical,10).appGlass(Capsule(),interactive:true,tinted:true).foregroundStyle(.white)
                             .accessibilityIdentifier("note.proposal.adopt")
                     } else {
-                        if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb().frame(width:20,height:20);Text("AI 工具").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}.padding(10).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("AI 工具").accessibilityIdentifier("note.ai.tools.toggle")}
+                        if !working {Button {withAnimation(Theme.normal) {tools.toggle()}} label:{HStack(spacing:6) {AIOrb().frame(width:20,height:20);if undo==nil {Text("AI").font(.caption.weight(.medium));Image(systemName:tools ? "chevron.down":"chevron.up").font(.system(size:10))}}.padding(10).appGlass(Capsule(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("AI 工具").accessibilityIdentifier("note.ai.tools.toggle")}
                         if working {Button("取消") {cancelOperation()}.font(.caption)}
                         Spacer()
                         if undo != nil && !working {Button {if let previous=undo {title=previous.0;bodyText=previous.1;richText=undoRich;undo=nil}} label:{Image(systemName:"arrow.uturn.backward")}.accessibilityLabel("撤销采用")}
@@ -321,6 +323,7 @@ struct NoteEditor:View {
     func load() {
         guard !draftLoaded else{return};draftLoaded=true
         baseNote=note
+        folder=initialFolder
         if let n=note {noteID=n.id;title=n.text("title");bodyText=n.text("body");loadExtras(n)}
         #if DEBUG
         if DebugFixtures.motion {title="周末计划";bodyText="想去公园走走。\n和朋友吃顿饭。\n也留一点时间休息。";working=true;aiMode="润色"}

@@ -27,11 +27,13 @@ struct VoiceCaptureState:Equatable {
     @Published private(set) var document: Document?
     @Published var busy = false
     @Published var error: String?
+    @Published var errorScopes:[UUID]=[]
     @Published var sessions: [ChatSession] = []
     @Published var messages: [ChatMessage] = []
     @Published var activeSessionID = UUID().uuidString
     @Published var financeMode = false
     @Published var chatDraft = ""
+    @Published var noteFolder="收件箱"
     @Published var chatImages:[ChatImage] = []
     @Published var voiceCapture:VoiceCaptureState?
     @Published var assistantBusy = false
@@ -124,7 +126,7 @@ struct VoiceCaptureState:Equatable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {

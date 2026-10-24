@@ -138,4 +138,8 @@ final class DebtTests:XCTestCase {
         l.set("name","更正名称");d=try Loans.save(l,in:d)
         XCTAssertTrue(d.records.contains {$0.id==receiptID});XCTAssertTrue(d.records.contains {$0.text("linkId")==fee.id});XCTAssertEqual(Finance.balance(a,in:d),196000)
     }
+    func testFullEarlyPrincipalRepaymentStopsUnpaidFutureInstallmentReminders() throws {
+        var(d,a,l)=try setup();d=try Loans.savePayment(payment(l,a,principal:200000,interest:0,period:-1),loanID:l.id,in:d)
+        d=Loans.refreshReminders(d);XCTAssertEqual(Loans.outstanding(l,in:d),0);XCTAssertFalse(d.records.contains {$0.bool("loanReminder")})
+    }
 }

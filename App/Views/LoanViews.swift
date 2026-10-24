@@ -18,7 +18,7 @@ struct LoansView:View {
                 }.accessibilityIdentifier("loan.row."+loan.id)
             }
             Button("登记贷款",systemImage:"plus") {adding=true}.accessibilityIdentifier("loan.add")
-        }.navigationTitle("贷款与还款").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("贷款与还款").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {ToolbarItem(placement:.topBarTrailing) {Menu {Toggle("查看归档贷款",isOn:$showArchived)} label:{Image(systemName:"ellipsis")}}}
             .sheet(isPresented:$adding) {NavigationStack {LoanEditor()}.environmentObject(store)}
     }
@@ -77,7 +77,7 @@ struct LoanEditor:View {
                 Stepper("提前 \(leadDays) 天提醒",value:$leadDays,in:0...30)
                 Text("到期日当天 09:00 自动提醒，并在提前日期再提醒一次；还款后自动同步。需要允许系统通知。").font(.caption).foregroundStyle(.secondary)
             }
-        }.navigationTitle(loan==nil ? "登记贷款":"编辑贷款").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(loan==nil ? "登记贷款":"编辑贷款").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {
                 ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}}
                 ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy).accessibilityIdentifier("loan.save")}
@@ -121,6 +121,10 @@ struct LoanDetailView:View {
     var loan:Item {store.current.wallet.items("loans").first {$0.id==loanID} ?? Item()}
     var plan:[Installment] {(try? Loans.schedule(loan)) ?? []}
     var remaining:Int64 {Loans.outstanding(loan,in:store.current)}
+    private var hasLegacyShortfall:Bool {
+        let accountIDs=Set(Loans.payments(loan,in:store.current).map(\.accountID)+[loan.text("accountId")])
+        return store.current.accounts.contains {accountIDs.contains($0.id) && $0.text("type") != "credit" && Finance.balance($0,in:store.current)<0}
+    }
     var body:some View {
         List {
             Section {
@@ -135,15 +139,20 @@ struct LoanDetailView:View {
                 if Loans.needsPlanReview(loan,in:store.current) {Text("已记录提前还本，请按贷款方的新账单核对后续计划。原计划不再用于现金流预测，提醒仍按原到期日提示核对。").font(.caption).foregroundStyle(Theme.expense)}
             }
             Section {
+                if hasLegacyShortfall {
+                    Text("账户有历史负余额，请在还款记录中核对、修改或撤销实际未发生的付款；系统不会自动补造收入。").font(.caption).foregroundStyle(Theme.expense)
+                }
                 NavigationLink {LoanPaymentsView(loanID:loanID)} label:{Label("还款记录（\(Loans.payments(loan,in:store.current).count)）",systemImage:"list.bullet.rectangle")}.accessibilityIdentifier("loan.history")
                 Button("核对还款计划",systemImage:"calendar") {planEditing=true}.accessibilityIdentifier("loan.plan")
                 Button("利率调整",systemImage:"percent") {rates=true}
                 Button("提前还本",systemImage:"arrow.down.circle") {paying=LoanPayment(period:-1,accountID:loan.text("accountId"),principal:remaining,interest:0,fee:0)}.disabled(remaining==0 || loan.bool("archived")).accessibilityIdentifier("loan.prepay")
             }
             Section {
+                let dues=Loans.dues(loan,in:store.current)
+                let recordedPeriods=Set(Loans.payments(loan,in:store.current).map(\.period))
                 ForEach(plan) {row in
-                    let due=Loans.due(row,loan:loan,in:store.current)
-                    let recorded=Loans.payments(loan,in:store.current).contains {$0.period==row.id}
+                    let due=dues[row.id] ?? DebtDue(principal:0,interest:0,fee:0)
+                    let recorded=recordedPeriods.contains(row.id)
                     Button {
                         paying=LoanPayment(period:row.id,accountID:loan.text("accountId"),principal:min(due.principal,remaining),interest:due.interest,fee:due.fee)
                     } label:{
@@ -163,7 +172,7 @@ struct LoanDetailView:View {
                 }
             } header:{Text("还款计划")} footer:{Text("分期金额为合同参考值，付款时填写实际本息和费用。部分还款不会标为全部已还；未来息费不计入当前本金负债。")}
             Section {Button("法律与权益风险核对") {risk=true}}
-        }.navigationTitle(loan.text("name")).navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(loan.text("name")).navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {ToolbarItemGroup(placement:.topBarTrailing) {
                 Button("编辑") {editing=true}.accessibilityIdentifier("loan.edit")
                 Menu {
@@ -176,7 +185,7 @@ struct LoanDetailView:View {
             .sheet(item:$paying) {payment in NavigationStack {LoanPaymentView(loanID:loanID,payment:payment)}.environmentObject(store)}
             .sheet(isPresented:$planEditing) {NavigationStack {LoanPlanEditor(loanID:loanID)}.environmentObject(store)}
             .sheet(isPresented:$rates) {NavigationStack {LoanRateEditor(loanID:loanID)}.environmentObject(store)}
-            .sheet(isPresented:$risk) {NavigationStack {ScrollView {Text(Loans.risk(loan)).font(.system(size:14)).lineSpacing(7).padding(20).textSelection(.enabled)}.navigationTitle("风险核对").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {risk=false}}}}}
+            .sheet(isPresented:$risk) {NavigationStack {ScrollView {Text(Loans.risk(loan)).font(.system(size:14)).lineSpacing(7).padding(20).textSelection(.enabled)}.navigationTitle("风险核对").navigationBarTitleDisplayMode(.inline).appErrorScope().toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {risk=false}}}}}
     }
 }
 
@@ -201,7 +210,7 @@ struct LoanPaymentView:View {
                 DatePicker("实际支付日期",selection:$date,in:...Date(),displayedComponents:.date)
             } footer:{Text("本金只减少负债；利息和费用计入支出。系统校验实际支付日及后续已记账余额，余额不足不能扣款。")}
             if payment.period == -1 {Section {Text("提前还本的利息、违约金按贷款方实际结算填写。完成后请核对后续还款计划，系统不会推断银行采用缩短期限还是减少月供。").font(.caption).foregroundStyle(.secondary)}}
-        }.navigationTitle(payment.period == -1 ? "提前还本":"记录第\(payment.period)期还款").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(payment.period == -1 ? "提前还本":"记录第\(payment.period)期还款").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {
                 ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}}
                 ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy).accessibilityIdentifier("loan.payment.save")}
@@ -233,7 +242,7 @@ struct LoanPaymentsView:View {
                     .swipeActions {Button("撤销",role:.destructive) {deleting=payment}}
                     .contextMenu {Button("编辑还款") {editing=payment};Button("撤销还款",role:.destructive) {deleting=payment}}
             }
-        }.navigationTitle("还款记录").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("还款记录").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .sheet(item:$editing) {payment in NavigationStack {LoanPaymentView(loanID:loanID,payment:payment)}.environmentObject(store)}
             .confirmationDialog("撤销这笔实际还款？",isPresented:Binding(get:{deleting != nil},set:{if !$0 {deleting=nil}}),titleVisibility:.visible) {Button("撤销还款并恢复余额",role:.destructive) {guard let payment=deleting else{return};Task {await store.commit {$0=try Loans.deletePayment(payment.id,loanID:loanID,in:$0)}};deleting=nil}} message:{Text("本金、息费、账户余额和还款提醒会同时恢复。")}
     }
@@ -260,7 +269,7 @@ struct LoanPlanEditor:View {
                     TextField("计划费用",text:$row.fee).keyboardType(.decimalPad)
                 }
             }
-        }.navigationTitle("核对还款计划").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("核对还款计划").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy)}}
             .onAppear {guard !loaded else {return};loaded=true;if let loan=store.current.wallet.items("loans").first(where:{$0.id==loanID}) {rows=((try? Loans.schedule(loan)) ?? []).map(PlanDraft.init)}}
     }
@@ -281,7 +290,7 @@ struct LoanRateEditor:View {
             Section {Text("填写合同约定的重定价日及执行年利率，不自动抓取 LPR。按月生成参考计划；贷款方实际扣息不同，请核对各期计划。已有自定义合同计划时，应直接在计划中修改本息。").font(.caption).foregroundStyle(.secondary)}
             ForEach($rows) {$row in Section {DatePicker("生效日",selection:$row.date,displayedComponents:.date);TextField("执行年利率（%）",text:$row.annual).keyboardType(.decimalPad)}}.onDelete {rows.remove(atOffsets:$0)}
             Button("添加利率调整",systemImage:"plus") {rows.append(RateDraft())}
-        }.navigationTitle("利率调整").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("利率调整").navigationBarTitleDisplayMode(.inline).appErrorScope()
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {save()}.disabled(store.busy)}}
             .onAppear {guard !loaded else{return};loaded=true;let loan=store.current.wallet.items("loans").first {$0.id==loanID};rows=(loan?.items("rateChanges") ?? []).map {RateDraft(date:Clock.date($0.text("from")) ?? Date(),annual:Money.amount($0.int("annualBps")))}}
     }

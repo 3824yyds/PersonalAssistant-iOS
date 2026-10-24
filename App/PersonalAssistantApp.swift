@@ -21,9 +21,9 @@ import SwiftUI
     var body: some Scene {
         WindowGroup {
             Group { if store.document != nil { MainTabs() } else { UnlockView() } }
-                .environmentObject(store).tint(Theme.accent)
+                .tint(Theme.accent)
                 .background {AppearanceWindow(appearance:store.document==nil ? .light:store.appearance).frame(width:0,height:0).allowsHitTesting(false)}
-                .alert("提示",isPresented:Binding(get:{store.error != nil},set:{if !$0 {store.error=nil}})) { Button("知道了",role:.cancel) {store.error=nil} } message: {Text(store.error ?? "")}
+                .appErrorScope().environmentObject(store)
                 .onChange(of:phase) { _,next in
                     if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.cancelReply() }
                     if next == .active, let date = backgroundAt, Date().timeIntervalSince(date)>60 { store.lock(); backgroundAt=nil }
@@ -79,8 +79,8 @@ struct MainTabs: View {
         .onChange(of:tab) {old,new in if new==3 && old != 3 {previousTab=old}}
         .sheet(item:$sheet) { value in
             NavigationStack {
-                switch value { case .note:NoteEditor();case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }
-            }.appClearChrome().environmentObject(store).interactiveDismissDisabled(store.busy)
+                switch value { case .note:NoteEditor(initialFolder:store.noteFolder);case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }
+            }.appClearChrome().appErrorScope().environmentObject(store).interactiveDismissDisabled(store.busy)
         }
     }
     @ViewBuilder func quick(_ icon:String,_ title:String,_ target:RootSheet)->some View {

@@ -39,6 +39,7 @@ extension Loans {
 
     public static func openingPrincipalPaid(_ loan:Item) -> Int64 {
         let count=max(0,Int(loan.int("openingPaidPeriods")))
+        guard count>0 else {return 0}
         // Opening periods refer to the original contract, not a later replacement plan.
         var original=loan; original.raw.removeValue(forKey:"customSchedule")
         return ((try? schedule(original)) ?? []).prefix(count).reduce(0) { $0+$1.principal }
@@ -54,6 +55,20 @@ extension Loans {
         return DebtDue(principal:max(0,row.principal-paid.reduce(0) { $0+$1.principal }),
                        interest:max(0,row.interest-paid.reduce(0) { $0+$1.interest }),
                        fee:max(0,row.fee-paid.reduce(0) { $0+$1.fee }))
+    }
+    public static func dues(_ loan:Item,in d:Document)->[Int:DebtDue] {
+        var result=Dictionary(uniqueKeysWithValues:((try? schedule(loan)) ?? []).map {($0.id,DebtDue(principal:$0.principal,interest:$0.interest,fee:$0.fee))})
+        for record in d.records where record.text("loanId")==loan.id {
+            let period=Int(record.int("loanPeriod"))
+            guard var due=result[period] else {continue}
+            if record.text("kind")=="loan_principal" {due.principal-=record.int("cents")}
+            else if record.text("kind")=="expense" {if record.text("category")=="贷款利息" {due.interest-=record.int("cents")}else{due.fee-=record.int("cents")}}
+            result[period]=due
+        }
+        for (period,value) in result {
+            result[period]=period<=loan.int("openingPaidPeriods") ? DebtDue(principal:0,interest:0,fee:0):DebtDue(principal:max(0,value.principal),interest:max(0,value.interest),fee:max(0,value.fee))
+        }
+        return result
     }
     public static func needsPlanReview(_ loan:Item,in d:Document) -> Bool {
         if loan.bool("planNeedsReview") {return true}
@@ -171,10 +186,11 @@ extension Loans {
         for loan in d.wallet.items("loans") where !loan.bool("archived") && !loan.bool("remindersPaused") {
             let balance=outstanding(loan,in:d),review=needsPlanReview(loan,in:d)
             let payments=payments(loan,in:d)
+            let dues=dues(loan,in:d)
             for row in (try? schedule(loan)) ?? [] {
-                let remaining=due(row,loan:loan,in:d)
+                guard let remaining=dues[row.id] else {continue}
                 guard remaining.total>0 else {continue}
-                if balance==0 && !payments.contains(where:{$0.period==row.id}) && !review {continue}
+                if balance==0 && (!payments.contains(where:{$0.period==row.id}) || remaining.interest+remaining.fee==0) {continue}
                 let date=Calendar.current.date(bySettingHour:9,minute:0,second:0,of:row.date) ?? row.date
                 let lead=Calendar.current.date(byAdding:.day,value:-Int(loan.int("reminderLeadDays",fallback:3)),to:date) ?? date
                 let account=d.accounts.first {$0.id==loan.text("accountId")}

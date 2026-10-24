@@ -54,7 +54,9 @@ final class Build5Tests:XCTestCase {
         attach(app,"ChatResponsePreferences");app.buttons["保存"].tap()
         app.buttons["chat.model"].tap();app.buttons["DeepSeek Pro"].tap();app.buttons["聊天功能"].tap();XCTAssertFalse(app.buttons["chat.menu.photos"].exists);app.buttons["chat.menu.new"].tap()
         app.buttons["chat.model"].tap();app.buttons["DeepSeek Flash"].tap();app.buttons["chat.mode.finance"].tap()
-        XCTAssertEqual(app.staticTexts.matching(identifier:"财务咨询").count,1,"Only the bottom mode label remains")
+        XCTAssertEqual(app.buttons["chat.mode.finance"].label,"财务咨询")
+        let duplicateHeadings=app.staticTexts.matching(NSPredicate(format:"label == '财务咨询'")).allElementsBoundByIndex.filter {$0.frame.minY<app.frame.height/2}
+        XCTAssertTrue(duplicateHeadings.isEmpty,"No duplicate mode title in the header")
         attach(app,"FinanceWithoutDuplicateTitle")
     }
 }

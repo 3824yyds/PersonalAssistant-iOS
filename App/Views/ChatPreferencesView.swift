@@ -15,7 +15,7 @@ struct ChatPreferencesView:View {
                 level("表情符号",key:"emoji")
                 level("可视化回答",key:"visuals")
             } footer:{Text("用于后续聊天回复。可视化回答会按内容使用简洁表格或清单；财务计算与事实依据不受语气偏好影响。")}
-        }.navigationTitle("回复风格").navigationBarTitleDisplayMode(.inline)
+        }.appErrorScope().navigationTitle("回复风格").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}}
                 ToolbarItem(placement:.confirmationAction) {

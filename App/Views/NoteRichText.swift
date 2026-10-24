@@ -22,7 +22,11 @@ struct NoteRichText:UIViewRepresentable {
             else {view.attributedText=NSAttributedString(string:text,attributes:[.font:UIFont.preferredFont(forTextStyle:.body),.foregroundColor:UIColor.label])}
             view.textColor = .label
         }
-        if let command,context.coordinator.lastCommand != command.id {context.coordinator.lastCommand=command.id;context.coordinator.apply(command.action,to:view)}
+        if let command,context.coordinator.lastCommand != command.id {
+            context.coordinator.lastCommand=command.id
+            let coordinator=context.coordinator
+            DispatchQueue.main.async {[weak view] in if let view,view.window != nil {coordinator.apply(command.action,to:view)}}
+        }
     }
     func sizeThatFits(_ proposal:ProposedViewSize,uiView:UITextView,context:Context)->CGSize? {
         let width=proposal.width ?? 320
