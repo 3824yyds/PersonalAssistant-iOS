@@ -131,7 +131,11 @@ struct NoteEditor:View {
     private var hasChanges:Bool {title != savedTitle || bodyText != savedBody || extras != savedExtras}
     private var canSave:Bool {!title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || checklist.contains {!$0.text("text").isEmpty} || !tables.isEmpty || !attachments.isEmpty}
     var body:some View {
-        VStack(spacing:0) {
+        drawingSheets
+            .sheet(item:$previewAttachment) {attachment in NoteAttachmentPreview(attachment:attachment)}
+            .alert("文件夹",isPresented:$folderPrompt) {TextField("名称",text:$folder);Button("完成") {if folder.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {folder="收件箱"}}}
+    }
+    private var editorScroll:some View {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
                     Text(Date(timeIntervalSince1970:Double(baseNote?.int("updatedAt",fallback:Clock.milliseconds) ?? Clock.milliseconds)/1000).formatted(date:.abbreviated,time:.shortened)).font(.caption).foregroundStyle(.secondary).frame(maxWidth:.infinity)
@@ -155,6 +159,8 @@ struct NoteEditor:View {
                     if proposal==nil {structuredContent.disabled(working)}
                 }.padding(20)
             }.scrollDismissesKeyboard(.interactively)
+    }
+    private var editorFooter:some View {
             AppGlassGroup {VStack(spacing:10) {
                 if working {ProcessingBar(label:"正在整理笔记").padding(.horizontal,16)}
                 if tools && !working && proposal==nil {ScrollView(.horizontal,showsIndicators:false) {HStack(spacing:8) {aiButton("润色","wand.and.stars");aiButton("摘要","text.alignleft");aiButton("要点","list.bullet");aiButton("会议纪要","person.2");aiButton("行动清单","checklist")}.padding(.horizontal,16)}.accessibilityIdentifier("note.ai.tools").transition(.move(edge:.bottom).combined(with:.opacity))}
@@ -174,8 +180,8 @@ struct NoteEditor:View {
                     }
                 }.padding(.horizontal,16)
             }.padding(.vertical,8)}
-        }.background {Color(uiColor:.systemBackground).ignoresSafeArea()}.appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+    }
+    @ToolbarContentBuilder private var editorToolbar:some ToolbarContent {
                 ToolbarItem(placement:.cancellationAction) {Button {proposal=nil;cancelOperation();if hasChanges && canSave {save()}else{dismiss()}} label:{Image(systemName:"chevron.left")}.accessibilityLabel("关闭")}
                 ToolbarItemGroup(placement:.topBarTrailing) {
                     ShareLink(item:NoteContent.text(snapshot())) {Image(systemName:"square.and.arrow.up")}.disabled(!canSave || working)
@@ -187,20 +193,53 @@ struct NoteEditor:View {
                     } label:{Image(systemName:"ellipsis")}.accessibilityLabel("备忘录选项").disabled(working || proposal != nil)
                     Button {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil);save(close:false)} label:{Image(systemName:"checkmark").fontWeight(.semibold).frame(width:32,height:32).background(Color(red:0.89,green:0.68,blue:0),in:Circle()).foregroundStyle(.white)}.accessibilityLabel("保存").disabled(store.busy || working || proposal != nil || !canSave)
                 }
-            }
+    }
+    private var editorSurface:some View {
+        VStack(spacing:0) {editorScroll;editorFooter}
+            .background {Color(uiColor:.systemBackground).ignoresSafeArea()}
+            .appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .toolbar {editorToolbar}
             .interactiveDismissDisabled(working || proposal != nil || hasChanges)
-            .confirmationDialog("保存笔记后再关闭？",isPresented:$confirmClose,titleVisibility:.visible) {Button("保存并关闭") {save()}.disabled(working || title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty);Button("放弃更改",role:.destructive) {draftTask?.cancel();try? FileManager.default.removeItem(at:PrivateFiles.url("note-draft.pavault"));dismiss()};Button("继续编辑",role:.cancel) {}}
-            .onAppear {load()}.onChange(of:title) {_,_ in scheduleDraft()}.onChange(of:bodyText) {_,_ in scheduleDraft()}.onChange(of:extras) {_,_ in scheduleDraft()}
+    }
+    private var observedEditor:some View {
+        editorSurface
+            .onAppear {load()}
+            .onChange(of:title) {_,_ in scheduleDraft()}
+            .onChange(of:bodyText) {_,_ in scheduleDraft()}
+            .onChange(of:extras) {_,_ in scheduleDraft()}
             .onDisappear {photoTask?.cancel();cancelOperation();draftTask?.cancel()}
-            .confirmationDialog("找到未保存的笔记草稿",isPresented:$recoverPrompt,titleVisibility:.visible) {Button("恢复草稿") {if let n=recovery {title=n.text("title");bodyText=n.text("body");loadExtras(n)}};Button("保留已保存内容",role:.cancel) {}}
-            .sheet(isPresented:$scanner) {DocumentScanner {images in scanner=false;task=Task {working=true;defer{working=false};do {if scannerText {let result=try await OCRService.recognize(images);bodyText+=(bodyText.isEmpty ? "":"\n")+result}else{for image in images {if let data=image.jpegData(compressionQuality:0.85) {try appendImage(data,name:"扫描文稿.jpg")}}}}catch{store.present(error)}}} onCancel:{scanner=false}}
-            .photosPicker(isPresented:$photoPicker,selection:$photos,maxSelectionCount:4,matching:.images).onChange(of:photos) {_,items in importPhotos(items)}
-            .fileImporter(isPresented:$files,allowedContentTypes:[.item],allowsMultipleSelection:false) {result in do {if let url=try result.get().first {try appendFile(url)}}catch{store.present(error)}}
-            .sheet(item:$tableEditing) {table in NavigationStack {NoteTableEditor(original:table) {value in if let index=tables.firstIndex(where:{$0.id==value.id}) {tables[index]=value}else{tables.append(value)}}}}
+            .confirmationDialog("找到未保存的笔记草稿",isPresented:$recoverPrompt,titleVisibility:.visible) {
+                Button("恢复草稿") {if let value=recovery {title=value.text("title");bodyText=value.text("body");loadExtras(value)}}
+                Button("保留已保存内容",role:.cancel) {}
+            }
+    }
+    private var importSheets:some View {
+        observedEditor
+            .sheet(isPresented:$scanner) {DocumentScanner(onResult:processScan,onCancel:{scanner=false})}
+            .photosPicker(isPresented:$photoPicker,selection:$photos,maxSelectionCount:4,matching:.images)
+            .onChange(of:photos) {_,items in importPhotos(items)}
+            .fileImporter(isPresented:$files,allowedContentTypes:[.item],allowsMultipleSelection:false) {result in
+                do {if let url=try result.get().first {try appendFile(url)}} catch {store.present(error)}
+            }
+    }
+    private var drawingSheets:some View {
+        importSheets
+            .sheet(item:$tableEditing) {table in NavigationStack {NoteTableEditor(original:table,onSave:saveTable)}}
             .sheet(isPresented:$newDrawing) {NavigationStack {NoteDrawingEditor {data,preview in saveDrawing(data,preview:preview)}}}
             .sheet(item:$drawingEditing) {drawing in NavigationStack {NoteDrawingEditor(initial:Data(base64Encoded:drawing.text("data"))) {data,preview in saveDrawing(data,preview:preview,id:drawing.id)}}}
-            .sheet(item:$previewAttachment) {attachment in NoteAttachmentPreview(attachment:attachment)}
-            .alert("文件夹",isPresented:$folderPrompt) {TextField("名称",text:$folder);Button("完成") {if folder.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {folder="收件箱"}}}
+    }
+    private func saveTable(_ value:Item) {
+        if let index=tables.firstIndex(where:{$0.id==value.id}) {tables[index]=value}else{tables.append(value)}
+    }
+    private func processScan(_ images:[UIImage]) {
+        scanner=false
+        task=Task {
+            working=true;defer{working=false}
+            do {
+                if scannerText {let result=try await OCRService.recognize(images);bodyText+=(bodyText.isEmpty ? "":"\n")+result}
+                else {for image in images {if let data=image.jpegData(compressionQuality:0.85) {try appendImage(data,name:"扫描文稿.jpg")}}}
+            } catch {store.present(error)}
+        }
     }
     private var editingTools:some View {
         HStack(spacing:8) {

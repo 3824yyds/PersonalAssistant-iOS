@@ -60,7 +60,7 @@ struct LoanEditor:View {
                 TextField("合同本金（CNY）",text:$principal).keyboardType(.decimalPad).accessibilityIdentifier("loan.principal")
                 TextField("名义年利率（%）",text:$annual).keyboardType(.decimalPad)
                 TextField("每期固定费用",text:$fee).keyboardType(.decimalPad)
-                Stepper("期限：\(months)个月",value:$months,in:1...480)
+                TextField("期限（月，1–480）",value:$months,format:.number).keyboardType(.numberPad)
                 Picker("还款方式",selection:$method) {ForEach(["annuity","principal","bullet","lump","flat"],id:\.self) {Text(Loans.methodLabels[$0] ?? $0).tag($0)}}
                 if lenderType=="private" {TextField("合同成立时一年期 LPR（%）",text:$lpr).keyboardType(.decimalPad)}
             } header:{Text("金额与利率")} footer:{Text("支持零利率。自动生成的月度计划用于参考；按日计息、浮动利率、宽限期和不规则分期，请在详情中按贷款方账单核对计划。")}

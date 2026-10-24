@@ -133,7 +133,7 @@ struct NoteAttachmentPreview:UIViewControllerRepresentable {
         let folder:URL
         var file:URL?
         init(_ attachment:Item) {
-            folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString,isDirectory:true)
+            folder=FileManager.default.temporaryDirectory.appendingPathComponent("note-preview-"+UUID().uuidString,isDirectory:true)
             super.init()
             do {
                 try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.complete])

@@ -47,6 +47,7 @@ struct VoiceCaptureState:Equatable {
     var activeReplyID: String?
     var speech: SpeechService?
     init() {
+        if let files=try? FileManager.default.contentsOfDirectory(at:FileManager.default.temporaryDirectory,includingPropertiesForKeys:nil) {for file in files where file.lastPathComponent.hasPrefix("note-preview-") {try? FileManager.default.removeItem(at:file)}}
         hasVault = (try? PrivateFiles.url()).map { FileManager.default.fileExists(atPath:$0.path) } ?? false
         hasAPIKey = (try? Keychain.read("deepseek")) != nil
     }
