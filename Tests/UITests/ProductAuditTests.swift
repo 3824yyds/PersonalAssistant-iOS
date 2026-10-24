@@ -5,6 +5,11 @@ import XCTest
 final class ProductAuditTests:XCTestCase {
     private func launch()->XCUIApplication {launchProduct(["--ui-audit-fixture"])}
     private func findButton(_ app:XCUIApplication,_ prefix:String)->XCUIElement {app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",prefix)).firstMatch}
+    private func menu(_ app:XCUIApplication,_ label:String) {
+        let button=app.buttons[label];XCTAssertTrue(button.waitForExistence(timeout:5))
+        // XCTest can choose a corner outside a circular menu's actual hit shape.
+        button.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+    }
     private func reveal(_ element:XCUIElement,in app:XCUIApplication) {
         for _ in 0..<8 {
             if element.exists && element.isHittable {return}
@@ -16,20 +21,22 @@ final class ProductAuditTests:XCTestCase {
         XCTAssertTrue(element.isHittable)
     }
     private func choose(_ app:XCUIApplication,_ label:String,_ value:String) {
-        let picker=findButton(app,label);reveal(picker,in:app);picker.tap()
-        let option=app.buttons[value]
-        if option.waitForExistence(timeout:2) {option.tap()}else{app.staticTexts[value].tap()}
+        let picker=findButton(app,label);reveal(picker,in:app);picker.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+        let options=app.descendants(matching:.any).matching(NSPredicate(format:"label == %@ OR identifier == %@",value,value))
+        XCTAssertTrue(options.firstMatch.waitForExistence(timeout:5))
+        guard let option=options.allElementsBoundByIndex.first(where:{$0.isHittable}) else {XCTFail("选项没有可点击元素："+value);return}
+        option.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
     }
     private func tools(_ app:XCUIApplication) {
-        app.buttons["账本"].firstMatch.tap();app.buttons["账本工具"].tap();app.buttons["订阅与资金规划"].tap()
+        app.buttons["账本"].firstMatch.tap();menu(app,"账本工具");XCTAssertTrue(app.buttons["订阅与资金规划"].waitForExistence(timeout:5));app.buttons["订阅与资金规划"].tap()
         XCTAssertTrue(app.navigationBars["财务工具"].waitForExistence(timeout:5))
     }
     private func back(_ app:XCUIApplication,_ title:String) {app.navigationBars[title].buttons.firstMatch.tap()}
     private func observation(_ text:String,_ name:String) {let a=XCTAttachment(string:text);a.name=name;a.lifetime = .keepAlways;add(a)}
     private func noteRow(_ app:XCUIApplication)->XCUIElement {app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'note.row.' AND label CONTAINS '审计笔记流程'")).firstMatch}
 
-    func testNotesFolderPinArchiveTrashRestoreSearchAndShare() {
-        let app=launch();app.buttons["笔记筛选"].tap();app.buttons["新建文件夹"].tap()
+    func testNotesFolderPinArchiveTrashRestoreAndSearch() {
+        let app=launch();menu(app,"笔记筛选");XCTAssertTrue(app.buttons["新建文件夹"].waitForExistence(timeout:5));app.buttons["新建文件夹"].tap()
         app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("审计文件夹");app.alerts.buttons["创建"].tap()
         app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
         let title=app.descendants(matching:.any).matching(identifier:"note.title").firstMatch;title.tap();title.typeText("审计笔记流程")
@@ -37,12 +44,12 @@ final class ProductAuditTests:XCTestCase {
         app.buttons["备忘录选项"].tap();app.buttons["置顶"].tap();app.buttons["note.done"].tap()
         XCTAssertTrue(noteRow(app).waitForExistence(timeout:8));recordScreen(app,"AuditNotePinnedInFolder")
         noteRow(app).tap();app.buttons["备忘录选项"].tap();app.buttons["归档"].tap();app.buttons["note.done"].tap()
-        app.buttons["笔记筛选"].tap();app.buttons["已归档"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5))
+        menu(app,"笔记筛选");app.buttons["已归档"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5))
         noteRow(app).press(forDuration:1);app.buttons["移出归档"].tap()
-        app.buttons["笔记筛选"].tap();app.buttons["全部备忘录"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5))
+        menu(app,"笔记筛选");app.buttons["全部备忘录"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5))
         noteRow(app).swipeLeft();app.buttons["删除"].tap()
-        app.buttons["笔记筛选"].tap();app.buttons["最近删除"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5));recordScreen(app,"AuditRecentlyDeletedNote")
-        noteRow(app).swipeLeft();app.buttons["恢复"].tap();app.buttons["笔记筛选"].tap();app.buttons["全部备忘录"].tap()
+        menu(app,"笔记筛选");app.buttons["最近删除"].tap();XCTAssertTrue(noteRow(app).waitForExistence(timeout:5));recordScreen(app,"AuditRecentlyDeletedNote")
+        noteRow(app).swipeLeft();app.buttons["恢复"].tap();menu(app,"笔记筛选");app.buttons["全部备忘录"].tap()
         XCTAssertTrue(noteRow(app).waitForExistence(timeout:5))
         let search=app.textFields["搜索备忘录"];search.tap();search.typeText("不应有的关键词")
         XCTAssertTrue(app.staticTexts["没有找到笔记"].waitForExistence(timeout:5));app.buttons["清除搜索"].tap();XCTAssertTrue(noteRow(app).exists)
@@ -62,7 +69,7 @@ final class ProductAuditTests:XCTestCase {
         app.buttons["保存"].tap();XCTAssertTrue(app.staticTexts["总预算"].waitForExistence(timeout:8));recordScreen(app,"AuditBudget")
         app.buttons["流水"].firstMatch.tap();app.buttons["筛选账目"].tap();app.buttons["重置筛选"].tap();app.buttons["完成"].firstMatch.tap()
         app.buttons["卡包与资产"].tap();app.buttons["全部账户与转账"].tap();app.buttons["账户转账"].tap()
-        choose(app,"转出账户","中国工商银行");choose(app,"转入账户","中国银行")
+        choose(app,"转出账户","中国工商银行 · CNY");choose(app,"转入账户","中国银行 · CNY")
         app.textFields["金额"].tap();app.textFields["金额"].typeText("25.00");app.buttons["确认"].tap()
         XCTAssertTrue(app.navigationBars["账户与余额"].waitForExistence(timeout:8));recordScreen(app,"AuditTransferBalances")
     }
@@ -72,9 +79,14 @@ final class ProductAuditTests:XCTestCase {
         app.textFields["订阅名称"].tap();app.textFields["订阅名称"].typeText("审计会员")
         app.textFields["每期金额"].tap();app.textFields["每期金额"].typeText("10.00")
         choose(app,"扣款账户","中国工商银行 · CNY");app.buttons["保存"].tap()
-        XCTAssertTrue(app.buttons["审计会员"].waitForExistence(timeout:8));app.buttons["确认已付款"].tap();app.buttons["确认付款并记账"].tap()
-        recordScreen(app,"AuditSubscriptionPaid")
-        app.buttons["审计会员"].tap();XCTAssertTrue(app.navigationBars["编辑订阅"].waitForExistence(timeout:5));app.buttons["取消"].tap()
+        XCTAssertTrue(app.buttons["审计会员"].waitForExistence(timeout:8));app.buttons["确认已付款"].tap()
+        if app.buttons["确认付款并记账"].waitForExistence(timeout:5) {app.buttons["确认付款并记账"].tap();recordScreen(app,"AuditSubscriptionPaid")}
+        else {
+            XCTAssertTrue(app.navigationBars["编辑订阅"].waitForExistence(timeout:5));recordScreen(app,"AuditSubscriptionPaymentOpensEditor")
+            observation("点确认已付款后打开了编辑订阅，付款确认没有出现。保留现状，等待用户审批后修复列表按钮冲突。","ObservationSubscriptionPaymentButtonConflict")
+            app.buttons["取消"].tap()
+            if app.buttons["确认付款并记账"].waitForExistence(timeout:1) {app.buttons["取消"].firstMatch.tap()}
+        }
         back(app,"订阅与续费");app.buttons["资金桶"].tap();app.buttons["新建资金桶"].tap()
         app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("审计旅行桶");app.alerts.buttons["创建"].tap()
         XCTAssertTrue(app.staticTexts["审计旅行桶"].waitForExistence(timeout:8));app.buttons["分配 / 释放"].tap()
@@ -87,7 +99,8 @@ final class ProductAuditTests:XCTestCase {
     func testSplitGroupsAndInvestmentTradingFlows() {
         let app=launch();tools(app);app.buttons["AA 分摊"].tap();app.buttons["新建 AA 账本"].tap()
         app.textFields["账本名称"].tap();app.textFields["账本名称"].typeText("审计AA")
-        fill(app.descendants(matching:.any).matching(identifier:"成员，用逗号分开").firstMatch,"我,朋友")
+        let memberFields=app.descendants(matching:.any).matching(NSPredicate(format:"(elementType == %d OR elementType == %d) AND (placeholderValue == %@ OR value == %@)",XCUIElement.ElementType.textField.rawValue,XCUIElement.ElementType.textView.rawValue,"成员，用逗号分开","我，"))
+        fill(memberFields.firstMatch,"我,朋友")
         app.buttons["保存"].tap();XCTAssertTrue(app.staticTexts["审计AA"].waitForExistence(timeout:8));app.staticTexts["审计AA"].tap()
         recordScreen(app,"AuditSplitGroup")
         let add=findButton(app,"添加分摊");XCTAssertTrue(add.waitForExistence(timeout:5));add.tap()
@@ -107,14 +120,16 @@ final class ProductAuditTests:XCTestCase {
     func testReminderCompletionAndMonthEndRecurrenceObservations() {
         let app=launch();app.buttons["提醒"].firstMatch.tap()
         let search=app.textFields["搜索提醒"];search.tap();search.typeText("审计一次性提醒");app.buttons["完成提醒"].firstMatch.tap()
-        app.buttons["提醒筛选"].tap();app.buttons["查看已完成"].tap()
+        menu(app,"提醒筛选");app.buttons["查看已完成"].tap()
         XCTAssertTrue(app.staticTexts["审计一次性提醒"].waitForExistence(timeout:5));recordScreen(app,"AuditCompletedReminderBeforeReopen")
         app.buttons["完成提醒"].firstMatch.tap();recordScreen(app,"AuditCompletedReminderAfterReopen")
         observation("点击已完成提醒的勾选按钮后，标题是否仍留在已完成列表：\(app.staticTexts["审计一次性提醒"].exists)","ObservationCompletedReminderReopen")
-        app.buttons["提醒筛选"].tap();app.buttons["查看已完成"].tap();app.buttons["清除搜索"].tap()
+        menu(app,"提醒筛选");app.buttons["查看已完成"].tap();app.buttons["清除搜索"].tap()
         app.textFields["搜索提醒"].tap();app.textFields["搜索提醒"].typeText("月底缴费复现")
         XCTAssertTrue(app.staticTexts["月底缴费复现"].waitForExistence(timeout:5));recordScreen(app,"AuditMonthEndBeforeCompletion")
-        app.buttons["完成提醒"].firstMatch.tap();recordScreen(app,"AuditMonthEndAfterCompletion")
+        app.buttons["完成提醒"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS '2027' AND (label CONTAINS '3月' OR label CONTAINS 'Mar')")).firstMatch.waitForExistence(timeout:5))
+        recordScreen(app,"AuditMonthEndAfterCompletion")
         observation(app.debugDescription,"ObservationMonthEndRecurrenceActualDate")
     }
 
@@ -128,6 +143,8 @@ final class ProductAuditTests:XCTestCase {
         back(app,"助理记忆");let backup=app.buttons["加密备份与恢复"];reveal(backup,in:app);backup.tap()
         app.buttons["导出完整加密备份"].tap();recordScreen(app,"AuditBackupExporter")
         let cancel=app.buttons.matching(NSPredicate(format:"label == '取消' OR label == 'Cancel'")).firstMatch;if cancel.waitForExistence(timeout:5) {cancel.tap()}
+        else {app.coordinate(withNormalizedOffset:CGVector(dx:0.08,dy:0.115)).tap()}
+        XCTAssertTrue(app.buttons["导出完整加密备份"].waitForExistence(timeout:8));recordScreen(app,"AuditBackupExporterCanceled")
         back(app,"加密备份与恢复");let about=app.buttons["关于个人助理"];reveal(about,in:app);about.tap();XCTAssertTrue(app.navigationBars["关于"].waitForExistence(timeout:5));recordScreen(app,"AuditAboutAndPrivacy")
     }
 

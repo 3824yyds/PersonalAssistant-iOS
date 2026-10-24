@@ -48,11 +48,11 @@ final class Build5Tests:XCTestCase {
         let body=app.textViews["note.body"];XCTAssertTrue(body.waitForExistence(timeout:5));body.tap();body.typeText("记录今天的安排。")
         app.buttons["格式"].tap();XCTAssertTrue(app.buttons["粗体"].waitForExistence(timeout:5));app.buttons["粗体"].tap()
         app.buttons["添加清单"].tap();let check=app.descendants(matching:.any).matching(NSPredicate(format:"identifier BEGINSWITH 'note.checklist.'")).firstMatch;XCTAssertTrue(check.waitForExistence(timeout:5));check.tap();check.typeText("买牛奶")
-        app.buttons["勾选清单"].firstMatch.tap();app.buttons["添加表格"].tap();XCTAssertTrue(app.navigationBars["表格"].waitForExistence(timeout:5));let cell=app.descendants(matching:.any).matching(identifier:"note.table.0.0").firstMatch;cell.tap();cell.typeText("项目");app.buttons["完成"].tap()
+        app.buttons["勾选清单"].firstMatch.tap();app.buttons["添加表格"].tap();XCTAssertTrue(app.navigationBars["表格"].waitForExistence(timeout:5));let cell=app.descendants(matching:.any).matching(identifier:"note.table.0.0").firstMatch;cell.tap();cell.typeText("项目");app.navigationBars["表格"].buttons["完成"].tap()
         app.buttons["手绘"].tap();XCTAssertTrue(app.navigationBars["手绘"].waitForExistence(timeout:5));attach(app,"NativeDrawingTools")
         let canvas=app.descendants(matching:.any).matching(identifier:"note.drawing.canvas").firstMatch;XCTAssertTrue(canvas.waitForExistence(timeout:5))
         canvas.coordinate(withNormalizedOffset:CGVector(dx:0.2,dy:0.3)).press(forDuration:0.1,thenDragTo:canvas.coordinate(withNormalizedOffset:CGVector(dx:0.65,dy:0.5)))
-        app.buttons["完成"].tap();XCTAssertTrue(app.buttons["编辑手绘"].waitForExistence(timeout:5));XCTAssertFalse(app.staticTexts["手绘.pkdrawing"].exists);attach(app,"NativeNoteStructuredContent")
+        app.navigationBars["手绘"].buttons["完成"].tap();XCTAssertTrue(app.buttons["编辑手绘"].waitForExistence(timeout:5));XCTAssertFalse(app.staticTexts["手绘.pkdrawing"].exists);attach(app,"NativeNoteStructuredContent")
         app.buttons["note.done"].tap();XCTAssertTrue(app.staticTexts["备忘录工具检查"].waitForExistence(timeout:10));attach(app,"NotesGroupedList")
         app.buttons["助理"].firstMatch.tap();app.buttons["聊天功能"].tap();XCTAssertTrue(app.buttons["chat.menu.photos"].waitForExistence(timeout:5));app.buttons["chat.menu.preferences"].tap()
         for title in ["基本风格和语调","亲切程度","热情程度","表情符号","可视化回答"] {XCTAssertTrue(app.staticTexts[title].exists)}

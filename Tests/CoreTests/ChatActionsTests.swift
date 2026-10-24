@@ -37,7 +37,7 @@ final class ChatActionsTests:XCTestCase {
     }
     func testInsufficientFundsAndInvalidMoneyDoNotCreateAnything() {
         let d=document()
-        for value in ["100.01","-1.00","0.00","1.001","NaN"] {XCTAssertThrowsError(try ChatActions.create(record(value),kind:.expense,id:UUID().uuidString,in:d,source:"支出",now:now),value)}
+        for value in ["100.01","-1.00","0.00","1.001","NaN"] {XCTAssertThrowsError(try ChatActions.create(record(value),kind:.expense,id:UUID().uuidString,in:d,source:"今天支出"+value+"元",now:now),value)}
         XCTAssertTrue(d.records.isEmpty)
     }
     func testMultipleAccountsNeedExplicitSelectionAndCannotBeInvented() throws {
@@ -64,11 +64,11 @@ final class ChatActionsTests:XCTestCase {
         let (d,receipt)=try ChatActions.create(draft,kind:.reminder,id:UUID().uuidString,in:document(),source:"明天9点提醒我喝水",now:now)
         XCTAssertEqual(d.records[0].int("due"),Int64(ChatActions.date("2026-10-25T01:00:00Z")!.timeIntervalSince1970*1000))
         XCTAssertEqual(d.records[0].int("alertAt"),d.records[0].int("due"));XCTAssertEqual(d.records[0].text("period"),"daily");XCTAssertEqual(receipt.kind,.reminder)
-        for time in ["","明天","2026-10-23T09:00:00+08:00"] {var invalid=draft;invalid.set("due",time);XCTAssertThrowsError(try ChatActions.create(invalid,kind:.reminder,id:UUID().uuidString,in:document(),source:"提醒我",now:now))}
+        for time in ["","明天","2026-10-23T09:00:00+08:00"] {var invalid=draft;invalid.set("due",time);XCTAssertThrowsError(try ChatActions.create(invalid,kind:.reminder,id:UUID().uuidString,in:document(),source:"明天9点提醒我",now:now))}
     }
     func testFutureFinancialEntriesAreNotFabricatedAsActualCash() {
         var draft=record();draft.set("date","2026-10-25T12:00:00Z")
-        XCTAssertThrowsError(try ChatActions.create(draft,kind:.income,id:UUID().uuidString,in:document(),source:"收入",now:now))
+        XCTAssertThrowsError(try ChatActions.create(draft,kind:.income,id:UUID().uuidString,in:document(),source:"收入25.50元",now:now))
     }
     func testResponseCanBeSavedWithoutAnotherModelRequest() {
         let draft=ChatActions.noteDraft("这里是计划。\n\n标题：明天爬岳麓山\n\n- 带水\n- 查看天气")
@@ -79,5 +79,11 @@ final class ChatActionsTests:XCTestCase {
         XCTAssertTrue(ChatActions.savesPreviousNote("把上面的回答保存到备忘录"))
         XCTAssertFalse(ChatActions.savesPreviousNote("帮我保存笔记，内容是明天爬山"))
         XCTAssertFalse(ChatActions.savesPreviousNote("不要保存上面的笔记"))
+    }
+    func testModelCannotInventMissingMoneyOrReminderTime() {
+        XCTAssertThrowsError(try ChatActions.create(record(),kind:.expense,id:UUID().uuidString,in:document(),source:"帮我记一笔午饭",now:now))
+        XCTAssertThrowsError(try ChatActions.create(record(),kind:.income,id:UUID().uuidString,in:document(),source:"2026年10月24日工资到账",now:now))
+        let draft=Item(["title":.string("喝水"),"due":.string("2026-10-25T09:00:00+08:00")])
+        XCTAssertThrowsError(try ChatActions.create(draft,kind:.reminder,id:UUID().uuidString,in:document(),source:"明天提醒我喝水",now:now))
     }
 }

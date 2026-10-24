@@ -42,12 +42,12 @@ final class Build6Tests:XCTestCase {
     }
     func testModelPopoverHasNoRefreshAndSelectedMarkFollowsModelName() {
         let app=launchProduct();app.buttons["助理"].firstMatch.tap();app.buttons["chat.model"].tap()
-        let flash=app.buttons["DeepSeek Flash"]
+        let flash=app.buttons["chat.model.option.deepseek-flash"]
         XCTAssertTrue(flash.waitForExistence(timeout:5));XCTAssertEqual(flash.value as? String,"已选择")
         XCTAssertFalse(app.buttons["刷新可用模型"].exists);recordScreen(app,"ModelSelectionTrailingCheckmark")
-        app.buttons["DeepSeek Pro"].tap();app.buttons["chat.model"].tap()
-        XCTAssertEqual(app.buttons["DeepSeek Pro"].value as? String,"已选择");XCTAssertEqual(app.buttons["DeepSeek Flash"].value as? String,"未选择")
-        app.buttons["DeepSeek Flash"].tap()
+        app.buttons["chat.model.option.deepseek-v4-pro"].tap();app.buttons["chat.model"].tap()
+        XCTAssertEqual(app.buttons["chat.model.option.deepseek-v4-pro"].value as? String,"已选择");XCTAssertEqual(app.buttons["chat.model.option.deepseek-flash"].value as? String,"未选择")
+        app.buttons["chat.model.option.deepseek-flash"].tap()
     }
     func testChatCreatesActualNotesIncomeExpenseAndReminderAndClarifiesAccount() {
         let app=launchProduct(["--ui-action-fixture"]);app.buttons["助理"].firstMatch.tap()

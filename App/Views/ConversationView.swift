@@ -35,7 +35,7 @@ struct ConversationView:View {
     @State private var openedItem:ChatCreatedItem?
     @AppStorage("chat.lastGreeting") private var lastGreeting=""
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
-    @FocusState var focused:Bool
+    @State var focused=false
     var body:some View {
         VStack(spacing:0) {
             header
@@ -89,7 +89,7 @@ struct ConversationView:View {
         VStack(spacing:0) {ForEach(availableModels,id:\.self) {model in
             Button {modelMenu=false;Task {await store.setting("model",.string(model))}} label:{
                 HStack(spacing:24) {Text(modelLabel(model)).foregroundStyle(.primary);Spacer(minLength:16);Image(systemName:"checkmark").foregroundStyle(Theme.accent).opacity(store.model==model ? 1:0).accessibilityHidden(true)}.padding(.horizontal,18).frame(height:46).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel(modelLabel(model)).accessibilityValue(store.model==model ? "已选择":"未选择").accessibilityAddTraits(store.model==model ? .isSelected:[])
+            }.buttonStyle(.plain).accessibilityIdentifier("chat.model.option."+model).accessibilityLabel(modelLabel(model)).accessibilityValue(store.model==model ? "已选择":"未选择").accessibilityAddTraits(store.model==model ? .isSelected:[])
         }}.frame(width:240).padding(.vertical,6)
     }
     var modePicker:some View {

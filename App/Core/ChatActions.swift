@@ -41,6 +41,16 @@ public enum ChatActions {
         f.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
         return f.date(from:source) ?? ISO8601DateFormatter().date(from:source)
     }
+    private static func explicitAmount(_ source:String)->Bool {
+        let cleaned=source.replacingOccurrences(of:#"[0-9]{4}[-/][0-9]{1,2}[-/][0-9]{1,2}|[0-9]{1,2}[:：][0-9]{2}|[0-9]+[年月日点时]"#,with:"",options:.regularExpression)
+        if cleaned.range(of:#"[0-9]+(?:\.[0-9]+)?"#,options:.regularExpression) != nil {return true}
+        let numbers="零〇一二三四五六七八九十百千万两点"
+        if source.range(of:"["+numbers+"]+(?:元|块|毛|角|分)|(?:收入|工资|奖金|支出|花了|花|付了|付款).{0,3}["+numbers+"]+",options:.regularExpression) != nil {return true}
+        return source.components(separatedBy:.newlines).last?.trimmingCharacters(in:.whitespaces).range(of:"^["+numbers+"]+$",options:.regularExpression) != nil
+    }
+    private static func explicitTime(_ source:String)->Bool {
+        source.lowercased().range(of:#"[0-9]{1,2}[:：][0-9]{2}|[0-9零〇一二三四五六七八九十两]+(?:点|时|分钟(?:之)?后|分后)|(?:半|[0-9一二三四五六七八九十两]+)(?:个)?小时(?:之)?后|[0-9]{1,2}\s*(?:am|pm)|in\s+[0-9]+\s+(?:minutes?|hours?)"#,options:.regularExpression) != nil
+    }
     public static func noteDraft(_ text:String)->Item {
         let lines=text.components(separatedBy:.newlines)
         let heading=lines.first {line in line.hasPrefix("# ") || line.hasPrefix("## ") || line.hasPrefix("标题：") || line.hasPrefix("标题:")}
@@ -66,6 +76,7 @@ public enum ChatActions {
             next.upsert(item,in:"notes")
         case .expense,.income:
             if source.range(of:#"(?:贷款|借款|借了|借到|还款|还本金)"#,options:.regularExpression) != nil {throw AppError.message("借款到账和归还本金不能记为普通收入或支出，请在贷款与还款中登记")}
+            guard explicitAmount(source) else {throw AppError.message("请补充实际金额，例如 25.50 元；没有金额时不会自动记账")}
             let cents=try Money.parse(draft.text("amount"))
             let currency=draft.text("currency",fallback:document.currency)
             let accounts=document.accounts.filter {!$0.bool("archived") && $0.text("currency",fallback:"CNY")==currency}
@@ -83,6 +94,7 @@ public enum ChatActions {
             next.upsert(item,in:"records");try Finance.validateCashChange(from:document,to:next)
             detail=Money.format(cents,currency:currency)+" · "+account.text("name")
         case .reminder:
+            guard explicitTime(source) else {throw AppError.message("请补充具体提醒时间，例如明天上午 9 点；没有明确时间时不会替你猜测")}
             guard let due=date(draft.text("due")),due>now else {throw AppError.message("请补充未来的提醒日期和具体时间，例如明天上午 9 点")}
             let period=draft.text("period",fallback:"none")
             guard ["none","daily","weekly","monthly","yearly"].contains(period) else {throw AppError.message("请选择每天、每周、每月、每年或不重复")}
