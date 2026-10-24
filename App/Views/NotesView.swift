@@ -132,6 +132,7 @@ struct NoteEditor:View {
     private var extras:Item {Item(["folder":.string(folder),"richText":.string(richText),"pinned":.bool(pinned),"archived":.bool(archived),"checklist":.array(checklist.map {.object($0.raw)}),"tables":.array(tables.map {.object($0.raw)}),"attachments":.array(attachments.map {.object($0.raw)})])}
     private var hasChanges:Bool {title != savedTitle || bodyText != savedBody || extras != savedExtras}
     private var canSave:Bool {!title.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !bodyText.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || checklist.contains {!$0.text("text").isEmpty} || !tables.isEmpty || !attachments.isEmpty}
+    private var textMinimumHeight:CGFloat {checklist.isEmpty && tables.isEmpty && attachments.isEmpty ? 320:44}
     var body:some View {
         drawingSheets.appErrorScope()
             .sheet(item:$previewAttachment) {attachment in NoteAttachmentPreview(attachment:attachment)}
@@ -156,7 +157,7 @@ struct NoteEditor:View {
                         if working && aiMode=="润色" {TextSkeleton(text:title,font:UIFont.systemFont(ofSize:21,weight:.semibold),lineSpacing:0).accessibilityIdentifier("note.title.skeleton")}
                         else {TextField("标题",text:$title,axis:.vertical).font(.system(size:21,weight:.semibold)).lineLimit(1...4).accessibilityIdentifier("note.title").disabled(working)}
                         if working && aiMode != nil {TextSkeleton(text:bodyText).frame(minHeight:320,alignment:.topLeading).accessibilityIdentifier("note.body.skeleton")}
-                        else {NoteRichText(text:$bodyText,richText:$richText,command:formatting).frame(minHeight:320,alignment:.topLeading).disabled(working)}
+                        else {NoteRichText(text:$bodyText,richText:$richText,command:formatting,minimumHeight:textMinimumHeight).frame(minHeight:textMinimumHeight,alignment:.topLeading).disabled(working)}
                     }
                     if proposal==nil {structuredContent.disabled(working)}
                 }.padding(20)
@@ -254,7 +255,7 @@ struct NoteEditor:View {
                 Button("扫描文稿",systemImage:"doc.viewfinder") {startScan(text:false)}
                 Button("扫描文字",systemImage:"text.viewfinder") {startScan(text:true)}
             } label:{Image(systemName:"paperclip").frame(width:28,height:38)}.accessibilityLabel("添加附件")
-            Button {newDrawing=true} label:{Image(systemName:"pencil.tip.crop.circle").frame(width:28,height:38)}.accessibilityLabel("手绘")
+            Button {checklistFocus=nil;UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil);newDrawing=true} label:{Image(systemName:"pencil.tip.crop.circle").frame(width:28,height:38)}.accessibilityLabel("手绘")
         }.padding(.horizontal,6).appGlass(Capsule(),interactive:true)
     }
     private var structuredContent:some View {

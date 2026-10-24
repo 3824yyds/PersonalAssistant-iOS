@@ -10,6 +10,7 @@ struct NoteRichText:UIViewRepresentable {
     @Binding var text:String
     @Binding var richText:String
     var command:NoteFormatCommand?
+    var minimumHeight:CGFloat=320
     func makeCoordinator()->Coordinator {Coordinator(self)}
     func makeUIView(context:Context)->UITextView {
         let view=UITextView();view.backgroundColor = .clear;view.isScrollEnabled=false;view.font = .preferredFont(forTextStyle:.body);view.adjustsFontForContentSizeCategory=true;view.textContainerInset = .zero;view.textContainer.lineFragmentPadding=0;view.delegate=context.coordinator;view.accessibilityIdentifier="note.body"
@@ -30,7 +31,7 @@ struct NoteRichText:UIViewRepresentable {
     }
     func sizeThatFits(_ proposal:ProposedViewSize,uiView:UITextView,context:Context)->CGSize? {
         let width=proposal.width ?? 320
-        return CGSize(width:width,height:max(320,uiView.sizeThatFits(CGSize(width:width,height:.greatestFiniteMagnitude)).height))
+        return CGSize(width:width,height:max(minimumHeight,uiView.sizeThatFits(CGSize(width:width,height:.greatestFiniteMagnitude)).height))
     }
     final class Coordinator:NSObject,UITextViewDelegate {
         var parent:NoteRichText
