@@ -160,7 +160,7 @@ struct NoteEditor:View {
                     }
                     if proposal==nil {structuredContent.disabled(working)}
                 }.padding(20)
-            }.scrollDismissesKeyboard(.interactively)
+            }.scrollDismissesKeyboard(.interactively).clipped()
     }
     private var editorFooter:some View {
             AppGlassGroup {VStack(spacing:10) {
