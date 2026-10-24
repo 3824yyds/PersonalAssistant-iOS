@@ -44,15 +44,20 @@ struct ConversationView:View {
             GeometryReader {geometry in
                 ScrollViewReader {proxy in
                     ScrollView {
-                        LazyVStack(alignment:.leading,spacing:22) {
+                        VStack(alignment:.leading,spacing:22) {
                             if store.messages.isEmpty {welcome.frame(minHeight:max(0,geometry.size.height-32))}
                             ForEach(store.messages) {message in ChatBubble(message:message,working:store.assistantBusy && message.id==store.messages.last?.id,onOpen:{openedItem=$0},onSave:{saveAnswer(message)})}
                             Color.clear.frame(height:1).id("latest").background(GeometryReader {g in Color.clear.preference(key:BottomPreference.self,value:g.frame(in:.named("conversationScroll")).minY)})
                         }.padding(16)
                     }.coordinateSpace(name:"conversationScroll").scrollDismissesKeyboard(.interactively)
-                        .onPreferenceChange(BottomPreference.self) {y in follow=y<geometry.size.height+80}
-                        .onChange(of:store.messages.last?.content) {_,_ in if follow {proxy.scrollTo("latest",anchor:.bottom)}}
-                        .onChange(of:store.messages.count) {_,_ in if follow {proxy.scrollTo("latest",anchor:.bottom)}}
+                        .onPreferenceChange(BottomPreference.self) {y in let nearBottom=y<geometry.size.height+80;if nearBottom != follow {follow=nearBottom}}
+                        // Let insertion and keyboard layout settle before scrolling. Synchronous
+                        // scrollTo during a lazy stack update can stall layout on iOS 26.
+                        .task(id:store.messages.last) {
+                            guard follow else{return}
+                            do {try await Task.sleep(nanoseconds:40_000_000);try Task.checkCancellation()}catch{return}
+                            guard follow else{return};proxy.scrollTo("latest",anchor:.bottom)
+                        }
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }.clipped()

@@ -40,10 +40,18 @@ jobs:
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
           PY
       - name: Wait for simulator startup
-        if: matrix.ios == 18
         run: |
-          xcrun simctl boot "$SIMULATOR_ID" || true
-          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          python3 - <<'PY'
+          import os,subprocess
+          device=os.environ['SIMULATOR_ID']
+          subprocess.run(['xcrun','simctl','boot',device],check=False,timeout=30)
+          subprocess.run(['xcrun','simctl','bootstatus',device,'-b'],check=True,timeout=240)
+          PY
+      - name: Focused iOS 26 chat regression
+        if: matrix.ios == 26 && matrix.suite == 'main'
+        run: |
+          mkdir -p build
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/ChatRegression.xcresult -only-testing:AssistantUITests/Build6Tests/testChatCreatesActualNotesIncomeExpenseAndReminderAndClarifiesAccount -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 240 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/chat-regression.log 2>&1 || { tail -n 100 build/chat-regression.log; exit 1; }
       - name: iOS crypto, migration and UI smoke tests
         run: |
           mkdir -p build
@@ -59,13 +67,18 @@ jobs:
           if [ -d build/Tests.xcresult ]; then
             xcrun xcresulttool export attachments --path build/Tests.xcresult --output-path build/Screenshots || true
           fi
+          if [ -d build/ChatRegression.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/ChatRegression.xcresult --output-path build/ChatScreenshots || true
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: iOS-test-results-${{ matrix.ios }}-${{ matrix.suite }}
           path: |
             build/simulator-test.log
+            build/chat-regression.log
             build/Screenshots/
+            build/ChatScreenshots/
           retention-days: 7
   ipa:
     needs: [core, ios-smoke]
