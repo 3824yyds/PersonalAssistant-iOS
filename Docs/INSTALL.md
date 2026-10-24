@@ -9,9 +9,9 @@
 
 ## 从 GitHub 构建获取 IPA
 
-在手机浏览器打开本工程私有仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-build4-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
+在手机浏览器打开本工程仓库，进入 Actions。已成功的 `iOS build and unsigned IPA` 运行中下载 `PersonalAssistant-iOS-3.5.1-build4-unsigned` artifact；它是ZIP包装，解压后才是IPA。下载需要登录你自己的GitHub账号。
 
-手动重新运行时选择 `Run workflow`。流程会先运行核心测试、iPhone模拟器测试，再构建Metal原生库及真正的iOS arm64程序。生成时不上传你的证书，不使用Apple ID，也不提交App Store。
+在 Actions 页面选择 `Run workflow` 手动启动。普通提交不会自动启动完整打包。流程先在 Ubuntu 运行核心测试，在 macOS 运行 iOS 18 / 26 模拟器测试，再构建 Metal 原生库及真正的 iOS arm64 程序。生成时不上传你的证书，不使用Apple ID，也不提交App Store。
 
 ## 注意
 

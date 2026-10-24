@@ -7,3 +7,19 @@ NativeBuild/
 *.p8
 xcuserdata/
 __pycache__/
+
+# Local credentials, signing material and personal exports
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.pavault
+*.pavault.*
+*.sqlite
+*.sqlite3
+*.db
+*.ipa
+*.apk

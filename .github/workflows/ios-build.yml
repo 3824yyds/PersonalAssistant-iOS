@@ -1,7 +1,5 @@
 name: iOS build and unsigned IPA
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +8,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   core:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3-noble
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
