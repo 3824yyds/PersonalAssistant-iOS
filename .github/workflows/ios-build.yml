@@ -38,6 +38,10 @@ jobs:
           print('Simulator:',candidates[0]['name'])
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
           PY
+      - name: Wait for simulator startup
+        run: |
+          xcrun simctl boot "$SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
       - name: iOS crypto, migration and UI smoke tests
         run: |
           mkdir -p build

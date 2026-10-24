@@ -4,6 +4,20 @@ import UIKit
 @testable import PersonalAssistant
 
 final class VaultTests:XCTestCase {
+    func testEveryDebugFixtureSurvivesEncryptedVaultValidation() throws {
+        let salt=try VaultCrypto.random(32),key=try VaultCrypto.random(32)
+        for scrolling in [false,true] {
+            for debts in [false,true] {
+                let fixture=try DebugFixtures.document(scrolling:scrolling,debts:debts).validated()
+                let original=try JSONDecoder().decode(Document.self,from:fixture.encoded()).validated()
+                let encrypted=try VaultCrypto.encrypt(original.encoded(),key:key,salt:salt)
+                let reopened=try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:key)).validated()
+                XCTAssertEqual(try original.encoded(),try reopened.encoded())
+                XCTAssertEqual(reopened.notes.count,scrolling ? 32:1)
+                XCTAssertEqual(reopened.wallet.items("loans").count,debts ? 1:0)
+            }
+        }
+    }
     func testSkeletonPreservesExplicitBlankAndTrailingLines() {
         let result=SkeletonTextLayout.measure("第一行\n\n第三行\n",width:300,font:.systemFont(ofSize:15),lineSpacing:7)
         XCTAssertEqual(result.lineCount,4)

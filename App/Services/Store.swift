@@ -85,6 +85,7 @@ struct VoiceCaptureState:Equatable {
                     #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
                     #endif
+                    d=try d.validated()
                     try PrivateFiles.write(VaultCrypto.encrypt(d.encoded(),key:key,salt:salt))
                     return (d,key,salt)
                 }

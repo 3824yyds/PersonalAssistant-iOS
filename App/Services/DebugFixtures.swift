@@ -16,7 +16,7 @@ enum DebugFixtures {
         store.messages=[ChatMessage(role:"user",content:"帮我整理一下周末计划"),ChatMessage(role:"assistant",content:"可以把周末安排分成出行、休息和准备三部分。",source:"云端回答")]
         store.assistantBusy=true
     }
-    static func document()->Document {
+    static func document(scrolling:Bool?=nil,debts:Bool?=nil)->Document {
         var d=Document()
         let names=["中国工商银行","中国银行","汇丰银行","招商银行"]
         d.accounts=names.enumerated().map {index,name in
@@ -25,18 +25,20 @@ enum DebugFixtures {
         var wallet=d.wallet
         wallet.set("cards",items:d.accounts.enumerated().map {index,account in Item(["accountId":.string(account.id),"institution":.string(account.text("name")),"lastFour":.string(String(1231+index)),"network":.string(index==2 ? "mastercard":"unionpay")])})
         d.wallet=wallet
-        if ProcessInfo.processInfo.arguments.contains("--ui-debt-fixture") {
+        if debts ?? ProcessInfo.processInfo.arguments.contains("--ui-debt-fixture") {
             let start=Calendar.current.date(byAdding:.day,value:-1,to:Date()) ?? Date()
             let first=Calendar.current.date(byAdding:.month,value:1,to:Date()) ?? Date()
             let loan=Item(["id":.string("00000000-0000-0000-0000-000000000201"),"name":.string("消费贷示例"),"type":.string("online"),"accountId":.string(d.accounts[0].id),"principalCents":.int(200000),"receivedCents":.int(200000),"recordReceipt":.bool(true),"months":.int(12),"annualBps":.int(2400),"monthlyFeeCents":.int(0),"method":.string("annuity"),"baseDate":.string(Clock.day(start)),"firstDue":.string(Clock.day(first))])
             if let seeded=try? Loans.save(loan,in:d) {d=Loans.refreshReminders(seeded)}
         }
         d.notes=[Item(["id":.string("00000000-0000-0000-0000-000000000100"),"title":.string("版式检查笔记"),"body":.string("想去天安门看看，也想去西安。\n\n## 摘要\n\n- 想去北京和西安。"),"createdAt":.int(Clock.milliseconds),"updatedAt":.int(Clock.milliseconds)])]
-        if ProcessInfo.processInfo.arguments.contains("--ui-scroll-fixture") {
-            d.notes=(0..<32).map {index in Item(["id":.string("scroll-note-\(index)"),"title":.string("笔记 \(index+1)"),"body":.string("滚动检查页面背景与悬浮控件。"),"updatedAt":.int(Clock.milliseconds-Int64(index))])}
-            d.records=(0..<32).flatMap {index -> [Item] in
-                [Item(["id":.string("scroll-reminder-\(index)"),"kind":.string("reminder"),"title":.string("提醒 \(index+1)"),"due":.int(Clock.milliseconds+Int64(index)*3600000),"completed":.bool(false)]),
-                 Item(["id":.string("scroll-expense-\(index)"),"kind":.string("expense"),"title":.string("账目 \(index+1)"),"cents":.int(100),"currency":.string("CNY"),"date":.int(Clock.milliseconds-Int64(index)*3600000)])]
+        if scrolling ?? ProcessInfo.processInfo.arguments.contains("--ui-scroll-fixture") {
+            let now=Clock.milliseconds,account=d.accounts[0].text("name")
+            d.notes=(0..<32).map {index in Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",1000+index)),"title":.string("笔记 \(index+1)"),"body":.string("滚动检查页面背景与悬浮控件。"),"createdAt":.int(now-Int64(index)),"updatedAt":.int(now-Int64(index))])}
+            d.records += (0..<32).flatMap {index -> [Item] in
+                let due=now+Int64(index+1)*3600000
+                return [Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",2000+index)),"kind":.string("reminder"),"title":.string("提醒 \(index+1)"),"date":.int(now),"due":.int(due),"alertAt":.int(due),"period":.string("none"),"currency":.string("CNY"),"completed":.bool(false)]),
+                 Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",3000+index)),"kind":.string("expense"),"title":.string("账目 \(index+1)"),"cents":.int(100),"currency":.string("CNY"),"account":.string(account),"category":.string("其他"),"date":.int(now-Int64(index)*3600000)])]
             }
         }
         return d
