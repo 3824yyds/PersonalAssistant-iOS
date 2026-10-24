@@ -19,6 +19,7 @@ public enum ReminderOperations {
             return changed
         }
         let calendar=calendar(for:reminder)
+        changed.set("completed",false)
         let due=Date(timeIntervalSince1970:Double(reminder.int("due"))/1000)
         let day=calendar.component(.day,from:due),month=calendar.component(.month,from:due)
         let anchorDay=(1...31).contains(reminder.int("anchorDay")) ? Int(reminder.int("anchorDay")):day
