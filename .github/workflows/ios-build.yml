@@ -17,11 +17,12 @@ jobs:
         run: swift test
   ios-smoke:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         ios: [18, 26]
+        suite: [main, audit]
     steps:
       - uses: actions/checkout@v4
       - name: Select iOS 26 toolchain
@@ -46,7 +47,12 @@ jobs:
       - name: iOS crypto, migration and UI smoke tests
         run: |
           mkdir -p build
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Tests.xcresult CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/simulator-test.log 2>&1 || { grep -A 6 -B 2 'error:' build/simulator-test.log || true; tail -n 120 build/simulator-test.log; exit 1; }
+          if [ "${{ matrix.suite }}" = "audit" ]; then
+            TEST_FILTER="-only-testing:AssistantUITests/ProductAuditTests"
+          else
+            TEST_FILTER="-skip-testing:AssistantUITests/ProductAuditTests"
+          fi
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Tests.xcresult "$TEST_FILTER" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/simulator-test.log 2>&1 || { grep -A 6 -B 2 'error:' build/simulator-test.log || true; tail -n 120 build/simulator-test.log; exit 1; }
       - name: Export test screenshots
         if: always()
         run: |
@@ -56,7 +62,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: iOS-test-results-${{ matrix.ios }}
+          name: iOS-test-results-${{ matrix.ios }}-${{ matrix.suite }}
           path: |
             build/simulator-test.log
             build/Screenshots/
@@ -83,7 +89,7 @@ jobs:
         run: bash Scripts/build-ipa.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PersonalAssistant-iOS-3.5.1-build5-unsigned
+          name: PersonalAssistant-iOS-3.5.1-build6-unsigned
           path: |
             build/*.ipa
             build/*.verification.json

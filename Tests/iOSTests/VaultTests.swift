@@ -4,6 +4,11 @@ import UIKit
 @testable import PersonalAssistant
 
 final class VaultTests:XCTestCase {
+    func testAuditAndPhotoFixturesAreValidWithoutRemovingStoredAttachmentNames() throws {
+        let d=try DebugFixtures.document(attachments:true,auditing:true).validated()
+        XCTAssertEqual(d.notes[0].items("attachments")[0].text("name"),"照片.jpg")
+        XCTAssertTrue(d.records.contains {$0.text("title")=="月底缴费复现"})
+    }
     func testEveryDebugFixtureSurvivesEncryptedVaultValidation() throws {
         let salt=try VaultCrypto.random(32),key=try VaultCrypto.random(32)
         for scrolling in [false,true] {

@@ -18,15 +18,20 @@ struct NoteRichText:UIViewRepresentable {
     }
     func updateUIView(_ view:UITextView,context:Context) {
         context.coordinator.parent=self
-        if view.text != text {
-            if let bytes=Data(base64Encoded:richText),let value=try? NSAttributedString(data:bytes,options:[.documentType:NSAttributedString.DocumentType.rtf],documentAttributes:nil),value.string==text {view.attributedText=value}
-            else {view.attributedText=NSAttributedString(string:text,attributes:[.font:UIFont.preferredFont(forTextStyle:.body),.foregroundColor:UIColor.label])}
-            view.textColor = .label
-        }
+        synchronize(view)
         if let command,context.coordinator.lastCommand != command.id {
             context.coordinator.lastCommand=command.id
             let coordinator=context.coordinator
             DispatchQueue.main.async {[weak view] in if let view,view.window != nil {coordinator.apply(command.action,to:view)}}
+        }
+    }
+    func synchronize(_ view:UITextView) {
+        // Marked text belongs to the IME until a candidate is accepted.
+        guard view.markedTextRange==nil else {return}
+        if view.text != text {
+            if let bytes=Data(base64Encoded:richText),let value=try? NSAttributedString(data:bytes,options:[.documentType:NSAttributedString.DocumentType.rtf],documentAttributes:nil),value.string==text {view.attributedText=value}
+            else {view.attributedText=NSAttributedString(string:text,attributes:[.font:UIFont.preferredFont(forTextStyle:.body),.foregroundColor:UIColor.label])}
+            view.textColor = .label
         }
     }
     func sizeThatFits(_ proposal:ProposedViewSize,uiView:UITextView,context:Context)->CGSize? {
@@ -38,10 +43,14 @@ struct NoteRichText:UIViewRepresentable {
         var lastCommand:UUID?
         init(_ parent:NoteRichText) {self.parent=parent}
         func textViewDidChange(_ view:UITextView) {
+            view.invalidateIntrinsicContentSize()
+            guard view.markedTextRange==nil else {return}
             parent.text=view.text
             if let data=try? view.attributedText.data(from:NSRange(location:0,length:view.attributedText.length),documentAttributes:[.documentType:NSAttributedString.DocumentType.rtf]) {parent.richText=data.base64EncodedString()}
         }
+        func textViewDidEndEditing(_ view:UITextView) {textViewDidChange(view)}
         func apply(_ action:NoteFormat,to view:UITextView) {
+            if view.markedTextRange != nil {view.unmarkText();textViewDidChange(view)}
             if action == .undo {view.undoManager?.undo();textViewDidChange(view);return}
             if action == .redo {view.undoManager?.redo();textViewDidChange(view);return}
             view.becomeFirstResponder()

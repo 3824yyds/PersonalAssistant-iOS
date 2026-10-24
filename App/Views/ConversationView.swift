@@ -32,6 +32,7 @@ struct ConversationView:View {
     @State private var photoTask:Task<Void,Never>?
     @State private var preferences=false
     @State private var greeting=""
+    @State private var openedItem:ChatCreatedItem?
     @AppStorage("chat.lastGreeting") private var lastGreeting=""
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @FocusState var focused:Bool
@@ -43,7 +44,7 @@ struct ConversationView:View {
                     ScrollView {
                         LazyVStack(alignment:.leading,spacing:22) {
                             if store.messages.isEmpty {welcome.frame(minHeight:max(0,geometry.size.height-32))}
-                            ForEach(store.messages) {message in ChatBubble(message:message,working:store.assistantBusy && message.id==store.messages.last?.id)}
+                            ForEach(store.messages) {message in ChatBubble(message:message,working:store.assistantBusy && message.id==store.messages.last?.id,onOpen:{openedItem=$0},onSave:{saveAnswer(message)})}
                             Color.clear.frame(height:1).id("latest").background(GeometryReader {g in Color.clear.preference(key:BottomPreference.self,value:g.frame(in:.named("conversationScroll")).minY)})
                         }.padding(16)
                     }.coordinateSpace(name:"conversationScroll").scrollDismissesKeyboard(.interactively)
@@ -55,7 +56,7 @@ struct ConversationView:View {
             }.clipped()
             VStack(spacing:8) {attachmentPreview;modePicker;composer}.layoutPriority(1)
         }
-            .background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
+            .background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar).appErrorScope()
             .onAppear {
                 refreshGreeting()
                 #if DEBUG
@@ -71,19 +72,25 @@ struct ConversationView:View {
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .onChange(of:store.financeMode) {_,_ in refreshGreeting()}
             .sheet(isPresented:$preferences) {NavigationStack {ChatPreferencesView()}.environmentObject(store)}
+            .sheet(item:$openedItem) {receipt in NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
     }
     var header:some View {
         HStack(spacing:8) {
             Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
-                Menu {
-                    ForEach(availableModels,id:\.self) {model in Button {Task {await store.setting("model",.string(model))}} label:{HStack {Text(modelLabel(model));if store.model==model {Image(systemName:"checkmark")}}}}
-                    Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
-                } label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
+                Button {focused=false;modelMenu=true} label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
+                    .popover(isPresented:$modelMenu,attachmentAnchor:.rect(.bounds),arrowEdge:.top) {modelChoices.presentationCompactAdaptation(.popover)}
                     .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
             Spacer(minLength:0)
             HeaderControls(sheet:$sheet)
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
+    }
+    private var modelChoices:some View {
+        VStack(spacing:0) {ForEach(availableModels,id:\.self) {model in
+            Button {modelMenu=false;Task {await store.setting("model",.string(model))}} label:{
+                HStack(spacing:24) {Text(modelLabel(model)).foregroundStyle(.primary);Spacer(minLength:16);Image(systemName:"checkmark").foregroundStyle(Theme.accent).opacity(store.model==model ? 1:0).accessibilityHidden(true)}.padding(.horizontal,18).frame(height:46).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel(modelLabel(model)).accessibilityValue(store.model==model ? "已选择":"未选择").accessibilityAddTraits(store.model==model ? .isSelected:[])
+        }}.frame(width:240).padding(.vertical,6)
     }
     var modePicker:some View {
         HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
@@ -120,7 +127,7 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
             } else {
-                TextField(finance ? "问问你的财务状况…":"发消息…",text:$store.chatDraft,axis:.vertical).lineLimit(1...6).font(.system(size:15)).padding(.vertical,11).focused($focused).accessibilityIdentifier("chat.input")
+                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused},set:{focused=$0}),placeholder:finance ? "问问你的财务状况…":"发消息…")
             }
             Button {
                 focused=false;voiceMode.toggle()
@@ -202,6 +209,7 @@ struct ConversationView:View {
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
     func send() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
         let images=store.chatImages
         var question=input.trimmingCharacters(in:.whitespacesAndNewlines)
         guard (!question.isEmpty || !images.isEmpty),!store.assistantBusy,!loadingPhotos else{return}
@@ -217,24 +225,70 @@ struct ConversationView:View {
         let user=ChatMessage(role:"user",content:question,images:images.isEmpty ? nil:images)
         store.messages.append(user);store.chatImages=[];selectedPhotos=[]
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
+        let actions=ChatActionService(store:store,question:question,history:previous,images:images)
+        let session=store.activeSessionID
         store.activeTask=Task {
             defer {if store.epoch==epoch && store.activeReplyID==answerID {store.assistantBusy=false;store.activeReplyID=nil}}
             do {
-                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,onPartial:{partial in
+                let response:(String,String)
+                if let local=try await savePreviousNote(question,previous:previous,actions:actions) {response=local}
+                else {response=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,localTools:actions.schemas,actionInstruction:actions.instruction,onTool:{name,arguments in
+                    let result=try await actions.perform(name,arguments:arguments)
+                    if store.epoch==epoch,store.activeSessionID==session,!actions.created.isEmpty {finishAnswer(answerID,text:actions.confirmedText(""),source:"应用已确认保存",created:actions.created,after:user.id)}
+                    return result
+                },onPartial:{partial in
                     guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial
                 },onSources:{sources in
                     guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].sources=sources
                 },onStatus:{status in
                     guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].source=status
-                })
-                try Task.checkCancellation();guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
-            }catch is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
-            catch {if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};if !images.isEmpty {store.messages.removeAll {$0.id==user.id};store.chatImages=images;input=question};store.present(error)}}
+                })}
+                let (text,source)=response
+                if actions.created.isEmpty {try Task.checkCancellation()}
+                guard store.epoch==epoch,store.activeSessionID==session else{return}
+                finishAnswer(answerID,text:actions.confirmedText(text),source:actions.created.isEmpty ? source:"应用已确认保存",created:actions.created)
+                await store.saveHistory()
+            } catch {
+                if store.epoch==epoch,store.activeSessionID==session,!actions.created.isEmpty {
+                    finishAnswer(answerID,text:actions.confirmedText("")+"\n本轮后续回复未完成，已保存的资料不会丢失。",source:"应用已确认保存",created:actions.created);await store.saveHistory()
+                } else if error is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
+                else if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};if !images.isEmpty {store.messages.removeAll {$0.id==user.id};store.chatImages=images;input=question};store.present(error)}
+            }
         }
+    }
+    private func savePreviousNote(_ question:String,previous:[ChatMessage],actions:ChatActionService) async throws -> (String,String)? {
+        guard ChatActions.savesPreviousNote(question),actions.allowed==[.note],let message=previous.last(where:{$0.role=="assistant" && !$0.content.isEmpty}),(message.createdItems ?? []).isEmpty else{return nil}
+        let draft=ChatActions.noteDraft(message.content)
+        let response=try await actions.perform("create_note",arguments:String(decoding:JSONEncoder().encode(draft),as:UTF8.self))
+        return (response.bool("saved") ? "备忘录已保存。":response.text("message"),"本机保存")
+    }
+    private func finishAnswer(_ id:String,text:String,source:String,created:[ChatCreatedItem],after userID:String?=nil) {
+        if let index=store.messages.firstIndex(where:{$0.id==id}) {store.messages[index].content=text;store.messages[index].source=source;store.messages[index].createdItems=created.isEmpty ? nil:created}
+        else if !created.isEmpty {let index=userID.flatMap {id in store.messages.firstIndex {$0.id==id}}.map {$0+1} ?? store.messages.endIndex;store.messages.insert(ChatMessage(id:id,role:"assistant",content:text,source:source,createdItems:created),at:index)}
+    }
+    private func saveAnswer(_ message:ChatMessage) {
+        guard !store.assistantBusy,!store.busy else{return}
+        var draft=ChatActions.noteDraft(message.content);draft.set("folder",store.noteFolder)
+        let id=UUID().uuidString.lowercased()
+        Task {do {
+            let (_,receipt)=try ChatActions.create(draft,kind:.note,id:id,in:store.current,source:"")
+            if await store.commit({$0=try ChatActions.create(draft,kind:.note,id:id,in:$0,source:"").0}) {
+                if let index=store.messages.firstIndex(where:{$0.id==message.id}) {store.messages[index].createdItems=(store.messages[index].createdItems ?? [])+[receipt]}
+                await store.saveHistory();openedItem=receipt
+            }
+        }catch{store.present(error)}}
+    }
+    @ViewBuilder private func createdDestination(_ receipt:ChatCreatedItem)->some View {
+        if receipt.kind == .note,let note=store.current.notes.first(where:{$0.id==receipt.id && $0.int("deletedAt")==0}) {NoteEditor(note:note)}
+        else if let record=store.current.records.first(where:{$0.id==receipt.id}) {
+            if receipt.kind == .reminder {ReminderEditor(reminder:record)}else{RecordEditor(record:record)}
+        } else {ContentUnavailableView("记录已移除",systemImage:"tray").toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {openedItem=nil}}}}
     }
 }
 struct ChatBubble:View {
     var message:ChatMessage,working:Bool
+    var onOpen:((ChatCreatedItem)->Void)?=nil
+    var onSave:(()->Void)?=nil
     @Environment(\.colorScheme) var scheme
     var body:some View {
         HStack(alignment:.top,spacing:8) {
@@ -250,6 +304,10 @@ struct ChatBubble:View {
                 }.padding(message.role=="user" ? 13:0)
                     .background(message.role=="user" ? Theme.accent.opacity(0.09):.clear,in:RoundedRectangle(cornerRadius:17,style:.continuous))
                 if message.role != "user",let sources=message.sources,!sources.isEmpty {WebSourcesView(sources:sources)}
+                if let created=message.createdItems {ForEach(created) {receipt in
+                    Button {onOpen?(receipt)} label:{HStack(spacing:10) {Image(systemName:receipt.kind == .note ? "note.text":receipt.kind == .reminder ? "bell":"creditcard");VStack(alignment:.leading,spacing:4) {Text(receipt.title).font(.subheadline.weight(.medium));Text(receipt.label+" · "+receipt.detail).font(.caption).foregroundStyle(.secondary)};Spacer(minLength:0);Image(systemName:"chevron.right").font(.caption)}.padding(12).background(.background.opacity(0.75),in:RoundedRectangle(cornerRadius:14))}.buttonStyle(.plain).accessibilityIdentifier("chat.created."+receipt.kind.rawValue)
+                }}
+                if message.role != "user",!working,!message.content.isEmpty,(message.createdItems ?? []).isEmpty,let onSave {Button("保存为备忘录",systemImage:"note.text.badge.plus",action:onSave).font(.caption).accessibilityIdentifier("chat.saveNote")}
                 if message.role != "user" && !working {Button {UIPasteboard.general.string=message.content;UIImpactFeedbackGenerator(style:.light).impactOccurred()} label:{Image(systemName:"doc.on.doc").font(.system(size:13)).frame(width:32,height:30)}.foregroundStyle(.secondary).accessibilityLabel("复制回答")}
             }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             if message.role != "user" {Spacer(minLength:6)}

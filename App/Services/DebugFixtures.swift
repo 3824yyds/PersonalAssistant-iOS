@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import UIKit
 
 enum DebugFixtures {
     static var proposals:Bool {ProcessInfo.processInfo.arguments.contains("--ui-proposal-fixture")}
@@ -16,7 +17,7 @@ enum DebugFixtures {
         store.messages=[ChatMessage(role:"user",content:"帮我整理一下周末计划"),ChatMessage(role:"assistant",content:"可以把周末安排分成出行、休息和准备三部分。",source:"云端回答")]
         store.assistantBusy=true
     }
-    static func document(scrolling:Bool?=nil,debts:Bool?=nil)->Document {
+    static func document(scrolling:Bool?=nil,debts:Bool?=nil,attachments:Bool?=nil,auditing:Bool?=nil)->Document {
         var d=Document()
         let names=["中国工商银行","中国银行","汇丰银行","招商银行"]
         d.accounts=names.enumerated().map {index,name in
@@ -32,6 +33,21 @@ enum DebugFixtures {
             if let seeded=try? Loans.save(loan,in:d) {d=Loans.refreshReminders(seeded)}
         }
         d.notes=[Item(["id":.string("00000000-0000-0000-0000-000000000100"),"title":.string("版式检查笔记"),"body":.string("想去天安门看看，也想去西安。\n\n## 摘要\n\n- 想去北京和西安。"),"createdAt":.int(Clock.milliseconds),"updatedAt":.int(Clock.milliseconds)])]
+        if attachments ?? ProcessInfo.processInfo.arguments.contains("--ui-attachment-fixture") {
+            let renderer=UIGraphicsImageRenderer(size:CGSize(width:160,height:120))
+            let image=renderer.image {context in UIColor.systemBlue.setFill();context.fill(CGRect(x:0,y:0,width:160,height:120))}
+            if let data=image.jpegData(compressionQuality:0.8) {d.notes[0].set("attachments",items:[Item.make(["name":.string("照片.jpg"),"kind":.string("image"),"mime":.string("image/jpeg"),"data":.string(data.base64EncodedString())])])}
+        }
+        if auditing ?? ProcessInfo.processInfo.arguments.contains("--ui-audit-fixture") {
+            for (index,kind,title,cents) in [(0,"income","审计工资",Int64(500000)),(1,"expense","审计午饭",Int64(3000))] {
+                d.records.append(Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",9000+index)),"kind":.string(kind),"title":.string(title),"cents":.int(cents),"currency":.string("CNY"),"account":.string(d.accounts[0].text("name")),"category":.string(kind=="income" ? "工资":"餐饮"),"date":.int(Clock.milliseconds-3600000)]))
+            }
+            let monthly=Clock.date("2027-02-28") ?? Date().addingTimeInterval(86400)
+            for (index,title,due,period) in [(0,"审计一次性提醒",Date().addingTimeInterval(86400),"none"),(1,"月底缴费复现",monthly,"monthly")] {
+                let timestamp=Int64(due.timeIntervalSince1970*1000)
+                d.records.append(Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",9100+index)),"kind":.string("reminder"),"title":.string(title),"currency":.string("CNY"),"date":.int(Clock.milliseconds),"due":.int(timestamp),"alertAt":.int(timestamp),"period":.string(period),"completed":.bool(false),"anchorDay":.int(period=="monthly" ? 31:1),"anchorMonth":.int(2),"priority":.int(1)]))
+            }
+        }
         if scrolling ?? ProcessInfo.processInfo.arguments.contains("--ui-scroll-fixture") {
             let now=Clock.milliseconds,account=d.accounts[0].text("name")
             d.notes=(0..<32).map {index in Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",1000+index)),"title":.string("笔记 \(index+1)"),"body":.string("滚动检查页面背景与悬浮控件。"),"createdAt":.int(now-Int64(index)),"updatedAt":.int(now-Int64(index))])}
@@ -42,6 +58,22 @@ enum DebugFixtures {
             }
         }
         return d
+    }
+    @MainActor static func actionReply(_ question:String,tools:[[String:Any]],handler:ChatToolHandler?) async throws -> (String,String)? {
+        guard ProcessInfo.processInfo.arguments.contains("--ui-action-fixture"),let handler,let tool=tools.first?["function"] as? [String:Any],let name=tool["name"] as? String else{return nil}
+        var value:[String:Any]
+        switch name {
+        case "create_note":value=["title":"模拟器创建备忘录","body":"准备好水和运动鞋。"]
+        case "create_record":
+            let properties=(tool["parameters"] as? [String:Any])?["properties"] as? [String:Any]
+            let kinds=(properties?["kind"] as? [String:Any])?["enum"] as? [String] ?? ["expense"]
+            let kind=kinds.first ?? "expense"
+            value=["kind":kind,"title":kind=="income" ? "模拟器收入":"模拟器午饭","amount":kind=="income" ? "200.00":"25.00","currency":"CNY","accountId":question.contains("中国工商银行") ? "00000000-0000-0000-0000-000000000001":"","category":"其他"]
+        case "create_reminder":value=["title":"模拟器喝水提醒","body":"喝一杯水","due":ISO8601DateFormatter().string(from:Date().addingTimeInterval(86400)),"period":"none"]
+        default:return nil
+        }
+        let result=try await handler(name,String(decoding:JSONSerialization.data(withJSONObject:value),as:UTF8.self))
+        return (result.bool("saved") ? "保存成功。":result.text("message"),"模拟器工具协议样例")
     }
 }
 #endif

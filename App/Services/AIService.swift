@@ -78,11 +78,16 @@ enum AIService {
         if q.range(of:"^(你是谁|你叫什么|介绍一下自己)[？?！!。]*$",options:.regularExpression) != nil { return "我是你的个人智能助理。我们可以聊日常、写作或知识问题；切换到财务咨询后，我也能结合你记录的账本帮你做分析。" }
         return nil
     }
-    static func reply(_ question: String, finance: Bool, document: Document, history: [ChatMessage], cloud: Bool, model: String, webSearch:Bool=true, images:[ChatImage]=[], onPartial: (@MainActor @Sendable (String)->Void)? = nil, onSources:(@MainActor @Sendable ([WebSource])->Void)?=nil, onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String) {
-        let financePrompt = "你是专业、审慎的个人财务助理，只回答财务问题。分析用户全部已提供财务状况，区分实际数据与建议，先给结论、再给依据和可执行计划。根据地区、收入、必要支出、债务和目标调整，缺少条件时说明假设。法律风险应区分持牌金融机构与民间借贷，不能统一套用利率上限，不作未经核实的法律结论。不代替用户记账或转账。"
+    static func reply(_ question: String, finance: Bool, document: Document, history: [ChatMessage], cloud: Bool, model: String, webSearch:Bool=true, images:[ChatImage]=[], localTools:[[String:Any]]=[],actionInstruction:String="",onTool:ChatToolHandler?=nil,onPartial: (@MainActor @Sendable (String)->Void)? = nil, onSources:(@MainActor @Sendable ([WebSource])->Void)?=nil, onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String) {
+        #if DEBUG
+        if let result=try await DebugFixtures.actionReply(question,tools:localTools,handler:onTool) {return result}
+        #endif
+        let financePrompt = "你是专业、审慎的个人财务助理，只回答财务问题或执行用户明确提出的应用创建操作。分析用户全部已提供财务状况，区分实际数据与建议，先给结论、再给依据和可执行计划。根据地区、收入、必要支出、债务和目标调整，缺少条件时说明假设。法律风险应区分持牌金融机构与民间借贷，不能统一套用利率上限，不作未经核实的法律结论。实际收支仅能通过获授权的工具登记，工具成功回执后才能确认；不执行真实银行转账。"
         let chatPrompt = "你是友好、直接的个人智能助理，正常回答聊天、写作、编程和知识问题。不要因为数字就把问题当作个人财务分析。只有用户问应用操作时才根据已给出的应用操作说明回答。"
         let help = "应用操作：底部导航依次为笔记、账本、提醒、助理。在笔记、账本、提醒页，右下角＋展开笔记、记账、提醒。助理页只保留输入区的＋菜单。卡包入口位于主页右上角。新建账户时一并编辑卡片资料。账本有流水、统计、日历、预算。个人详情可配置 DeepSeek、本机模型、记忆、外观、安全和加密备份。笔记编辑底部的 AI 工具可润色标题与正文、提取摘要/要点/会议纪要/行动清单；在原编辑页显示结果，点采纳才应用，取消保留原文，采纳后可撤销。个人详情顶部可更换个人头像，从系统相册选择照片或使用预设。系统解锁在个人详情启用，锁定后点击登录页 Face ID 图标。聊天输入区麦克风按钮切换到按住说话，普通松开后发送识别文字，左滑取消，右滑转文字核对；键盘按钮切回文字输入。聊天与财务咨询在输入框上方切换。输入区＋提供联网搜索开关、新对话和历史对话。联网搜索由模型按需调用DeepSeek官方搜索接口，回答下方可展开来源；联网搜索另有按次费用。卡包自动匹配机构、类型和卡组织，可在编辑账户的卡片部分切换卡面。"
         var system = (finance ? financePrompt : chatPrompt) + "\n" + help
+        if !actionInstruction.isEmpty {system+="\n"+actionInstruction}
+        system+="\n本应用已具备聊天创建笔记、收入、支出和提醒的能力。用户明确提出创建要求时，应用会提供对应工具。只在工具确认保存成功后报告成功；没有工具回执时不能假装已写入。不再要求用户复制粘贴已要求保存的内容。"
         system += "\n"+ChatPreferences.prompt(Item(document.settings.raw["chatPreferences"]?.object ?? [:]))
         if finance { system += "\n" + financeContext(document) }
         else if document.root.raw["assistantMemory"]?.object["enabled"]?.flag != false {
@@ -101,7 +106,7 @@ enum AIService {
             }
             messages.append(["role":"user","content":try ChatImage.content(question,images:images)])
             let client=DeepSeekWebClient(apiKey:try credential())
-            if webSearch {return try await client.answer(messages:messages,model:"deepseek-flash",onPartial:onPartial,onSources:onSources,onStatus:onStatus)}
+            if webSearch || !localTools.isEmpty {return try await client.answer(messages:messages,model:"deepseek-flash",webSearch:webSearch,localTools:localTools,onTool:onTool,onPartial:localTools.isEmpty ? onPartial:nil,onSources:onSources,onStatus:onStatus)}
             let response=try await client.stream(messages,model:"deepseek-flash",tools:false,onPartial:onPartial)
             guard !response.content.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {throw AppError.message("看图接口没有返回正文，请重试")}
             await onPartial?(response.content);return(response.content,"DeepSeek Flash · 图像理解")
@@ -112,14 +117,19 @@ enum AIService {
             let previous = history.filter { !$0.content.isEmpty }.suffix(6).map { ["role":$0.role,"content":String($0.content.prefix(12000))] }
             do {
                 let messages=[["role":"system","content":system]] + previous + [["role":"user","content":question]]
-                if webSearch {
+                if webSearch || !localTools.isEmpty {
                     let client=DeepSeekWebClient(apiKey:try credential())
-                    return try await client.answer(messages:messages,model:model,onPartial:onPartial,onSources:onSources,onStatus:onStatus)
+                    return try await client.answer(messages:messages,model:model,webSearch:webSearch,localTools:localTools,onTool:onTool,onPartial:localTools.isEmpty ? onPartial:nil,onSources:onSources,onStatus:onStatus)
                 }
                 return (try await self.cloud(messages:messages,model:model,onPartial:onPartial),"云端回答")
             }
             catch is CancellationError { throw CancellationError() }
             catch { cloudFailure = error;await onSources?([]) }
+        }
+        // Do not fall back to a text-only model after a tool may already have saved data.
+        if !localTools.isEmpty {
+            if let cloudFailure {throw cloudFailure}
+            throw AppError.message("聊天自动创建需要开启云端智能并配置可用的 DeepSeek API Key")
         }
         if let fast = localFast(question,finance:finance,document:document) { return (fast,cloudFailure == nil ? "本机回答":"本机回答 · 云端暂不可用") }
         if LocalModel.shared.available {

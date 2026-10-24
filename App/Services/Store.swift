@@ -10,6 +10,7 @@ struct ChatMessage: Codable, Identifiable, Equatable, Sendable {
     var source: String = ""
     var sources:[WebSource]? = nil
     var images:[ChatImage]? = nil
+    var createdItems:[ChatCreatedItem]? = nil
 }
 struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var id = UUID().uuidString
@@ -35,6 +36,7 @@ struct VoiceCaptureState:Equatable {
     @Published var chatDraft = ""
     @Published var noteFolder="收件箱"
     @Published var chatImages:[ChatImage] = []
+    var pendingChatActions=Set<ChatCreationKind>()
     @Published var voiceCapture:VoiceCaptureState?
     @Published var assistantBusy = false
     @Published var cloudEnabled = true
@@ -127,7 +129,7 @@ struct VoiceCaptureState:Equatable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];pendingChatActions=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {
@@ -206,5 +208,5 @@ struct VoiceCaptureState:Equatable {
             }
         } catch { self.error = "历史对话未能读取，当前资料库不受影响" }
     }
-    func newChat(finance:Bool?=nil) async {cancelReply();snapshotCurrentHistory();messages=[];chatImages=[];activeSessionID=UUID().uuidString;if let finance {financeMode=finance};await persistHistory()}
+    func newChat(finance:Bool?=nil) async {cancelReply();snapshotCurrentHistory();messages=[];chatImages=[];pendingChatActions=[];activeSessionID=UUID().uuidString;if let finance {financeMode=finance};await persistHistory()}
 }

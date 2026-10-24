@@ -52,8 +52,8 @@ final class Build5Tests:XCTestCase {
         app.buttons["手绘"].tap();XCTAssertTrue(app.navigationBars["手绘"].waitForExistence(timeout:5));attach(app,"NativeDrawingTools")
         let canvas=app.descendants(matching:.any).matching(identifier:"note.drawing.canvas").firstMatch;XCTAssertTrue(canvas.waitForExistence(timeout:5))
         canvas.coordinate(withNormalizedOffset:CGVector(dx:0.2,dy:0.3)).press(forDuration:0.1,thenDragTo:canvas.coordinate(withNormalizedOffset:CGVector(dx:0.65,dy:0.5)))
-        app.buttons["完成"].tap();XCTAssertTrue(app.staticTexts["手绘.pkdrawing"].waitForExistence(timeout:5));attach(app,"NativeNoteStructuredContent")
-        app.buttons["关闭"].tap();XCTAssertTrue(app.staticTexts["备忘录工具检查"].waitForExistence(timeout:10));attach(app,"NotesGroupedList")
+        app.buttons["完成"].tap();XCTAssertTrue(app.buttons["编辑手绘"].waitForExistence(timeout:5));XCTAssertFalse(app.staticTexts["手绘.pkdrawing"].exists);attach(app,"NativeNoteStructuredContent")
+        app.buttons["note.done"].tap();XCTAssertTrue(app.staticTexts["备忘录工具检查"].waitForExistence(timeout:10));attach(app,"NotesGroupedList")
         app.buttons["助理"].firstMatch.tap();app.buttons["聊天功能"].tap();XCTAssertTrue(app.buttons["chat.menu.photos"].waitForExistence(timeout:5));app.buttons["chat.menu.preferences"].tap()
         for title in ["基本风格和语调","亲切程度","热情程度","表情符号","可视化回答"] {XCTAssertTrue(app.staticTexts[title].exists)}
         attach(app,"ChatResponsePreferences");app.buttons["保存"].tap()

@@ -116,4 +116,34 @@ final class DeepSeekWebTests:XCTestCase {
         let result=try await client().answer(messages:messages,model:"deepseek-flash",onPartial:nil,onSources:nil,onStatus:nil)
         XCTAssertTrue(result.0.contains("风景"))
     }
+    @MainActor func testLocalCreationToolWritesRealDocumentAndReturnsReceiptWithoutSearch() async throws {
+        var chats=0,document=Document()
+        let id=UUID().uuidString
+        let schema:[String:Any]=["type":"function","function":["name":"create_note","parameters":["type":"object","properties":[:]]]]
+        WebProtocol.handler={request in
+            XCTAssertEqual(request.url!.path,"/chat/completions")
+            let body=try self.body(request);chats+=1
+            if chats==1 {
+                let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
+                XCTAssertEqual(tools.count,1);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"create_note")
+                return (200,try self.sse(["tool_calls":[["index":0,"id":"note-1","function":["name":"create_note","arguments":"{\"title\":\"明天爬山\",\"body\":\"准备水和运动鞋\"}"]]]]))
+            }
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertTrue((messages.last?["content"] as? String)?.contains("true")==true)
+            return (200,try self.sse(["content":"已保存备忘录。 "]))
+        }
+        _=try await client().answer(messages:[["role":"user","content":"帮我新建爬山笔记"]],model:"deepseek-flash",webSearch:false,localTools:[schema],onTool:{name,args in
+            XCTAssertEqual(name,"create_note")
+            let draft=try JSONDecoder().decode(Item.self,from:Data(args.utf8))
+            document=try ChatActions.create(draft,kind:.note,id:id,in:document,source:"帮我新建爬山笔记").0
+            return Item(["saved":.bool(true),"id":.string(id)])
+        },onPartial:nil,onSources:nil,onStatus:nil)
+        XCTAssertEqual(chats,2);XCTAssertEqual(document.notes.count,1);XCTAssertEqual(document.notes[0].text("body"),"准备水和运动鞋")
+    }
+    @MainActor func testUnexposedWriteToolIsNeverExecuted() async throws {
+        var chats=0,executed=false
+        WebProtocol.handler={_ in chats+=1;return (200,try self.sse(chats==1 ? ["tool_calls":[["index":0,"id":"bad","function":["name":"create_note","arguments":"{}"]]]]:["content":"没有保存任何内容。 "]))}
+        _=try await client().answer(messages:[["role":"user","content":"查天气"]],model:"deepseek-flash",onTool:{_,_ in executed=true;return Item()},onPartial:nil,onSources:nil,onStatus:nil)
+        XCTAssertFalse(executed)
+    }
 }

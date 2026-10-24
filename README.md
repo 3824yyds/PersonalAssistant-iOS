@@ -4,9 +4,9 @@
 
 ## 安装者只有 iPhone
 
-交付目标为 `PersonalAssistant-iOS-3.5.1-build5-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
+交付目标为 `PersonalAssistant-iOS-3.5.1-build6-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
 
-没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build5-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
+没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build6-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
 
 保持签名工具使用的 Bundle ID 和签名配置稳定，有助于后续覆盖升级；不同签名方式的数据保留行为以工具与 iOS 为准。免费开发签名通常有有效期限制。首次使用前请导出加密备份。
 
@@ -55,3 +55,5 @@ API Key 单独保存在 `ThisDeviceOnly` 钥匙串。资料、草稿和聊天密
 公开仓库采用标准 GitHub-hosted runner。完整流程只在 Actions 中手动点击 `Run workflow` 时运行，普通提交不会自动打包。核心测试使用 Ubuntu + Swift 6.0.3，iOS 18 / 26 测试与 IPA 构建使用标准 macOS runner。
 
 本次更新：[Build 5](Docs/BUILD5.md) · [债务记账与自动提醒规则](Docs/DEBT_MODEL.md)。
+
+本次更新见 [Build 6](Docs/BUILD6.md)。全产品模拟器审计发现的额外优化会单独列建议，获得用户确认后再实施。

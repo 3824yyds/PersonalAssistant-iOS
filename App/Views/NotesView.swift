@@ -194,7 +194,7 @@ struct NoteEditor:View {
                         Button(archived ? "移出归档":"归档",systemImage:"archivebox") {archived.toggle()}
                         if baseNote != nil {Button("删除备忘录",role:.destructive) {var value=snapshot();value.set("deletedAt",Clock.milliseconds);Task {if await store.commit({$0.upsert(value,in:"notes")}) {dismiss()}}}}
                     } label:{Image(systemName:"ellipsis")}.accessibilityLabel("备忘录选项").disabled(working || proposal != nil)
-                    Button {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil);save(close:false)} label:{Image(systemName:"checkmark").fontWeight(.semibold).frame(width:32,height:32).background(Color(red:0.89,green:0.68,blue:0),in:Circle()).foregroundStyle(.white)}.accessibilityLabel("保存").disabled(store.busy || working || proposal != nil || !canSave)
+                    Button {UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil);save()} label:{Image(systemName:"checkmark").fontWeight(.semibold).frame(width:32,height:32).background(Color(red:0.89,green:0.68,blue:0),in:Circle()).foregroundStyle(.white)}.accessibilityLabel("完成").accessibilityIdentifier("note.done").disabled(store.busy || working || proposal != nil || !canSave)
                 }
     }
     private var editorSurface:some View {
@@ -280,9 +280,8 @@ struct NoteEditor:View {
                     VStack(alignment:.leading,spacing:6) {
                         if let data=Data(base64Encoded:attachment.text("kind")=="drawing" ? attachment.text("preview"):attachment.text("data")),let image=UIImage(data:data) {Image(uiImage:image).resizable().scaledToFit().frame(maxHeight:240).clipShape(RoundedRectangle(cornerRadius:12))}
                         else {Label(attachment.text("name"),systemImage:"doc.fill").padding(14).frame(maxWidth:.infinity,alignment:.leading).background(.primary.opacity(0.04),in:RoundedRectangle(cornerRadius:12))}
-                        Text(attachment.text("name")).font(.caption).foregroundStyle(.secondary)
                     }
-                }.buttonStyle(.plain).contextMenu {Button("移除附件",role:.destructive) {attachments.removeAll {$0.id==attachment.id}}}
+                }.buttonStyle(.plain).accessibilityLabel(attachment.text("kind")=="drawing" ? "编辑手绘":attachment.text("kind")=="image" ? "查看照片":attachment.text("name")).accessibilityIdentifier("note.attachment."+attachment.id).contextMenu {Button("移除附件",role:.destructive) {attachments.removeAll {$0.id==attachment.id}}}
             }
         }
     }
