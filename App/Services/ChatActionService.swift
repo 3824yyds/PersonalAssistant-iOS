@@ -64,10 +64,13 @@ import Foundation
             try Task.checkCancellation()
             let saved=await store.commit {document in document=try ChatActions.create(draft,kind:kind,id:id,in:document,source:self.source).0}
             guard saved else {return failure(kind,store.error ?? "保存未完成，请重试")}
-            created.append(receipt);issues[kind]=nil;store.pendingChatActions.remove(kind)
+            created.append(receipt);issues[kind]=nil
+            guard store.epoch==epoch,store.activeSessionID==session,store.document != nil else {return response(receipt)}
+            store.pendingChatActions.remove(kind)
             var value=response(receipt)
             if kind == .reminder {
-                let granted=await NotificationService.request();NotificationService.sync(store.current.records)
+                let granted=await NotificationService.request()
+                if store.epoch==epoch,store.document != nil {NotificationService.sync(store.current.records)}
                 value.set("notificationsEnabled",granted)
                 if !granted {let notice="提醒已保存，需在系统设置中允许通知后才能弹出通知";value.set("notice",notice);notices.append(notice)}
             }
@@ -76,7 +79,11 @@ import Foundation
         catch {return failure(kind,error.localizedDescription)}
     }
     private func response(_ receipt:ChatCreatedItem)->Item {Item(["saved":.bool(true),"id":.string(receipt.id),"type":.string(receipt.kind.rawValue),"title":.string(receipt.title),"detail":.string(receipt.detail)])}
-    private func failure(_ kind:ChatCreationKind,_ message:String)->Item {issues[kind]=message;store.pendingChatActions.insert(kind);return Item(["saved":.bool(false),"message":.string(message)])}
+    private func failure(_ kind:ChatCreationKind,_ message:String)->Item {
+        issues[kind]=message
+        if store.epoch==epoch,store.activeSessionID==session,store.document != nil {store.pendingChatActions.insert(kind)}
+        return Item(["saved":.bool(false),"message":.string(message)])
+    }
     func confirmedText(_ fallback:String)->String {
         if created.isEmpty {
             if !issues.isEmpty {return "尚未保存。\n"+issues.values.sorted().joined(separator:"\n")}
