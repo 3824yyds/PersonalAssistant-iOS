@@ -88,7 +88,7 @@ struct ConversationView:View {
     private var modelChoices:some View {
         VStack(spacing:0) {ForEach(availableModels,id:\.self) {model in
             Button {modelMenu=false;Task {await store.setting("model",.string(model))}} label:{
-                HStack(spacing:24) {Text(modelLabel(model)).foregroundStyle(.primary);Spacer(minLength:16);Image(systemName:"checkmark").foregroundStyle(Theme.accent).opacity(store.model==model ? 1:0).accessibilityHidden(true)}.padding(.horizontal,18).frame(height:46).contentShape(Rectangle())
+                HStack(spacing:12) {Text(modelLabel(model)).font(.system(size:16)).lineLimit(1).foregroundStyle(.primary);Spacer(minLength:12);Image(systemName:"checkmark").foregroundStyle(Theme.accent).opacity(store.model==model ? 1:0).accessibilityHidden(true)}.padding(.horizontal,18).frame(height:46).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("chat.model.option."+model).accessibilityLabel(modelLabel(model)).accessibilityValue(store.model==model ? "已选择":"未选择").accessibilityAddTraits(store.model==model ? .isSelected:[])
         }}.frame(width:240).padding(.vertical,6)
     }

@@ -69,7 +69,10 @@ enum DebugFixtures {
             let kinds=(properties?["kind"] as? [String:Any])?["enum"] as? [String] ?? ["expense"]
             let kind=kinds.first ?? "expense"
             value=["kind":kind,"title":kind=="income" ? "模拟器收入":"模拟器午饭","amount":kind=="income" ? "200.00":"25.00","currency":"CNY","accountId":question.contains("中国工商银行") ? "00000000-0000-0000-0000-000000000001":"","category":"其他"]
-        case "create_reminder":value=["title":"模拟器喝水提醒","body":"喝一杯水","due":ISO8601DateFormatter().string(from:Date().addingTimeInterval(86400)),"period":"none"]
+        case "create_reminder":
+            let tomorrow=Calendar.current.date(byAdding:.day,value:1,to:Date()) ?? Date().addingTimeInterval(86400)
+            let due=Calendar.current.date(bySettingHour:9,minute:0,second:0,of:tomorrow) ?? tomorrow
+            value=["title":"模拟器喝水提醒","body":"喝一杯水","due":ISO8601DateFormatter().string(from:due),"period":"none"]
         default:return nil
         }
         let result=try await handler(name,String(decoding:JSONSerialization.data(withJSONObject:value),as:UTF8.self))

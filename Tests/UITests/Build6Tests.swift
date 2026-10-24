@@ -64,7 +64,7 @@ final class Build6Tests:XCTestCase {
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         for name in ["允许","Allow"] {if springboard.buttons[name].waitForExistence(timeout:2) {springboard.buttons[name].tap();break}}
         if app.alerts.firstMatch.exists {let allow=app.alerts.buttons.matching(NSPredicate(format:"label == '允许' OR label == 'Allow'")).firstMatch;if allow.exists {allow.tap()}}
-        XCTAssertTrue(app.buttons["chat.created.reminder"].waitForExistence(timeout:10));recordScreen(app,"ChatRealCreationReceipts")
+        XCTAssertTrue(app.buttons["chat.created.reminder"].waitForExistence(timeout:10));XCTAssertTrue(app.buttons["chat.created.reminder"].label.contains("9:00"));recordScreen(app,"ChatRealCreationReceipts")
         app.buttons["chat.created.reminder"].tap();XCTAssertTrue(app.navigationBars["编辑提醒"].waitForExistence(timeout:5));app.buttons["取消"].tap()
         app.buttons["返回"].firstMatch.tap();XCTAssertTrue(app.staticTexts["模拟器创建备忘录"].waitForExistence(timeout:8))
         app.buttons["账本"].firstMatch.tap();XCTAssertTrue(app.staticTexts["模拟器午饭"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["模拟器收入"].exists);recordScreen(app,"ChatEntriesInLedger")

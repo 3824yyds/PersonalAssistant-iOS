@@ -74,7 +74,7 @@ final class ProductAuditTests:XCTestCase {
         XCTAssertTrue(app.navigationBars["账户与余额"].waitForExistence(timeout:8));recordScreen(app,"AuditTransferBalances")
     }
 
-    func testSubscriptionsAndEnvelopeAllocationFlows() {
+    func testSubscriptionPaymentObservation() {
         let app=launch();tools(app);app.buttons["订阅与续费"].tap();app.buttons["添加订阅"].tap()
         app.textFields["订阅名称"].tap();app.textFields["订阅名称"].typeText("审计会员")
         app.textFields["每期金额"].tap();app.textFields["每期金额"].typeText("10.00")
@@ -82,12 +82,12 @@ final class ProductAuditTests:XCTestCase {
         XCTAssertTrue(app.buttons["审计会员"].waitForExistence(timeout:8));app.buttons["确认已付款"].tap()
         if app.buttons["确认付款并记账"].waitForExistence(timeout:5) {app.buttons["确认付款并记账"].tap();recordScreen(app,"AuditSubscriptionPaid")}
         else {
-            XCTAssertTrue(app.navigationBars["编辑订阅"].waitForExistence(timeout:5));recordScreen(app,"AuditSubscriptionPaymentOpensEditor")
-            observation("点确认已付款后打开了编辑订阅，付款确认没有出现。保留现状，等待用户审批后修复列表按钮冲突。","ObservationSubscriptionPaymentButtonConflict")
-            app.buttons["取消"].tap()
-            if app.buttons["确认付款并记账"].waitForExistence(timeout:1) {app.buttons["取消"].firstMatch.tap()}
+            recordScreen(app,"AuditSubscriptionPaymentButtonConflict")
+            observation("点确认已付款后，付款确认没有出现。实际界面见截图及层级；保留现状，等待用户审批后修复列表按钮冲突。\n"+app.debugDescription,"ObservationSubscriptionPaymentButtonConflict")
         }
-        back(app,"订阅与续费");app.buttons["资金桶"].tap();app.buttons["新建资金桶"].tap()
+    }
+    func testEnvelopeAllocationAndExpenseLinking() {
+        let app=launch();tools(app);app.buttons["资金桶"].tap();app.buttons["新建资金桶"].tap()
         app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("审计旅行桶");app.alerts.buttons["创建"].tap()
         XCTAssertTrue(app.staticTexts["审计旅行桶"].waitForExistence(timeout:8));app.buttons["分配 / 释放"].tap()
         app.alerts.textFields.firstMatch.tap();app.alerts.textFields.firstMatch.typeText("100");app.alerts.buttons["确认"].tap()
@@ -140,12 +140,18 @@ final class ProductAuditTests:XCTestCase {
         back(app,"本机智能");app.buttons["助理记忆"].tap();app.buttons["添加记忆"].tap()
         let memory=app.descendants(matching:.any).matching(identifier:"希望助理记住什么").firstMatch;memory.tap();memory.typeText("审计：喜欢简洁回答");app.buttons["保存"].tap()
         XCTAssertTrue(app.staticTexts["审计：喜欢简洁回答"].waitForExistence(timeout:8));recordScreen(app,"AuditMemorySaved")
-        back(app,"助理记忆");let backup=app.buttons["加密备份与恢复"];reveal(backup,in:app);backup.tap()
+        back(app,"助理记忆");let about=app.buttons["关于个人助理"];reveal(about,in:app);about.tap();XCTAssertTrue(app.navigationBars["关于"].waitForExistence(timeout:5));recordScreen(app,"AuditAboutAndPrivacy");back(app,"关于")
+        let backup=app.buttons["加密备份与恢复"];reveal(backup,in:app);backup.tap()
         app.buttons["导出完整加密备份"].tap();recordScreen(app,"AuditBackupExporter")
-        let cancel=app.buttons.matching(NSPredicate(format:"label == '取消' OR label == 'Cancel'")).firstMatch;if cancel.waitForExistence(timeout:5) {cancel.tap()}
-        else {app.coordinate(withNormalizedOffset:CGVector(dx:0.08,dy:0.115)).tap()}
-        XCTAssertTrue(app.buttons["导出完整加密备份"].waitForExistence(timeout:8));recordScreen(app,"AuditBackupExporterCanceled")
-        back(app,"加密备份与恢复");let about=app.buttons["关于个人助理"];reveal(about,in:app);about.tap();XCTAssertTrue(app.navigationBars["关于"].waitForExistence(timeout:5));recordScreen(app,"AuditAboutAndPrivacy")
+        observation("本测试检查备份加密函数和导出入口；系统文件保存界面使用独立进程，本次不声称已完成选目录、保存文件或关闭系统界面的端到端验证。","ObservationSystemFileExporterBoundary")
+    }
+    func testManualLockWrongPasswordAndUnlockAgain() {
+        let app=launch();app.buttons["个人详情"].tap();let lock=app.buttons["锁定资料库"];reveal(lock,in:app);lock.tap()
+        XCTAssertTrue(app.buttons["解锁"].waitForExistence(timeout:8));XCTAssertFalse(app.buttons["展开快捷操作"].exists);recordScreen(app,"AuditVaultLocked")
+        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("wrong-password-351");app.buttons["解锁"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout:8));recordScreen(app,"AuditWrongPasswordRejected");app.buttons["知道了"].tap()
+        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()
+        XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20));recordScreen(app,"AuditUnlockedAgain")
     }
 
     func testValidationErrorPreservationObservation() {
