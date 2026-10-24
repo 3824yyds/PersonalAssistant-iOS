@@ -52,7 +52,7 @@ jobs:
           else
             TEST_FILTER="-skip-testing:AssistantUITests/ProductAuditTests"
           fi
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Tests.xcresult "$TEST_FILTER" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/simulator-test.log 2>&1 || { grep -A 6 -B 2 'error:' build/simulator-test.log || true; tail -n 120 build/simulator-test.log; exit 1; }
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Tests.xcresult "$TEST_FILTER" -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 300 -maximum-test-execution-time-allowance 600 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/simulator-test.log 2>&1 || { grep -A 6 -B 2 'error:' build/simulator-test.log || true; tail -n 120 build/simulator-test.log; exit 1; }
       - name: Export test screenshots
         if: always()
         run: |
