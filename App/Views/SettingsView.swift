@@ -34,12 +34,12 @@ struct SettingsView:View {
 struct VaultCapacityView:View {
     @EnvironmentObject var store:AppStore
     var body:some View {Form {
-        Section("笔记与财务资料") {
+        Section {
             ProgressView(value:Double(min(store.vaultBytes,VaultCrypto.maximum)),total:Double(VaultCrypto.maximum)).tint(store.vaultBytes>VaultCrypto.maximum*4/5 ? .orange:Theme.accent)
             LabeledContent("已使用",value:VaultCrypto.capacityLabel(store.vaultBytes)).accessibilityIdentifier("vault.capacity.used")
             LabeledContent("可用容量",value:VaultCrypto.capacityLabel(VaultCrypto.maximum-store.vaultBytes))
             LabeledContent("容量上限",value:VaultCrypto.capacityLabel(VaultCrypto.maximum))
-        } footer:{Text("显示上次成功保存的加密资料大小，包含笔记、图片、手绘、账户和账本；聊天记录独立保存。附件经过编码后会占用更多容量。")}
+        } header:{Text("笔记与财务资料")} footer:{Text("显示上次成功保存的加密资料大小，包含笔记、图片、手绘、账户和账本；聊天记录独立保存。附件经过编码后会占用更多容量。")}
         if store.vaultBytes>=VaultCrypto.maximum*4/5 {Section {Label("容量即将用满",systemImage:"exclamationmark.circle").foregroundStyle(.orange);Text("建议先导出备份，再缩小图片或移除不需要的附件。超过上限时会保留原资料，当前编辑内容仍留在页面中。").font(.subheadline)}}
         Section {NavigationLink("导出加密备份",destination:BackupView());Text("附件目前随资料库加密保存；独立附件存储涉及旧资料迁移，将另行评估。").font(.caption).foregroundStyle(.secondary)}
     }.navigationTitle("资料库容量").navigationBarTitleDisplayMode(.inline).appErrorScope()}
