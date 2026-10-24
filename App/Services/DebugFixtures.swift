@@ -25,6 +25,12 @@ enum DebugFixtures {
         var wallet=d.wallet
         wallet.set("cards",items:d.accounts.enumerated().map {index,account in Item(["accountId":.string(account.id),"institution":.string(account.text("name")),"lastFour":.string(String(1231+index)),"network":.string(index==2 ? "mastercard":"unionpay")])})
         d.wallet=wallet
+        if ProcessInfo.processInfo.arguments.contains("--ui-debt-fixture") {
+            let start=Calendar.current.date(byAdding:.day,value:-1,to:Date()) ?? Date()
+            let first=Calendar.current.date(byAdding:.month,value:1,to:Date()) ?? Date()
+            let loan=Item(["id":.string("00000000-0000-0000-0000-000000000201"),"name":.string("消费贷示例"),"type":.string("online"),"accountId":.string(d.accounts[0].id),"principalCents":.int(200000),"receivedCents":.int(200000),"recordReceipt":.bool(true),"months":.int(12),"annualBps":.int(2400),"monthlyFeeCents":.int(0),"method":.string("annuity"),"baseDate":.string(Clock.day(start)),"firstDue":.string(Clock.day(first))])
+            if let seeded=try? Loans.save(loan,in:d) {d=Loans.refreshReminders(seeded)}
+        }
         d.notes=[Item(["id":.string("00000000-0000-0000-0000-000000000100"),"title":.string("版式检查笔记"),"body":.string("想去天安门看看，也想去西安。\n\n## 摘要\n\n- 想去北京和西安。"),"createdAt":.int(Clock.milliseconds),"updatedAt":.int(Clock.milliseconds)])]
         if ProcessInfo.processInfo.arguments.contains("--ui-scroll-fixture") {
             d.notes=(0..<32).map {index in Item(["id":.string("scroll-note-\(index)"),"title":.string("笔记 \(index+1)"),"body":.string("滚动检查页面背景与悬浮控件。"),"updatedAt":.int(Clock.milliseconds-Int64(index))])}

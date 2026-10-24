@@ -100,7 +100,7 @@ public struct Document: Codable, Equatable, Sendable {
                   Money.currencies.contains(r.text("currency", fallback: "CNY")),
                   r.text("kind") == "reminder" || (1...Money.maximum).contains(r.int("cents")) else { throw AppError.message("账目内容或金额无效，请核对备份") }
         }
-        for n in notes { guard UUID(uuidString: n.id) != nil, !n.text("title").isEmpty, n.text("title").count <= 200, n.text("body").count <= 100_000 else { throw AppError.message("笔记内容无效") } }
+        for n in notes { guard UUID(uuidString: n.id) != nil, !n.text("title").isEmpty, n.text("title").count <= 200, n.text("body").count <= 100_000 else { throw AppError.message("笔记内容无效") };try NoteContent.validate(n) }
         for a in accounts { guard UUID(uuidString: a.id) != nil, !a.text("name").isEmpty, Money.currencies.contains(a.text("currency", fallback: "CNY")), (-Money.maximum...Money.maximum).contains(a.int("openingCents")) else { throw AppError.message("账户资料无效") } }
         guard Set(accounts.map { $0.text("currency", fallback: "CNY") + "|" + $0.text("name") }).count == accounts.count else { throw AppError.message("同币种账户名称重复") }
         let expenses = Dictionary(uniqueKeysWithValues: records.filter { $0.text("kind") == "expense" }.map { ($0.id, $0) })

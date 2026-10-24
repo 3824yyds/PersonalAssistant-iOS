@@ -1,12 +1,12 @@
-# 个人助理 iOS 3.5.1 · Build 4
+# 个人助理 iOS 3.5.1 · Build 5
 
 为 iPhone 设计的原生 SwiftUI 应用，包含加密笔记、多币种账本、卡包和智能助理。使用 iOS 26 SDK 构建，导航和控制层采用原生 Liquid Glass；最低支持 iOS 17，旧系统提供清晰的兼容显示。
 
 ## 安装者只有 iPhone
 
-交付目标为 `PersonalAssistant-iOS-3.5.1-build4-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
+交付目标为 `PersonalAssistant-iOS-3.5.1-build5-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
 
-没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build4-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
+没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build5-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
 
 保持签名工具使用的 Bundle ID 和签名配置稳定，有助于后续覆盖升级；不同签名方式的数据保留行为以工具与 iOS 为准。免费开发签名通常有有效期限制。首次使用前请导出加密备份。
 
@@ -46,10 +46,12 @@ API Key 单独保存在 `ThisDeviceOnly` 钥匙串。资料、草稿和聊天密
 
 只有成功的实际构建与测试日志才能证明对应检查通过。查看交付时生成的 `VERIFICATION.json`。仓库本身包含测试与构建流程，不代表已经完成 Xcode 构建、真机安装或中国运营商网络测试。
 
-详见 [签名安装说明](Docs/INSTALL.md)、[Build 4 改进](Docs/BUILD4.md) 和 [公开构建说明](Docs/OPEN_SOURCE.md)。
+详见 [签名安装说明](Docs/INSTALL.md)、[Build 5 改进](Docs/BUILD4.md) 和 [公开构建说明](Docs/OPEN_SOURCE.md)。
 
 ## 开源许可与云端构建
 
 原创应用代码、脚本、测试与文档采用 [MIT License](LICENSE)，第三方库、银行标识与图形素材的权利说明见 [NOTICE.md](NOTICE.md)。
 
 公开仓库采用标准 GitHub-hosted runner。完整流程只在 Actions 中手动点击 `Run workflow` 时运行，普通提交不会自动打包。核心测试使用 Ubuntu + Swift 6.0.3，iOS 18 / 26 测试与 IPA 构建使用标准 macOS runner。
+
+本次更新：[Build 5](Docs/BUILD5.md) · [债务记账与自动提醒规则](Docs/DEBT_MODEL.md)。

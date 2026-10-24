@@ -54,3 +54,9 @@ SOFTWARE.
 
 卡面与账户图形沿用用户提供的 Android 3.5.1 工程中的手绘素材。卡面公开参考来源见 CardArtwork.json。
 Qwen GGUF 权重由用户单独下载，不包含在本 IPA 中。
+
+Visa、Mastercard、American Express 品牌矢量标识：
+https://commons.wikimedia.org/wiki/File:Visa_Inc._logo_(2021–present).svg
+https://commons.wikimedia.org/wiki/File:Mastercard-logo.svg
+https://commons.wikimedia.org/wiki/File:American_Express_logo_(2018).svg
+标识权利归各品牌所有，不在本应用代码 MIT 许可范围。

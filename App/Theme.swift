@@ -96,7 +96,7 @@ struct AIOrb:View {
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body:some View {
         TimelineView(.animation(minimumInterval:1.0/24,paused:!active || reduced)) {timeline in
-            let time=active && !reduced ? timeline.date.timeIntervalSinceReferenceDate:0
+            let time=active && !reduced ? timeline.date.timeIntervalSinceReferenceDate*2.4:0
             Canvas {context,size in
                 let side=min(size.width,size.height)
                 let bounds=CGRect(x:(size.width-side)/2,y:(size.height-side)/2,width:side,height:side)

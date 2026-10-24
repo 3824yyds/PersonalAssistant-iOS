@@ -14,3 +14,14 @@
 ## Build 3 个人头像
 
 小猫、小熊、狐狸、猫头鹰按用户要求分别使用绘图工具重新绘制，各为独立方形满幅作品，头部居中且保持直立。应用统一进行正圆裁切，不在素材中预画圆框。资源采用 512px JPEG；仅进行常规尺寸与编码转换，未拼接成合图。
+
+
+## Build 5 卡组织矢量标识
+
+Visa、Mastercard、American Express 从以下品牌标识文件取得原始矢量路径，转换为 PDF 编入 Asset Catalog，保持比例与颜色，没有使用系统字体拼写品牌：
+
+- Visa：https://commons.wikimedia.org/wiki/File:Visa_Inc._logo_(2021–present).svg
+- Mastercard：https://commons.wikimedia.org/wiki/File:Mastercard-logo.svg
+- American Express：https://commons.wikimedia.org/wiki/File:American_Express_logo_(2018).svg
+
+这些品牌标识和既有银联标识用于卡片识别，属于各权利人，不在本项目 MIT 授权范围；不表示支付或银行连接功能。

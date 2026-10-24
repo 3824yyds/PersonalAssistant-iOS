@@ -95,5 +95,25 @@ final class DeepSeekWebTests:XCTestCase {
         let source=WebSource(title:"官方",url:"https://example.com",date:"2026-10-17")
         let current=ChatMessage(role:"assistant",content:"内容[1]",sources:[source])
         XCTAssertEqual(try JSONDecoder().decode(ChatMessage.self,from:JSONEncoder().encode(current)),current)
+        XCTAssertNil(message.images)
+        let image=ChatImage(jpeg:Data([0xff,0xd8,0xff,0xd9]))
+        let pictured=ChatMessage(role:"user",content:"图中有什么",images:[image])
+        XCTAssertEqual(try JSONDecoder().decode(ChatMessage.self,from:JSONEncoder().encode(pictured)),pictured)
+    }
+    @MainActor func testVisionSendsRealImageBlocksAndPreservesThemThroughSearch() async throws {
+        let image=ChatImage(jpeg:Data([0xff,0xd8,0xff,0xd9]))
+        WebProtocol.handler={request in
+            XCTAssertEqual(request.url?.host,"api.deepseek.com")
+            let body=try self.body(request)
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let blocks=try XCTUnwrap(messages.last?["content"] as? [[String:Any]])
+            XCTAssertEqual(blocks.last?["type"] as? String,"image_url")
+            XCTAssertTrue(((blocks.last?["image_url"] as? [String:String])?["url"] ?? "").hasPrefix("data:image/jpeg;base64,"))
+            XCTAssertEqual(body["model"] as? String,"deepseek-flash")
+            return (200,try self.sse(["content":"这是一张风景图片。颜色和场景均来自图像。 "]))
+        }
+        let messages:[[String:Any]]=[["role":"user","content":try ChatImage.content("看懂这张图",images:[image])]]
+        let result=try await client().answer(messages:messages,model:"deepseek-flash",onPartial:nil,onSources:nil,onStatus:nil)
+        XCTAssertTrue(result.0.contains("风景"))
     }
 }

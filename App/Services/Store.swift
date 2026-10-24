@@ -9,6 +9,7 @@ struct ChatMessage: Codable, Identifiable, Equatable, Sendable {
     var content: String
     var source: String = ""
     var sources:[WebSource]? = nil
+    var images:[ChatImage]? = nil
 }
 struct ChatSession: Codable, Identifiable, Equatable, Sendable {
     var id = UUID().uuidString
@@ -31,6 +32,7 @@ struct VoiceCaptureState:Equatable {
     @Published var activeSessionID = UUID().uuidString
     @Published var financeMode = false
     @Published var chatDraft = ""
+    @Published var chatImages:[ChatImage] = []
     @Published var voiceCapture:VoiceCaptureState?
     @Published var assistantBusy = false
     @Published var cloudEnabled = true
@@ -93,7 +95,8 @@ struct VoiceCaptureState:Equatable {
             // Each UI test receives its own deterministic in-memory content, even after relaunch.
             if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {d=DebugFixtures.document()}
             #endif
-            d.accounts = Finance.accounts(d); document = d; hasVault = true
+            d.accounts = Finance.accounts(d); d=Loans.refreshReminders(d); document = d; hasVault = true
+            NotificationService.sync(d.records)
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(d.settings.text("model",fallback:"deepseek-flash"))
             restoreAppearance(d)
             Keychain.delete("attempts"); epoch = UUID(); await loadHistory()
@@ -111,7 +114,8 @@ struct VoiceCaptureState:Equatable {
             guard let saved = try Keychain.read("vault-biometric",prompt:"解锁个人助理资料库") else { throw AppError.message("请先用密码解锁，并在设置中启用系统解锁") }
             let encrypted = try PrivateFiles.boundedRead(PrivateFiles.url())
             let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:saved)).validated()
-            key = saved; salt = try VaultCrypto.salt(encrypted); var next = d; next.accounts = Finance.accounts(d); document = next
+            key = saved; salt = try VaultCrypto.salt(encrypted); var next = d; next.accounts = Finance.accounts(d); next=Loans.refreshReminders(next);document = next
+            NotificationService.sync(next.records)
             cloudEnabled = d.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(d.settings.text("model",fallback:"deepseek-flash")); epoch = UUID(); await loadHistory()
             restoreAppearance(d)
         } catch { present(error) }
@@ -119,7 +123,7 @@ struct VoiceCaptureState:Equatable {
     func lock() {
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
-        document = nil; messages = []; sessions = []; chatDraft="";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
+        document = nil; messages = []; sessions = []; chatDraft="";chatImages=[];voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()
         LocalModel.shared.release()
     }
     func cancelReply() {
@@ -130,7 +134,7 @@ struct VoiceCaptureState:Equatable {
         guard var next = document, !busy else { return false }
         busy = true; let token = epoch; let key = key, salt = salt; defer { busy = false }
         do {
-            try change(&next); next = try next.validated(); let snapshot = next
+            try change(&next); next=Loans.refreshReminders(next);next = try next.validated(); let snapshot = next
             try await Task.detached(priority:.userInitiated) { try PrivateFiles.write(VaultCrypto.encrypt(snapshot.encoded(),key:key,salt:salt)) }.value
             guard token == epoch, document != nil else { return false }
             document = next; cloudEnabled = next.settings.bool("cloudEnabled",fallback:true); model = DeepSeekModels.current(next.settings.text("model",fallback:"deepseek-flash"))
@@ -181,7 +185,11 @@ struct VoiceCaptureState:Equatable {
     }
     private func persistHistory() async {
         guard document != nil,!key.isEmpty else{return}
-        do { let data = try JSONEncoder().encode(Array(sessions.prefix(100))), key = key, salt = salt
+        do {
+            var saved=Array(sessions.prefix(100))
+            var data=try JSONEncoder().encode(saved)
+            while data.count>24*1024*1024 && saved.count>1 {saved.removeLast();data=try JSONEncoder().encode(saved)}
+            let key=key,salt=salt
             try await Task.detached { try PrivateFiles.write(VaultCrypto.encrypt(data,key:key,salt:salt),name:"chat.pavault") }.value
         } catch { present(error) }
     }
@@ -194,5 +202,5 @@ struct VoiceCaptureState:Equatable {
             }
         } catch { self.error = "历史对话未能读取，当前资料库不受影响" }
     }
-    func newChat(finance:Bool?=nil) async {cancelReply();snapshotCurrentHistory();messages=[];activeSessionID=UUID().uuidString;if let finance {financeMode=finance};await persistHistory()}
+    func newChat(finance:Bool?=nil) async {cancelReply();snapshotCurrentHistory();messages=[];chatImages=[];activeSessionID=UUID().uuidString;if let finance {financeMode=finance};await persistHistory()}
 }

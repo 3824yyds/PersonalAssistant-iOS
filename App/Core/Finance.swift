@@ -35,6 +35,41 @@ public struct Totals: Equatable, Sendable {
 }
 
 public enum Finance {
+    /// Check day-end cash throughout the changed history. Existing bad balances remain editable,
+    /// but no operation may create or worsen a cash shortfall. Credit is an explicit debt account.
+    public static func validateCashChange(from before:Document,to after:Document) throws {
+        let calendar=Calendar.current,now=Clock.milliseconds
+        func end(_ milliseconds:Int64)->Int64 {
+            let date=Date(timeIntervalSince1970:Double(milliseconds)/1000)
+            return Int64((calendar.date(byAdding:.day,value:1,to:calendar.startOfDay(for:date)) ?? date).timeIntervalSince1970*1000)-1
+        }
+        func events(_ account:Item,_ document:Document)->[Int64:Int64] {
+            let start=account.int("openingDate",fallback:1),currency=account.text("currency",fallback:"CNY")
+            guard start<=now else {return [:]}
+            var result=[end(start):account.int("openingCents")]
+            let originals=Dictionary(document.records.map {($0.id,$0)},uniquingKeysWith:{$1})
+            for record in document.records where record.text("currency",fallback:"CNY")==currency && (start...now).contains(record.int("date")) {
+                let owner=record.text("kind")=="refund" ? originals[record.text("linkId")] ?? record:record
+                if owner.text("account",fallback:"默认账户")==account.text("name") {result[end(record.int("date")),default:0]+=Money.delta(record)}
+            }
+            for transfer in document.root.items("transfers") where (start...now).contains(transfer.int("date")) && transfer.text("currency")==currency {
+                if transfer.text("from")==account.id {result[end(transfer.int("date")),default:0]-=transfer.int("cents")}
+                if transfer.text("to")==account.id {result[end(transfer.int("date")),default:0]+=transfer.int("cents")}
+            }
+            for adjustment in document.root.items("adjustments") where adjustment.text("accountId")==account.id && (start...now).contains(adjustment.int("date")) {result[end(adjustment.int("date")),default:0]+=adjustment.int("cents")}
+            return result
+        }
+        for account in after.accounts where account.text("type") != "credit" {
+            guard let old=before.accounts.first(where:{$0.id==account.id}) else {continue}
+            let oldEvents=events(old,before),newEvents=events(account,after)
+            if oldEvents==newEvents {continue}
+            var oldBalance:Int64=0,newBalance:Int64=0
+            for day in Set(oldEvents.keys).union(newEvents.keys).sorted() {
+                oldBalance+=oldEvents[day] ?? 0;newBalance+=newEvents[day] ?? 0
+                guard newBalance>=min(0,oldBalance) else {throw AppError.message(account.text("name")+"在 "+Clock.day(Date(timeIntervalSince1970:Double(day)/1000))+" 的余额不足，不能完成此操作。请核对到账、期初余额或更换付款账户。")}
+            }
+        }
+    }
     public static func origin(_ r: Item, in d: Document) -> Item { r.text("kind") == "refund" ? d.records.first { $0.id == r.text("linkId") } ?? r : r }
     public static func accounts(_ d: Document) -> [Item] {
         var result = d.accounts
@@ -76,7 +111,7 @@ public enum Finance {
               !a.bool("archived"), !b.bool("archived"), a.text("currency", fallback: "CNY") == b.text("currency", fallback: "CNY"), cents > 0, cents <= Money.maximum else { throw AppError.message("请选择两个可用的同币种账户和有效金额") }
         var next = d
         let t = Item.make(["from":.string(from),"to":.string(to),"cents":.int(cents),"currency":.string(a.text("currency", fallback: "CNY")),"date":.int(Clock.milliseconds),"memo":.string(memo)])
-        next.upsert(t, in: "transfers"); return next
+        next.upsert(t, in: "transfers"); try validateCashChange(from:d,to:next); return next
     }
     public static func repay(_ d: Document, credit: Item, from: String, cents: Int64) throws -> Document {
         guard let a = d.accounts.first(where: { $0.id == from }), credit.text("type") == "credit", a.text("type") != "credit", cents <= max(0, -balance(credit, in:d)), balance(a,in:d) >= cents else { throw AppError.message("请核对欠款和还款账户余额") }
@@ -98,6 +133,7 @@ public enum Finance {
         let prev = select(d, month: prevDate, currency: currency), p = Totals(prev)
         let balances = d.accounts.filter { $0.text("currency", fallback: "CNY") == currency }.map { ($0, balance($0,in:d)) }
         let assets = balances.reduce(Int64(0)) { $0 + max(0, $1.1) }, debt = balances.reduce(Int64(0)) { $0 + max(0, -$1.1) }
+        let sheet=BalanceSheet(d,currency:currency)
         let categories = Dictionary(grouping: rs.filter { $0.text("kind") == "expense" }, by: { $0.text("category",fallback:"其他") }).map { ($0.key, $0.value.reduce(Int64(0)) { $0 + $1.int("cents") }) }.sorted { $0.1 > $1.1 }
         let budget = d.root.items("budgets").first { $0.text("month") == Clock.month(month) && $0.text("currency") == currency && $0.text("category").isEmpty }
         var s = "# \(Clock.month(month)) 月度财务报告\n\n币种：\(currency) · 仅依据已记录数据\n\n| 指标 | 金额 |\n|---|---:|\n| 收入 | \(Money.amount(t.income)) |\n| 支出 | \(Money.amount(t.expense)) |\n| 退款 | \(Money.amount(t.refund)) |\n| 结余 | \(Money.amount(t.surplus)) |\n| 当前账户资产 | \(Money.amount(assets)) |\n| 当前账户欠款 | \(Money.amount(debt)) |\n\n"
@@ -110,7 +146,7 @@ public enum Finance {
         if let top = categories.first { s += "- 本月最大支出类别是\(top.0)，可核对其中的固定支出与可调整支出。\n" }
         if t.income > 0 { s += "- 以必要月支出为基准逐步建立 3–6 个月应急金，金额应结合住房、家庭和工作稳定性调整。\n" }
         if rs.isEmpty { s += "- 本期没有流水，请先记录收入和必要支出，再制定预算。\n" }
-        s += "\n账户余额为当前值；月报收支为所选月份。手动资产、贷款和不同币种不在本表中相加。"
+        s += "\n\n## 当前资产与负债\n| 指标 | 金额 |\n|---|---:|\n| 总资产 | \(Money.amount(sheet.assets)) |\n| 账户欠款 | \(Money.amount(sheet.accountDebt)) |\n| 手动负债 | \(Money.amount(sheet.manualDebt)) |\n| 贷款待还本金 | \(Money.amount(sheet.loanDebt)) |\n| 总负债 | \(Money.amount(sheet.liabilities)) |\n| 净资产 | \(Money.amount(sheet.netWorth)) |\n\n借款到账不计收入，归还本金不计支出；利息和费用计入支出。未到期的预计利息不计入当前本金负债。账户及资产负债为当前值；月报收支为所选月份，各币种分别统计。"
         return s
     }
 }

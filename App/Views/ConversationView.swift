@@ -1,5 +1,6 @@
 import UIKit
 import SwiftUI
+import PhotosUI
 
 private struct BottomPreference:PreferenceKey {
     static let defaultValue:CGFloat=0
@@ -25,6 +26,14 @@ struct ConversationView:View {
     @State var follow=true
     @State var viewport:CGFloat=0
     @State var availableModels=["deepseek-flash","deepseek-v4-pro"]
+    @State private var photoPicker=false
+    @State private var loadingPhotos=false
+    @State private var selectedPhotos:[PhotosPickerItem]=[]
+    @State private var photoTask:Task<Void,Never>?
+    @State private var preferences=false
+    @State private var greeting=""
+    @AppStorage("chat.lastGreeting") private var lastGreeting=""
+    @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @FocusState var focused:Bool
     var body:some View {
         VStack(spacing:0) {
@@ -44,30 +53,34 @@ struct ConversationView:View {
                         .overlay(alignment:.bottom) {if !follow && !store.messages.isEmpty {Button {follow=true;withAnimation(Theme.normal) {proxy.scrollTo("latest",anchor:.bottom)}} label:{Label("回到最新",systemImage:"arrow.down").font(.caption).padding(10).background(.regularMaterial,in:Capsule())}.padding(.bottom,8)}}
                 }
             }.clipped()
-            VStack(spacing:8) {modePicker;composer}.layoutPriority(1)
+            VStack(spacing:8) {attachmentPreview;modePicker;composer}.layoutPriority(1)
         }
             .background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
             .onAppear {
+                refreshGreeting()
                 #if DEBUG
                 DebugFixtures.showThinking(in:store);DebugFixtures.showSearchResults(in:store)
                 #endif
                 store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}
             }
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
-            .onDisappear {cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
+            .onDisappear {photoTask?.cancel();cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
+            .onChange(of:store.model) {_,value in if !DeepSeekModels.supportsImages(value) {photoTask?.cancel();loadingPhotos=false;selectedPhotos=[];store.chatImages=[];photoPicker=false}}
+            .photosPicker(isPresented:$photoPicker,selection:$selectedPhotos,maxSelectionCount:ChatImage.maximumCount,matching:.images)
+            .onChange(of:selectedPhotos) {_,photos in loadPhotos(photos)}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
+            .onChange(of:store.financeMode) {_,_ in refreshGreeting()}
+            .sheet(isPresented:$preferences) {NavigationStack {ChatPreferencesView()}.environmentObject(store)}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
     }
     var header:some View {
         HStack(spacing:8) {
             Button {focused=false;onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
-            if !finance {
                 Menu {
                     ForEach(availableModels,id:\.self) {model in Button {Task {await store.setting("model",.string(model))}} label:{HStack {Text(modelLabel(model));if store.model==model {Image(systemName:"checkmark")}}}}
                     Button("刷新可用模型") {Task {do {availableModels=try await AIService.models()}catch{store.present(error)}}}
                 } label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
                     .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
-            } else {Text("财务咨询").font(.system(size:15,weight:.medium))}
             Spacer(minLength:0)
             HeaderControls(sheet:$sheet)
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
@@ -86,10 +99,14 @@ struct ConversationView:View {
     var composer:some View {
         HStack(alignment:.bottom,spacing:8) {
             Menu {
+                if DeepSeekModels.supportsImages(store.model) {
+                    Section {Button("上传图片",systemImage:"photo") {focused=false;photoPicker=true}.accessibilityIdentifier("chat.menu.photos")} footer:{Text("最多 4 张。图片随消息发送给 DeepSeek Flash，并保存在本机加密聊天记录中。")}
+                }
                 Section {
                     Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
                 } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
+                    Button("回复风格",systemImage:"slider.horizontal.3") {focused=false;preferences=true}.accessibilityIdentifier("chat.menu.preferences")
                     Button("新对话",systemImage:"square.and.pencil") {focused=false;Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {focused=false;history=true}.accessibilityIdentifier("chat.menu.history")
                 }
@@ -110,10 +127,42 @@ struct ConversationView:View {
                 if voiceMode {Task {_=await speech.prepare()}}
             } label:{Image(systemName:voiceMode ? "keyboard":"mic").font(.system(size:20)).frame(width:36,height:42)}
                 .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || holding || speech.finishing)
-            if (!voiceMode && !input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty) || store.assistantBusy {
-                Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(!store.assistantBusy && input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty).padding(.bottom,4)
+            if (!voiceMode && (!input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !store.chatImages.isEmpty)) || store.assistantBusy {
+                Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(loadingPhotos).padding(.bottom,4)
             }
         }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
+    }
+    @ViewBuilder private var attachmentPreview:some View {
+        if loadingPhotos {ProgressView("正在准备图片…").font(.caption)}
+        if !store.chatImages.isEmpty {
+            ScrollView(.horizontal,showsIndicators:false) {
+                HStack(spacing:10) {ForEach(store.chatImages) {image in
+                    if let preview=UIImage(data:image.jpeg) {
+                        Image(uiImage:preview).resizable().scaledToFill().frame(width:64,height:64).clipShape(RoundedRectangle(cornerRadius:12))
+                            .overlay(alignment:.topTrailing) {Button {store.chatImages.removeAll {$0.id==image.id}} label:{Image(systemName:"xmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(.white,.black.opacity(0.7)).padding(3)}.accessibilityLabel("移除图片")}
+                    }
+                }}.padding(.horizontal,16)
+            }.accessibilityIdentifier("chat.attachments")
+        }
+    }
+    private func loadPhotos(_ photos:[PhotosPickerItem]) {
+        photoTask?.cancel();guard !photos.isEmpty else {return};loadingPhotos=true
+        let epoch=store.epoch,session=store.activeSessionID
+        photoTask=Task {
+            defer {loadingPhotos=false}
+            do {
+                var images:[ChatImage]=[]
+                for item in photos.prefix(ChatImage.maximumCount) {
+                    try Task.checkCancellation()
+                    guard let data=try await item.loadTransferable(type:Data.self) else {throw AppError.message("无法从相册读取图片")}
+                    let image=try await Task.detached(priority:.userInitiated) {try ChatImageService.prepare(data)}.value
+                    images.append(image)
+                }
+                try Task.checkCancellation()
+                guard store.epoch==epoch,store.activeSessionID==session,DeepSeekModels.supportsImages(store.model) else {return}
+                store.chatImages=images
+            } catch is CancellationError {} catch {store.present(error)}
+        }
     }
     var voiceGesture:some Gesture {
         DragGesture(minimumDistance:0,coordinateSpace:.global)
@@ -141,22 +190,37 @@ struct ConversationView:View {
     var welcome:some View {
         VStack(spacing:18) {
             AIOrb(active:true).frame(width:88,height:88).accessibilityIdentifier("assistant.orb")
-            Text(finance ? "一起理清你的财务":"今天心情怎么样？").font(.system(size:28,weight:.regular)).multilineTextAlignment(.center).frame(maxWidth:290)
+            Text(greeting).font(.system(size:28,weight:.regular)).multilineTextAlignment(.center).frame(maxWidth:290)
         }.frame(maxWidth:.infinity).accessibilityElement(children:.contain).accessibilityIdentifier("assistant.greeting")
+    }
+    private func refreshGreeting() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-layout-fixture") {greeting=finance ? "一起理清你的财务":"今天心情怎么样？";return}
+        #endif
+        greeting=ChatGreetings.next(after:finance ? lastFinanceGreeting:lastGreeting,finance:finance)
+        if finance {lastFinanceGreeting=greeting} else {lastGreeting=greeting}
     }
     func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
     func send() {
-        let question=input.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard !question.isEmpty,!store.assistantBusy else{return}
+        let images=store.chatImages
+        var question=input.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard (!question.isEmpty || !images.isEmpty),!store.assistantBusy,!loadingPhotos else{return}
+        if question.isEmpty {question="请描述并分析这些图片。"}
+        if !images.isEmpty {
+            guard DeepSeekModels.supportsImages(store.model),store.cloudEnabled,store.hasAPIKey else {store.error="图片理解需要选择 DeepSeek Flash，并开启云端智能、配置 API Key";return}
+            let stored=store.messages.flatMap {$0.images ?? []}.reduce(0) {$0+$1.jpeg.count}
+            guard stored+images.reduce(0,{$0+$1.jpeg.count})<=12*1024*1024 else {store.error="本对话图片较多，请新建对话后继续发送";return}
+        }
         guard question.count<=20000 else {store.error="消息过长，请分段发送";return}
         input="";focused=false;follow=true
         let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model,searchEnabled=webSearch
-        store.messages.append(ChatMessage(role:"user",content:question))
+        let user=ChatMessage(role:"user",content:question,images:images.isEmpty ? nil:images)
+        store.messages.append(user);store.chatImages=[];selectedPhotos=[]
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
         store.activeTask=Task {
             defer {if store.epoch==epoch && store.activeReplyID==answerID {store.assistantBusy=false;store.activeReplyID=nil}}
             do {
-                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,onPartial:{partial in
+                let (text,source)=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,onPartial:{partial in
                     guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=partial
                 },onSources:{sources in
                     guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].sources=sources
@@ -165,7 +229,7 @@ struct ConversationView:View {
                 })
                 try Task.checkCancellation();guard store.epoch==epoch,store.activeReplyID==answerID,let i=store.messages.firstIndex(where:{$0.id==answerID}) else{return};store.messages[i].content=text;store.messages[i].source=source;await store.saveHistory()
             }catch is CancellationError {if store.epoch==epoch,let i=store.messages.firstIndex(where:{$0.id==answerID}),store.messages[i].content.isEmpty {store.messages.remove(at:i)}}
-            catch {if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};store.present(error)}}
+            catch {if !Task.isCancelled,store.epoch==epoch,store.activeReplyID==answerID {store.messages.removeAll {$0.id==answerID};if !images.isEmpty {store.messages.removeAll {$0.id==user.id};store.chatImages=images;input=question};store.present(error)}}
         }
     }
 }
@@ -178,6 +242,9 @@ struct ChatBubble:View {
             VStack(alignment:.leading,spacing:8) {
                 if message.role != "user" {Text(message.source).font(.system(size:10)).foregroundStyle(.secondary)}
                 VStack(alignment:.leading,spacing:10) {
+                    if let images=message.images,!images.isEmpty {
+                        ForEach(images) {image in if let preview=UIImage(data:image.jpeg) {Image(uiImage:preview).resizable().scaledToFit().frame(maxWidth:220,maxHeight:220).clipShape(RoundedRectangle(cornerRadius:12)).accessibilityLabel("已发送的图片")}}
+                    }
                     if message.content.isEmpty && working {Text("正在思考…").font(.subheadline).aiText(revealing:true).padding(.vertical,4)}
                     else {MarkdownBody(text:WebEvidence.cited(message.content,sources:message.sources ?? [])).aiText(revealing:working && message.role != "user")}
                 }.padding(message.role=="user" ? 13:0)

@@ -10,22 +10,39 @@ public struct Installment: Identifiable, Sendable {
 public enum Loans {
     public static func schedule(_ l: Item) throws -> [Installment] {
         let months = Int(l.int("months",fallback:12)), amount = l.int("principalCents")
-        guard (1...480).contains(months), (1...Money.maximum).contains(amount), (0...20000).contains(l.int("annualBps")), let first = Clock.date(l.text("firstDue")), (0...Money.maximum).contains(l.int("monthlyFeeCents")), ["annuity","principal","bullet","flat"].contains(l.text("method",fallback:"annuity")) else { throw AppError.message("请核对本金、期限、日期和年利率") }
-        var remaining = amount, result: [Installment] = []
+        guard (1...480).contains(months), (1...Money.maximum).contains(amount), (0...20000).contains(l.int("annualBps")), let first = Clock.date(l.text("firstDue")), (0...Money.maximum).contains(l.int("monthlyFeeCents")), ["annuity","principal","bullet","flat","lump"].contains(l.text("method",fallback:"annuity")) else { throw AppError.message("请核对本金、期限、日期和年利率") }
+        let changes=l.items("rateChanges")
+        guard changes.count<=480, Set(changes.map {$0.text("from")}).count==changes.count,
+              changes.allSatisfy({Clock.date($0.text("from")) != nil && (0...20000).contains($0.int("annualBps"))}) else { throw AppError.message("利率调整日期重复或年利率无效") }
+        let custom=l.items("customSchedule")
+        if !custom.isEmpty {
+            guard custom.count==months else { throw AppError.message("合同计划期数不完整") }
+            var rows:[Installment]=[]
+            for (index,row) in custom.enumerated() {
+                guard row.int("period")==index+1, let date=Clock.date(row.text("date")),
+                      rows.last.map({date>$0.date}) ?? true,
+                      [row.int("principalCents"),row.int("interestCents"),row.int("feeCents")].allSatisfy({(0...Money.maximum).contains($0)}) else { throw AppError.message("请核对合同计划的日期顺序和金额") }
+                rows.append(Installment(id:index+1,date:date,principal:row.int("principalCents"),interest:row.int("interestCents"),fee:row.int("feeCents")))
+            }
+            guard rows.reduce(Int64(0),{$0+$1.principal})<=amount else { throw AppError.message("计划本金合计超过登记本金") }
+            return rows
+        }
+        var remaining = amount, result: [Installment] = [], accrued:Int64=0
         for period in 1...months {
             let date = Calendar.current.date(byAdding:.month,value:period-1,to:first) ?? first
-            let changes = l.items("rateChanges").filter { $0.text("from") <= Clock.day(date) }.sorted { $0.text("from") < $1.text("from") }
-            let bps = changes.last?.int("annualBps") ?? l.int("annualBps")
+            let applicable = changes.filter { $0.text("from") <= Clock.day(date) }.sorted { $0.text("from") < $1.text("from") }
+            let bps = applicable.last?.int("annualBps") ?? l.int("annualBps")
             let r = Decimal(bps) / Decimal(120_000)
             let method = l.text("method",fallback:"annuity")
-            let interest = rounded(Decimal(method == "flat" ? amount : remaining)*r)
+            var interest = rounded(Decimal(method == "flat" ? amount : remaining)*r)
+            if method == "lump" { accrued+=interest;interest=period==months ? accrued:0 }
             let n = months-period+1
             let principal: Int64
             if period == months { principal = remaining }
-            else if method == "bullet" { principal = 0 }
+            else if method == "bullet" || method == "lump" { principal = 0 }
             else if method == "principal" || method == "flat" { principal = amount / Int64(months) }
             else if r == 0 { principal = remaining / Int64(n) }
-            else { var factor=Decimal(1); for _ in 0..<n { factor *= 1+r }; let payment = rounded(Decimal(remaining)*r*factor/(factor-1)); principal = max(0,min(remaining,payment-interest)) }
+            else { var discount=Decimal(1); for _ in 0..<n { discount /= 1+r }; let payment = rounded(Decimal(remaining)*r/(1-discount)); principal = max(0,min(remaining,payment-interest)) }
             remaining -= principal
             result.append(Installment(id:period,date:date,principal:principal,interest:interest,fee:l.int("monthlyFeeCents")))
         }

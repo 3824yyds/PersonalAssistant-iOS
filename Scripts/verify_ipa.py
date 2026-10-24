@@ -19,8 +19,8 @@ with zipfile.ZipFile(p) as z:
     assert not encrypted,'A re-signable build must not be App Store encrypted'
     assert b'MIT' in z.read('Payload/PersonalAssistant.app/OpenSourceLicenses.txt'),'Bundled open-source license is required'
     assert info['CFBundleShortVersionString']=='3.5.1'
-    assert info['CFBundleVersion']=='4'
+    assert info['CFBundleVersion']=='5'
     assert str(info.get('DTSDKName','')).startswith('iphoneos26'), 'An iOS 26 SDK build is required'
-    result={'version':'3.5.1','build':'4','sdk':info.get('DTSDKName'),'platform':'iOS device','architecture':'arm64','unsigned':True,'fairplay_encrypted':False,'minimum_ios':info.get('MinimumOSVersion'),'bundle_id':info['CFBundleIdentifier'],'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'device_installation_verified':False}
+    result={'version':'3.5.1','build':'5','sdk':info.get('DTSDKName'),'platform':'iOS device','architecture':'arm64','unsigned':True,'fairplay_encrypted':False,'minimum_ios':info.get('MinimumOSVersion'),'bundle_id':info['CFBundleIdentifier'],'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'device_installation_verified':False}
     p.with_suffix('.verification.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result,indent=2))

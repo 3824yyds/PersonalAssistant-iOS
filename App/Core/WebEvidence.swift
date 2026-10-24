@@ -92,9 +92,10 @@ struct DeepSeekStreamMessage {
 }
 
 enum DeepSeekModels {
+    static func supportsImages(_ value:String)->Bool {current(value)=="deepseek-flash"}
     static func current(_ value:String)->String {
         switch value {
-        case "deepseek-chat","deepseek-reasoner","":return "deepseek-flash"
+        case "deepseek-chat","deepseek-reasoner","deepseek-v4-flash","deepseek-v4-flash-vision-exp","":return "deepseek-flash"
         default:return value
         }
     }

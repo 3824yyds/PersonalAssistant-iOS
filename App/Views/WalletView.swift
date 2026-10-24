@@ -13,13 +13,13 @@ struct WalletView: View {
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
-                HStack {Text("我的卡片 · \(cards.count)").font(.headline);Spacer();if cards.count>2 {Button(expanded ? "收起":"查看全部") {withAnimation(Theme.normal) {expanded.toggle();selected=nil}}.font(.caption)}}
+                HStack {Text("我的卡片 · \(cards.count)").font(.headline);Spacer();if cards.count>2 {Button(expanded ? "收起":"查看全部") {withAnimation(.spring(response:0.5,dampingFraction:0.88)) {expanded.toggle();selected=nil}}.font(.caption)}}
                 if cards.isEmpty {EmptyState(icon:"creditcard",title:"把账户收进卡包",subtitle:"添加银行卡或信用卡，余额会与账本同步")}
                 WalletStackLayout(expansion:expanded || cards.count<=2 ? 1:0) {
                     ForEach(cards) {a in
                         VStack(spacing:0) {
                             Button {
-                                if !expanded && cards.count>2 {withAnimation(Theme.normal) {expanded=true};return}
+                                if !expanded && cards.count>2 {withAnimation(.spring(response:0.5,dampingFraction:0.88)) {expanded=true};return}
                                 withAnimation(Theme.normal) {selected=selected==a.id ? nil:a.id}
                             } label:{CardFace(account:a,card:store.current.wallet.items("cards").first {$0.text("accountId")==a.id})}.buttonStyle(.plain).accessibilityIdentifier("wallet.card.\(a.id)")
                             if selected==a.id && (expanded || cards.count<=2) {
@@ -39,20 +39,30 @@ struct WalletView: View {
 
 /// Each folded card keeps a visible strip; height follows the actual card ratio, not a negative spacing constant.
 struct WalletStackLayout:Layout {
+    struct Cache {var width:CGFloat = -1;var sizes:[CGSize]=[]}
+    func makeCache(subviews:Subviews)->Cache {Cache()}
+    func updateCache(_ cache:inout Cache,subviews:Subviews) {cache=Cache()}
+    func measure(width:CGFloat,subviews:Subviews,cache:inout Cache) {
+        if cache.width != width || cache.sizes.count != subviews.count {
+            cache.width=width;cache.sizes=subviews.map {$0.sizeThatFits(ProposedViewSize(width:width,height:nil))}
+        }
+    }
     var expansion:CGFloat
     var animatableData:CGFloat {get {expansion} set {expansion=newValue}}
-    func sizeThatFits(proposal:ProposedViewSize,subviews:Subviews,cache:inout ()) -> CGSize {
+    func sizeThatFits(proposal:ProposedViewSize,subviews:Subviews,cache:inout Cache) -> CGSize {
         let width=proposal.width ?? 320
-        let sizes=subviews.map {$0.sizeThatFits(ProposedViewSize(width:width,height:nil))}
+        measure(width:width,subviews:subviews,cache:&cache)
+        let sizes=cache.sizes
         let height=sizes.enumerated().reduce(CGFloat(0)) {sum,entry in
             sum + (entry.offset==sizes.count-1 ? entry.element.height:60+(entry.element.height+16-60)*expansion)
         }
         return CGSize(width:width,height:height)
     }
-    func placeSubviews(in bounds:CGRect,proposal:ProposedViewSize,subviews:Subviews,cache:inout ()) {
+    func placeSubviews(in bounds:CGRect,proposal:ProposedViewSize,subviews:Subviews,cache:inout Cache) {
         var y=bounds.minY
-        for view in subviews {
-            let size=view.sizeThatFits(ProposedViewSize(width:bounds.width,height:nil))
+        measure(width:bounds.width,subviews:subviews,cache:&cache)
+        for (index,view) in subviews.enumerated() {
+            let size=cache.sizes[index]
             view.place(at:CGPoint(x:bounds.minX,y:y),anchor:.topLeading,proposal:ProposedViewSize(width:bounds.width,height:size.height))
             y += 60+(size.height+16-60)*expansion
         }
@@ -95,13 +105,13 @@ struct CardFace:View {
 struct NetworkMark:View {
     var network:String
     var body:some View {Group {
-        if network=="mastercard" {ZStack {Circle().fill(Color(red:0.92,green:0,blue:0.1)).offset(x:-8);Circle().fill(Color(red:0.98,green:0.62,blue:0.1)).blendMode(.plusLighter).offset(x:8)}.frame(width:36,height:23)}
-        else if network=="visa" {Text("VISA").font(.system(size:18,weight:.heavy,design:.rounded)).italic()}
+        if network=="mastercard" {Image("NetworkMastercard").resizable().scaledToFit().frame(width:38,height:25)}
+        else if network=="visa" {Image("NetworkVisa").resizable().scaledToFit().frame(width:38,height:25)}
         else if network=="unionpay" {Image("NetworkUnionPay").resizable().scaledToFit().frame(width:38,height:25)}
         else if network=="unionpay_mastercard" {HStack(spacing:5) {NetworkMark(network:"unionpay");NetworkMark(network:"mastercard")}}
         else if network=="unionpay_visa" {HStack(spacing:5) {NetworkMark(network:"unionpay");NetworkMark(network:"visa")}}
-        else if network=="amex" {Text("AMEX").font(.system(size:11,weight:.bold)).padding(4).background(.blue,in:RoundedRectangle(cornerRadius:3))}
-    }.accessibilityHidden(true)}
+        else if network=="amex" {Image("NetworkAmex").resizable().scaledToFit().frame(width:38,height:25)}
+    }.padding(network.contains("_") ? 0:3).background(network.contains("_") ? Color.clear:Color.white.opacity(0.96),in:RoundedRectangle(cornerRadius:4)).accessibilityHidden(true)}
 }
 
 struct CardDetailsView:View {
@@ -250,24 +260,63 @@ struct TransferView:View {
 
 struct AssetsView:View {
     @EnvironmentObject var store:AppStore
-    @State var editing:Item?
-    @State var adding=false
-    var body:some View {List {
-        Section("手动资产与负债") {ForEach(store.current.wallet.items("assets")) {a in Button {editing=a} label:{HStack {VStack(alignment:.leading,spacing:5) {Text(a.text("name"));Text(a.text("kind")=="debt" ? "负债":"资产").font(.caption).foregroundStyle(.secondary)};Spacer();Amount(cents:a.int("cents"),currency:a.text("currency",fallback:"CNY"))}}}.onDelete {indices in let ids=Set(indices.map {store.current.wallet.items("assets")[$0].id});Task {await store.commit {d in var w=d.wallet;w.set("assets",items:w.items("assets").filter {!ids.contains($0.id)});d.wallet=w}}}}
-        Section {Button("添加资产",systemImage:"plus") {adding=true}}
-    }.navigationTitle("资产管理").navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented:$adding) {NavigationStack {AssetEditor()}.environmentObject(store)}
-        .sheet(item:$editing) {a in NavigationStack {AssetEditor(asset:a)}.environmentObject(store)}
+    @State private var editing:Item?
+    @State private var adding=false
+    @State private var addingDebt=false
+    @State private var currency="CNY"
+    var manual:[Item] {store.current.wallet.items("assets").filter {$0.text("currency",fallback:"CNY")==currency}}
+    var body:some View {
+        List {
+            Section {
+                Picker("币种",selection:$currency) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}}
+                let total=BalanceSheet(store.current,currency:currency)
+                LabeledContent("总资产",value:Money.format(total.assets,currency:currency))
+                LabeledContent("总负债",value:Money.format(total.liabilities,currency:currency)).accessibilityIdentifier("assets.liabilities")
+                LabeledContent("净资产",value:Money.format(total.netWorth,currency:currency))
+            } footer:{Text("按币种分别计算。负债包含账户欠款、贷款待还本金及手动负债；未来预计利息不计入本金负债。")}
+            Section("手动资产") {
+                ForEach(manual.filter {$0.text("kind") != "debt"}) {asset in manualRow(asset)}
+                Button("添加资产",systemImage:"plus") {adding=true}
+            }
+            Section {
+                ForEach(manual.filter {$0.text("kind")=="debt"}) {asset in manualRow(asset)}
+                Button("添加负债",systemImage:"plus") {addingDebt=true}.accessibilityIdentifier("assets.addDebt")
+            } header:{Text("手动负债")} footer:{Text("仅登记未在账户欠款或贷款中管理的负债，避免重复计算。需要自动还款计划和提醒，请登记贷款。")}
+            if currency=="CNY" {
+                Section("贷款负债 · 自动同步") {
+                    ForEach(store.current.wallet.items("loans").filter {Loans.outstanding($0,in:store.current)>0}) {loan in
+                        NavigationLink {LoanDetailView(loanID:loan.id)} label:{HStack {Text(loan.text("name"));Spacer();Amount(cents:Loans.outstanding(loan,in:store.current),currency:"CNY")}}
+                    }
+                    NavigationLink("管理贷款与还款",destination:LoansView())
+                }
+            }
+            Section("账户欠款 · 自动同步") {
+                ForEach(store.current.accounts.filter {$0.text("currency",fallback:"CNY")==currency && Finance.balance($0,in:store.current)<0}) {account in
+                    NavigationLink {AccountEditor(account:account)} label:{HStack {Text(account.text("name"));Spacer();Amount(cents:-Finance.balance(account,in:store.current),currency:currency)}}
+                }
+            }
+        }.navigationTitle("资产与负债").navigationBarTitleDisplayMode(.inline).onAppear {currency=store.currency}
+            .sheet(isPresented:$adding) {NavigationStack {AssetEditor()}.environmentObject(store)}
+            .sheet(isPresented:$addingDebt) {NavigationStack {AssetEditor(initialKind:"debt")}.environmentObject(store)}
+            .sheet(item:$editing) {asset in NavigationStack {AssetEditor(asset:asset)}.environmentObject(store)}
+    }
+    private func manualRow(_ asset:Item)->some View {
+        Button {editing=asset} label:{HStack {Text(asset.text("name"));Spacer();Amount(cents:asset.int("cents"),currency:currency)}}
+            .swipeActions {Button("删除",role:.destructive) {Task {await store.commit {document in
+                guard !document.wealth.items("positions").contains(where:{$0.text("assetId")==asset.id}) else {throw AppError.message("投资持仓请在投资管理中处理")}
+                var wallet=document.wallet;wallet.set("assets",items:wallet.items("assets").filter {$0.id != asset.id});document.wallet=wallet
+            }}}}
     }
 }
 struct AssetEditor:View {
     @EnvironmentObject var store:AppStore
     @Environment(\.dismiss) var dismiss
     var asset:Item?
+    var initialKind="fund"
     @State var name=""
     @State var amount=""
     @State var currency="CNY"
     @State var kind="fund"
     @State var memo=""
-    var body:some View {Form {TextField("资产名称",text:$name);Picker("类型",selection:$kind) {Text("基金").tag("fund");Text("股票").tag("stock");Text("房产").tag("property");Text("独立存款").tag("deposit");Text("其他资产").tag("other");Text("其他负债").tag("debt")};Picker("币种",selection:$currency) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}};TextField("估值金额",text:$amount).keyboardType(.decimalPad);TextField("备注",text:$memo);Text("与账户存款分开记录，避免将同一笔资产重复计入。").font(.caption).foregroundStyle(.secondary)}.navigationTitle(asset==nil ? "添加资产":"编辑资产").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {do {guard !name.isEmpty else {throw AppError.message("请填写资产名称")};var a=asset ?? Item.make();a.set("name",name);a.set("kind",kind);a.set("currency",currency);a.set("cents",try Money.parse(amount,allowZero:true));a.set("valuedAt",Clock.milliseconds);a.set("memo",memo);Task {if await store.commit({$0.upsertWallet(a,in:"assets")}) {dismiss()}}}catch{store.present(error)}}}}.onAppear {currency=store.currency;if let a=asset {name=a.text("name");kind=a.text("kind");currency=a.text("currency");amount=Money.amount(a.int("cents"));memo=a.text("memo")}}}
+    var body:some View {Form {TextField(kind=="debt" ? "负债名称":"资产名称",text:$name);Picker("类型",selection:$kind) {Text("基金").tag("fund");Text("股票").tag("stock");Text("房产").tag("property");Text("独立存款").tag("deposit");Text("其他资产").tag("other");Text("其他负债").tag("debt")};Picker("币种",selection:$currency) {ForEach(Money.currencies,id:\.self) {Text($0).tag($0)}};TextField(kind=="debt" ? "待还金额":"估值金额",text:$amount).keyboardType(.decimalPad);TextField("备注",text:$memo);Text("与账户存款分开记录，避免将同一笔资产重复计入。").font(.caption).foregroundStyle(.secondary)}.navigationTitle(asset==nil ? (initialKind=="debt" ? "添加负债":"添加资产"):(kind=="debt" ? "编辑负债":"编辑资产")).navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {do {guard !name.isEmpty else {throw AppError.message("请填写资产名称")};var a=asset ?? Item.make();a.set("name",name);a.set("kind",kind);a.set("currency",currency);a.set("cents",try Money.parse(amount,allowZero:true));a.set("valuedAt",Clock.milliseconds);a.set("memo",memo);Task {if await store.commit({$0.upsertWallet(a,in:"assets")}) {dismiss()}}}catch{store.present(error)}}}}.onAppear {currency=store.currency;kind=initialKind;if let a=asset {name=a.text("name");kind=a.text("kind");currency=a.text("currency");amount=Money.amount(a.int("cents"));memo=a.text("memo")}}}
 }
