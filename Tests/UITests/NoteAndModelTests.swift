@@ -11,15 +11,17 @@ final class NoteAndModelTests:XCTestCase {
         // A standalone page starts at the status bar, without the sheet's top gap.
         XCTAssertLessThan(app.buttons["note.back"].frame.minY,100)
         XCTAssertFalse(app.buttons["main.navigation"].isHittable)
-        fill(title,"应该被放弃的标题")
+        title.tap();title.typeText("应该被放弃的标题")
         app.buttons["note.back"].tap()
         XCTAssertTrue(row.waitForExistence(timeout:5));row.tap()
         XCTAssertTrue(title.waitForExistence(timeout:5));XCTAssertEqual(title.value as? String,original)
         XCTAssertFalse(app.staticTexts["找到未保存的笔记草稿"].exists)
-        fill(title,"单独页面保存检查")
+        title.tap();title.typeText("单独页面保存检查")
+        let edited=title.value as? String
+        XCTAssertTrue(edited?.contains("单独页面保存检查") == true)
         app.buttons["note.done"].tap()
         XCTAssertTrue(row.waitForExistence(timeout:8));row.tap()
-        XCTAssertTrue(title.waitForExistence(timeout:5));XCTAssertEqual(title.value as? String,"单独页面保存检查")
+        XCTAssertTrue(title.waitForExistence(timeout:5));XCTAssertEqual(title.value as? String,edited)
         recordScreen(app,"StandaloneNoteEditor")
     }
     func testQuickNoteBackDiscardsNewNoteAndItsDraft() {

@@ -427,7 +427,7 @@ private struct ChatModelSlider:View {
                             guard !disabled else{dragging=nil;return}
                             commit(value.location.x < geometry.size.width/2 ? 0:1);dragging=nil
                         })
-            }.frame(height:86).accessibilityIdentifier("chat.model.slider")
+            }.frame(height:86)
         }.padding(20).frame(width:280)
             .animation(reduceMotion ? nil:Theme.normal,value:active)
             .disabled(disabled)
