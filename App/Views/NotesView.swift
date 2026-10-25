@@ -350,8 +350,8 @@ struct NoteEditor:View {
         cancelOperation()
         draftTask?.cancel()
         // The draft file is shared across notes; discard only this editor's slot.
-        let url=PrivateFiles.url("note-draft.pavault")
-        if let bytes=try? PrivateFiles.boundedRead(url),
+        if let url=try? PrivateFiles.url("note-draft.pavault"),
+           let bytes=try? PrivateFiles.boundedRead(url),
            let plain=try? VaultCrypto.decrypt(bytes,key:store.key),
            let draft=try? JSONDecoder().decode(Item.self,from:plain),
            draft.text("slot") == (baseNote?.id ?? "new") {
