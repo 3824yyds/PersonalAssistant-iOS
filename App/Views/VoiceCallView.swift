@@ -8,6 +8,7 @@ struct VoiceCallView:View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var call=VoiceCallSession()
     @State private var awaitingReply:String?
+    @State private var replyWaitTask:Task<Void,Never>?
     @State private var transcriptVisible=false
     @AppStorage("voice.showCaptions") private var captions=true
     @AppStorage("voice.rate") private var rate=0.5
@@ -41,6 +42,11 @@ struct VoiceCallView:View {
                 }
             }.padding(.horizontal,28).padding(.top,28)
             Spacer(minLength:20)
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--ui-voice-call-fixture") {
+                Button("模拟一句语音") {call.previewUtterance("你好")}.accessibilityIdentifier("voice.call.fixtureUtterance")
+            }
+            #endif
             HStack(spacing:24) {
                 Button {call.toggleMute()} label:{Image(systemName:call.isMuted ? "mic.slash.fill":"mic.fill").font(.system(size:24)).frame(width:64,height:64).appGlass(Circle(),interactive:true)}
                     .accessibilityLabel(call.isMuted ? "取消静音":"静音麦克风").accessibilityValue(call.isMuted ? "已静音":"未静音").accessibilityIdentifier("voice.call.mute")
@@ -53,7 +59,14 @@ struct VoiceCallView:View {
                 call.onUtterance={text in
                     guard store.document != nil,!store.assistantBusy else{call.fail("当前对话尚未就绪，请稍后继续");return}
                     onSend(text);awaitingReply=store.activeReplyID
-                    if awaitingReply==nil {call.fail(store.error ?? "这句话未能发送，请重试")}
+                    guard let id=awaitingReply,let task=store.activeTask else{call.fail(store.error ?? "这句话未能发送，请重试");return}
+                    replyWaitTask=Task {
+                        await task.value
+                        guard !Task.isCancelled,awaitingReply==id,call.phase == .thinking else{return}
+                        awaitingReply=nil
+                        if let answer=store.messages.first(where:{$0.id==id}),!answer.content.isEmpty {call.speak(answer.content)}
+                        else {call.fail(store.error ?? "没有收到回复，请继续通话后重试")}
+                    }
                 }
                 store.speech=call.speech
                 #if DEBUG
@@ -62,12 +75,6 @@ struct VoiceCallView:View {
                 call.start()
             }
             .onChange(of:rate) {_,value in call.rate=Float(value)}
-            .onChange(of:store.assistantBusy) {_,busy in
-                guard !busy,let id=awaitingReply else{return};awaitingReply=nil
-                guard scenePhase == .active,call.phase == .thinking else{return}
-                if let answer=store.messages.first(where:{$0.id==id}),!answer.content.isEmpty {call.speak(answer.content)}
-                else {call.fail(store.error ?? "没有收到回复，请继续通话后重试")}
-            }
             .onChange(of:scenePhase) {_,phase in
                 // Permission alerts temporarily make the app inactive before any recording starts.
                 if phase == .background || (phase == .inactive && call.phase != .connecting) {pause()}
@@ -86,6 +93,7 @@ struct VoiceCallView:View {
             }
     }
     private func cancelReply() {
+        replyWaitTask?.cancel();replyWaitTask=nil
         let owned=awaitingReply;awaitingReply=nil
         if let owned,store.activeReplyID==owned {store.cancelReply()}
     }

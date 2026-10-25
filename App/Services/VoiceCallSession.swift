@@ -54,6 +54,10 @@ import Combine
     func start() {active=true;problem="";listen()}
     #if DEBUG
     func startPreview() {preview=true;active=true;phase = .listening}
+    func previewUtterance(_ text:String) {
+        guard preview,active,!isMuted,phase == .listening else{return}
+        transcript=text;phase = .thinking;onUtterance?(text)
+    }
     #endif
     private func listen() {
         guard active else{return}
@@ -93,7 +97,9 @@ import Combine
             .replacingOccurrences(of:"[#*_`>]",with:"",options:.regularExpression)
             .trimmingCharacters(in:.whitespacesAndNewlines)
         guard !spoken.isEmpty else{fail("没有收到可朗读的回复，请重试");return}
-        reply=text;speech.cancel()
+        reply=text
+        if preview {phase = .speaking;return}
+        speech.cancel()
         do {
             let audio=AVAudioSession.sharedInstance()
             try audio.setCategory(.playback,mode:.spokenAudio,options:.duckOthers)
