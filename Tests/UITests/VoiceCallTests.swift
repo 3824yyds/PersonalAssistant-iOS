@@ -26,6 +26,7 @@ final class VoiceCallTests:XCTestCase {
         XCTAssertEqual(app.buttons["voice.call.mute"].value as? String,"已静音")
         app.buttons["voice.call.mute"].tap();XCTAssertEqual(status.label,"正在听")
         app.buttons["voice.call.fixtureUtterance"].tap()
+        // The fixture only supplies partial recognition plus constant noise. Production timing must send it.
         expectation(for:NSPredicate(format:"label == '正在说'"),evaluatedWith:status);waitForExpectations(timeout:8)
         XCTAssertEqual(app.staticTexts["voice.call.caption"].label,"你好！今天想聊点什么？")
         app.buttons["voice.call.orb"].tap();XCTAssertEqual(status.label,"正在听")

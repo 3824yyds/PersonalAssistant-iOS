@@ -28,7 +28,7 @@ jobs:
         run: bash Scripts/build-ipa.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PersonalAssistant-iOS-3.5.1-build8-unsigned
+          name: PersonalAssistant-iOS-3.5.1-build9-unsigned
           path: |
             build/*.ipa
             build/*.verification.json

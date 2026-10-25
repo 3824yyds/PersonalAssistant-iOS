@@ -29,16 +29,19 @@ struct VoiceCallView:View {
             }.padding(.horizontal,16).padding(.top,8)
             Spacer(minLength:20)
             Button(action:orbAction) {VoiceCallOrb(meter:call.speech.meter,phase:call.phase).frame(width:240,height:240)}
-                .buttonStyle(.plain).accessibilityLabel(call.phase == .speaking || call.phase == .thinking ? "打断回复，继续说话":"说完发送")
+                .buttonStyle(.plain).accessibilityLabel(call.phase == .speaking || call.phase == .startingSpeech || call.phase == .thinking ? "打断回复，继续说话":"说完发送")
                 .accessibilityIdentifier("voice.call.orb")
             VStack(spacing:10) {
                 Text(call.status).font(.title3.weight(.medium)).accessibilityIdentifier("voice.call.status")
                 if !call.problem.isEmpty {Text(call.problem).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)}
-                else {Text(call.phase == .speaking || call.phase == .thinking ? "点一下云雾球，打断后继续说":"说完停顿片刻，自动发送").font(.caption).foregroundStyle(.secondary)}
+                else {Text(call.phase == .speaking || call.phase == .startingSpeech || call.phase == .thinking ? "点一下云雾球，打断后继续说":"停顿后自动发送，也可点云雾球发送").font(.caption).foregroundStyle(.secondary)}
                 if call.phase == .failed || call.phase == .paused {Button("继续通话") {call.start()}.buttonStyle(.bordered).accessibilityIdentifier("voice.call.resume")}
                 if captions {
                     Text(call.phase == .speaking ? call.reply:call.transcript).font(.subheadline).foregroundStyle(.secondary)
                         .lineLimit(4).multilineTextAlignment(.center).frame(minHeight:40).accessibilityIdentifier("voice.call.caption")
+                }
+                if call.phase == .listening,!call.transcript.isEmpty {
+                    Button("发送这句话") {call.finishTurn()}.accessibilityIdentifier("voice.call.sendTurn")
                 }
             }.padding(.horizontal,28).padding(.top,28)
             Spacer(minLength:20)
@@ -100,7 +103,7 @@ struct VoiceCallView:View {
     private func pause() {cancelReply();call.pause()}
     private func close() {cancelReply();call.end();Task {await store.saveHistory()};dismiss()}
     private func orbAction() {
-        if call.phase == .speaking || call.phase == .thinking {cancelReply();call.interrupt()}
+        if call.phase == .speaking || call.phase == .startingSpeech || call.phase == .thinking {cancelReply();call.interrupt()}
         else if call.phase == .listening {call.finishTurn()}
     }
 }
