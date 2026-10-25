@@ -1,0 +1,37 @@
+name: iOS device IPA package only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select iOS 26 toolchain
+        run: python3 Scripts/select-xcode.py
+      - id: toolchain
+        run: echo "sdk=$(xcrun --sdk iphoneos --show-sdk-build-version)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: NativeBuild/iphoneos/lib
+          key: ios-native-${{ steps.toolchain.outputs.sdk }}-${{ hashFiles('Vendor/llama.cpp/**', 'Scripts/build-native.sh') }}
+      - name: Build Metal runtime
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: bash Scripts/build-native.sh
+      - name: Build device IPA
+        run: bash Scripts/build-ipa.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PersonalAssistant-iOS-3.5.1-build6-unsigned
+          path: |
+            build/*.ipa
+            build/*.verification.json
+            build/SHA256SUMS.txt
+            build/device-build.log
+          retention-days: 14
