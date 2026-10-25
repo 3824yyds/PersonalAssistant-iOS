@@ -1,0 +1,60 @@
+name: Product presentation captures
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/promo-preview]
+    paths:
+      - '.github/workflows/promo-capture.yml'
+      - 'Tests/UITests/PromoCaptureTests.swift'
+      - 'App/Services/DebugFixtures.swift'
+      - 'App/Views/VoiceCallView.swift'
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 Scripts/select-xcode.py
+      - run: python3 Scripts/generate_project.py
+      - name: Prepare a clean presentation simulator
+        run: |
+          python3 - <<'PY'
+          import json,subprocess,os
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          choices=[dict(d,runtime=r) for r,ds in devices.items() if 'iOS-26-' in r for d in ds if d['name'].startswith('iPhone')]
+          choices.sort(key=lambda d:('Max' in d['name'],'Plus' in d['name'],'Pro' in d['name'],d['name']))
+          selected=choices[0]
+          types=json.loads(subprocess.check_output(['xcrun','simctl','list','devicetypes','--json']))['devicetypes']
+          kind=next(t['identifier'] for t in types if t['name']==selected['name'])
+          device=subprocess.check_output(['xcrun','simctl','create','Product Presentation',kind,selected['runtime']],text=True,timeout=90).strip()
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+device+'\n')
+          for attempt in range(2):
+              try:
+                  subprocess.run(['xcrun','simctl','boot',device],check=False,timeout=60)
+                  subprocess.run(['xcrun','simctl','bootstatus',device,'-b'],check=True,timeout=360)
+                  break
+              except (subprocess.TimeoutExpired,subprocess.CalledProcessError):
+                  if attempt:raise
+                  subprocess.run(['xcrun','simctl','shutdown',device],check=False,timeout=60)
+          subprocess.run(['xcrun','simctl','status_bar',device,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100'],check=True)
+          PY
+      - name: Capture current product views using synthetic data
+        run: |
+          mkdir -p build
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Promo.xcresult -only-testing:AssistantUITests/PromoCaptureTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 150 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/promo-capture.log 2>&1 || { tail -n 90 build/promo-capture.log; exit 1; }
+      - name: Export actual presentation screenshots
+        if: always()
+        run: |
+          if [ -d build/Promo.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/Promo.xcresult --output-path build/Screenshots || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: product-presentation-captures
+          path: |
+            build/Screenshots
+            build/promo-capture.log
+          retention-days: 14

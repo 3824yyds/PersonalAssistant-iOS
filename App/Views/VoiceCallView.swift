@@ -46,7 +46,7 @@ struct VoiceCallView:View {
             }.padding(.horizontal,28).padding(.top,28)
             Spacer(minLength:20)
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--ui-voice-call-fixture") {
+            if ProcessInfo.processInfo.arguments.contains("--ui-voice-call-fixture") && !DebugFixtures.promo {
                 Button("模拟一句语音") {call.previewUtterance("你好")}.accessibilityIdentifier("voice.call.fixtureUtterance")
             }
             #endif
@@ -73,7 +73,7 @@ struct VoiceCallView:View {
                 }
                 store.speech=call.speech
                 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--ui-voice-call-fixture") {call.startPreview();return}
+                if ProcessInfo.processInfo.arguments.contains("--ui-voice-call-fixture") || DebugFixtures.promo {call.startPreview();return}
                 #endif
                 call.start()
             }

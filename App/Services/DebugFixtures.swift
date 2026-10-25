@@ -3,6 +3,7 @@ import Foundation
 import UIKit
 
 enum DebugFixtures {
+    static var promo:Bool {ProcessInfo.processInfo.arguments.contains("--promo-capture")}
     static var proposals:Bool {ProcessInfo.processInfo.arguments.contains("--ui-proposal-fixture")}
     static func proposal(mode:String,title:String,body:String)->NoteAIProposal {
         NoteAIProposal(mode:mode,source:NoteTextVersion(title:title,body:body),result:NoteTextVersion(title:mode=="润色" ? "从容的周末":title,body:mode=="润色" ? "去公园散步，与朋友聚餐，也给自己留出休息的时间。":"## "+mode+"\n\n安排散步、聚餐与休息。"),evidence:mode=="润色" ? []:["想去公园走走。"])
@@ -56,6 +57,20 @@ enum DebugFixtures {
                 return [Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",2000+index)),"kind":.string("reminder"),"title":.string("提醒 \(index+1)"),"date":.int(now),"due":.int(due),"alertAt":.int(due),"period":.string("none"),"currency":.string("CNY"),"completed":.bool(false)]),
                  Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",3000+index)),"kind":.string("expense"),"title":.string("账目 \(index+1)"),"cents":.int(100),"currency":.string("CNY"),"account":.string(account),"category":.string("其他"),"date":.int(now-Int64(index)*3600000)])]
             }
+        }
+        if promo {
+            let now=Clock.milliseconds
+            d.notes=[
+                Item(["id":.string("00000000-0000-0000-0000-000000000100"),"title":.string("给周末留一点空白"),"body":.string("周六，去公园走走。\n带一本喜欢的书，找家安静的咖啡馆。\n\n周日，和朋友一起吃饭。\n整理照片，也整理一下最近的想法。\n\n不用安排得太满。\n把时间留给真正喜欢的事。"),"createdAt":.int(now),"updatedAt":.int(now)]),
+                Item.make(["title":.string("下一站，长沙"),"body":.string("沿着湘江散步，看看老街。\n记得提前预约博物馆。"),"createdAt":.int(now-86400000),"updatedAt":.int(now-86400000)]),
+                Item.make(["title":.string("那些突然闪过的灵感"),"body":.string("把生活里值得记住的小事，慢慢收集起来。"),"createdAt":.int(now-172800000),"updatedAt":.int(now-172800000)])
+            ]
+            d.records=[]
+            let entries:[(String,String,Int64,String)]=[("income","工资收入",1280000,"工资"),("expense","房租",280000,"居住"),("expense","日常购物",68000,"购物"),("expense","朋友聚餐",28600,"餐饮"),("expense","超市采购",15800,"购物"),("expense","午餐",3800,"餐饮"),("expense","咖啡",2800,"餐饮"),("expense","地铁通勤",600,"交通")]
+            for (index,entry) in entries.enumerated() {
+                d.records.append(Item.make(["kind":.string(entry.0),"title":.string(entry.1),"cents":.int(entry.2),"currency":.string("CNY"),"account":.string(d.accounts[0].text("name")),"category":.string(entry.3),"date":.int(now-Int64(entries.count-1-index)*1800000)]))
+            }
+            var settings=d.settings;settings.set("cloudEnabled",false);d.settings=settings
         }
         return d
     }
