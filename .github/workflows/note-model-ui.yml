@@ -1,0 +1,72 @@
+name: Voice call and input mode checks
+on:
+  push:
+    branches: [codex/fullscreen-notes-model-slider]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  voice-turn-rules:
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3-noble
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --filter VoiceTurnDetectorTests
+  focused-ui:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select iOS 26 toolchain
+        run: python3 Scripts/select-xcode.py
+      - run: python3 Scripts/generate_project.py
+      - name: Select an installed iPhone simulator
+        run: |
+          python3 - <<'PY'
+          import json,subprocess,os
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          candidates=[dict(d,runtime=runtime) for runtime,ds in devices.items() if 'iOS-26-' in runtime for d in ds if d['name'].startswith('iPhone')]
+          candidates.sort(key=lambda d:('Max' in d['name'],'Plus' in d['name'],'Pro' in d['name'],d['name']))
+          assert candidates,'No available iPhone simulator'
+          print('Simulator:',candidates[0]['name'])
+          selected=candidates[0];device=selected['udid']
+          if '26'=='26':
+              types=json.loads(subprocess.check_output(['xcrun','simctl','list','devicetypes','--json']))['devicetypes']
+              kind=next(t['identifier'] for t in types if t['name']==selected['name'])
+              device=subprocess.check_output(['xcrun','simctl','create','Assistant CI iPhone',kind,selected['runtime']],text=True,timeout=90).strip()
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+device+'\n')
+          PY
+      - name: Wait for simulator startup
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          device=os.environ['SIMULATOR_ID']
+          for attempt in range(2):
+              try:
+                  subprocess.run(['xcrun','simctl','boot',device],check=False,timeout=60)
+                  subprocess.run(['xcrun','simctl','bootstatus',device,'-b'],check=True,timeout=360)
+                  break
+              except (subprocess.TimeoutExpired,subprocess.CalledProcessError):
+                  if attempt:raise
+                  print('Simulator startup stalled; restarting once.',flush=True)
+                  subprocess.run(['xcrun','simctl','shutdown',device],check=False,timeout=60)
+          PY
+      - name: Compile and test note editor and model slider on iOS 26
+        run: |
+          mkdir -p build
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/NoteModel.xcresult -only-testing:AssistantTests/VoiceAudioTests -only-testing:AssistantUITests/VoiceCallTests -only-testing:AssistantUITests/NoteAndModelTests/testModelSliderSwipesBothWaysAndPersistsSelection -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/note-model.log 2>&1 || { grep -n -E -A 5 -B 2 "error:|failed|passed" build/note-model.log || true; tail -n 100 build/note-model.log; exit 1; }
+      - name: Export screenshots
+        if: always()
+        run: |
+          if [ -d build/NoteModel.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/NoteModel.xcresult --output-path build/Screenshots || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: note-model-ui-results
+          path: |
+            build/note-model.log
+            build/Screenshots
+          retention-days: 14

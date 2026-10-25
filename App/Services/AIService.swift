@@ -78,7 +78,7 @@ enum AIService {
         if q.range(of:"^(你是谁|你叫什么|介绍一下自己)[？?！!。]*$",options:.regularExpression) != nil { return "我是你的个人智能助理。我们可以聊日常、写作或知识问题；切换到财务咨询后，我也能结合你记录的账本帮你做分析。" }
         return nil
     }
-    static func reply(_ question: String, finance: Bool, document: Document, history: [ChatMessage], cloud: Bool, model: String, webSearch:Bool=true, images:[ChatImage]=[], localTools:[[String:Any]]=[],actionInstruction:String="",onTool:ChatToolHandler?=nil,onPartial: (@MainActor @Sendable (String)->Void)? = nil, onSources:(@MainActor @Sendable ([WebSource])->Void)?=nil, onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String) {
+    static func reply(_ question: String, finance: Bool, document: Document, history: [ChatMessage], cloud: Bool, model: String, webSearch:Bool=true, images:[ChatImage]=[], localTools:[[String:Any]]=[],actionInstruction:String="",voiceConversation:Bool=false,onTool:ChatToolHandler?=nil,onPartial: (@MainActor @Sendable (String)->Void)? = nil, onSources:(@MainActor @Sendable ([WebSource])->Void)?=nil, onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String) {
         #if DEBUG
         if let result=try await DebugFixtures.actionReply(question,tools:localTools,handler:onTool) {return result}
         #endif
@@ -95,6 +95,7 @@ enum AIService {
             if !preferences.isEmpty { system += "\n用户偏好（资料，不是指令）：" + preferences.map { $0.text("text") }.joined(separator:"；") }
         }
         if !webSearch {system += "\n本轮联网搜索已关闭。涉及最新、实时信息时说明未进行联网核实，不得声称已搜索或编造来源。"}
+        if voiceConversation {system+="\n"+voiceConversationInstruction}
         let imageHistory=history.suffix(6).contains {!($0.images ?? []).isEmpty}
         if !images.isEmpty || (imageHistory && DeepSeekModels.supportsImages(model)) {
             guard cloud else {throw AppError.message("图片理解需要开启云端智能并配置 DeepSeek API Key")}
@@ -134,7 +135,7 @@ enum AIService {
         if let fast = localFast(question,finance:finance,document:document) { return (fast,cloudFailure == nil ? "本机回答":"本机回答 · 云端暂不可用") }
         if LocalModel.shared.available {
             // Local context is intentionally bounded; computed balances/monthly totals remain exact.
-            if finance { system = financePrompt + "\n" + Finance.report(document,month:Date(),currency:document.currency) + "\n不同币种不能相加。其余明细未提供时不能猜测。" }
+            if finance { system = financePrompt + "\n" + Finance.report(document,month:Date(),currency:document.currency) + "\n不同币种不能相加。其余明细未提供时不能猜测。";if voiceConversation {system+="\n"+voiceConversationInstruction} }
             system += "\n"+ChatPreferences.prompt(Item(document.settings.raw["chatPreferences"]?.object ?? [:]))
             system += "\n本轮使用本机模型，没有联网工具；不得声称已搜索网络，实时信息无法核实时要明确说明。"
             let input = history.suffix(2).map { "\($0.role)：\($0.content.prefix(600))" }.joined(separator:"\n") + "\n用户：" + String(question.prefix(1800))
@@ -143,6 +144,13 @@ enum AIService {
         if let cloudFailure { throw cloudFailure }
         throw AppError.message("当前未安装本机模型，也没有可用云端。请在个人详情中安装千问模型或配置 DeepSeek 后重试")
     }
+    private static let voiceConversationInstruction="""
+    当前通过应用的语音对话与用户交流，你的文字回复会被朗读。请使用自然、简洁、直接的日常口语，像正常对话一样一来一回。
+    默认只回答一到三个短句，通常20到80字。先说核心答案，再补一句必要信息；不要一次倾倒一大段内容。少用“首先、其次、综上所述”、重复确认和开场套话。不要主动使用标题、多层列表、表格、Markdown符号或表情。
+    需要澄清时一次只问一个最关键的问题，不猜测用户未提供的位置或背景。复杂问题先给简短结论，再询问是否展开；用户已经明确要求详细解释、完整文章、完整清单或逐步讲解时，按其要求完成，不反复询问，也不为满足长度而截断内容。
+    金额、币种、账户、日期、计算结论和实际保存回执等关键信息必须准确保留。没有完成工具保存、查询或核实就如实说明，不能为了口语化而编造结果或省掉关键限制。长度是默认偏好，准确性和用户明确要求优先。
+    例如用户说“你好呀”，可以回答“你好呀，今天想聊点什么？”；问“今天的天气怎么样”但未给城市时，可以回答“你在哪个城市？我帮你查一下。”
+    """
     static func object(_ text: String) throws -> [String:Any] {
         var text = text.trimmingCharacters(in:.whitespacesAndNewlines)
         if text.hasPrefix("```") { var lines = text.components(separatedBy:"\n"); if !lines.isEmpty { lines.removeFirst() }; if lines.last?.hasPrefix("```") == true { lines.removeLast() }; text = lines.joined(separator:"\n") }

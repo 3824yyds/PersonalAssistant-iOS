@@ -53,7 +53,7 @@ final class ProductAuditTests:XCTestCase {
         let search=app.textFields["搜索备忘录"];search.tap();search.typeText("不应有的关键词")
         XCTAssertTrue(app.staticTexts["没有找到笔记"].waitForExistence(timeout:5));app.buttons["清除搜索"].tap();XCTAssertTrue(noteRow(app).exists)
         noteRow(app).tap();recordScreen(app,"AuditRestoredNoteContent")
-        app.buttons["关闭"].tap()
+        app.buttons["note.back"].tap()
     }
 
     func testLedgerIncomeEditingStatisticsCalendarBudgetAndTransfer() {

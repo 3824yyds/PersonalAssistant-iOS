@@ -6,6 +6,7 @@ struct ComposingTextInput:UIViewRepresentable {
     @Binding var text:String
     @Binding var isFocused:Bool
     var placeholder:String
+    var concealed=false
     func makeCoordinator()->Coordinator {Coordinator(self)}
     func makeUIView(context:Context)->ComposerTextView {
         let view=ComposerTextView(frame:.zero,textContainer:nil);view.delegate=context.coordinator;view.backgroundColor = .clear
@@ -17,7 +18,8 @@ struct ComposingTextInput:UIViewRepresentable {
     func updateUIView(_ view:ComposerTextView,context:Context) {
         context.coordinator.parent=self;synchronize(view)
         view.accessibilityLabel=placeholder
-        view.placeholder.text=placeholder;view.placeholder.isHidden = !view.text.isEmpty
+        view.textColor=concealed ? .clear:.label;view.tintColor=concealed ? .clear:UIColor(Theme.accent)
+        view.placeholder.text=placeholder;view.placeholder.isHidden = concealed || !view.text.isEmpty
         if isFocused != view.isFirstResponder {
             let focused=isFocused
             let coordinator=context.coordinator

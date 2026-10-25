@@ -18,7 +18,7 @@ final class AppSmokeTests:XCTestCase {
         let counted=expectation(for:NSPredicate(format:"label == %@","正在处理，共 3 行"),evaluatedWith:skeleton);wait(for:[counted],timeout:4)
         app.buttons["取消"].tap();XCTAssertFalse(app.staticTexts["正在整理笔记"].exists)
         XCTAssertEqual(app.descendants(matching:.any).matching(identifier:"note.body").firstMatch.value as? String,"想去公园走走。\n和朋友吃顿饭。\n也留一点时间休息。")
-        app.buttons["关闭"].tap()
+        app.buttons["note.back"].tap()
     }
     func testCreateVaultAndNavigateMainScreens() {
         continueAfterFailure=false
@@ -47,7 +47,7 @@ final class AppSmokeTests:XCTestCase {
         XCTAssertEqual(dimmedFooter,luminance(app,point:CGPoint(x:2,y:app.frame.height*0.5)),accuracy:0.04,"No opaque rectangular footer behind the floating navigation")
         for name in ["新建笔记","记一笔","新建提醒"] {let frame=app.buttons[name].frame;XCTAssertEqual(frame.midX,plus.midX,accuracy:2)}
         attach(app,"QuickActionsAligned")
-        app.buttons["新建笔记"].tap();XCTAssertTrue(app.buttons["关闭"].waitForExistence(timeout:5));app.buttons["关闭"].tap()
+        app.buttons["新建笔记"].tap();XCTAssertTrue(app.buttons["note.back"].waitForExistence(timeout:5));app.buttons["note.back"].tap()
         app.buttons["展开快捷操作"].tap();app.buttons["记一笔"].tap();XCTAssertTrue(app.navigationBars["记一笔"].waitForExistence(timeout:5));app.buttons["取消"].tap()
         app.buttons["展开快捷操作"].tap();app.buttons["新建提醒"].tap();XCTAssertTrue(app.navigationBars["新建提醒"].waitForExistence(timeout:5));app.buttons["取消"].tap()
         app.buttons["展开快捷操作"].tap()
@@ -123,7 +123,7 @@ final class AppSmokeTests:XCTestCase {
         tapProductTab("助理",in:app)
         XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5))
         let back=app.buttons["返回"],model=app.buttons["chat.model"]
-        XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minX-back.frame.maxX,4)
+        XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minY,back.frame.maxY+100)
         let orb=app.descendants(matching:.any).matching(identifier:"assistant.orb").firstMatch
         XCTAssertEqual(orb.frame.width,88,accuracy:1);XCTAssertEqual(orb.frame.height,88,accuracy:1)
         XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:back.frame.midY)),luminance(app,point:CGPoint(x:2,y:back.frame.maxY+24)),accuracy:0.015)
@@ -152,7 +152,7 @@ final class AppSmokeTests:XCTestCase {
         }
         app.buttons["AI 工具"].tap();app.buttons["润色"].tap()
         XCTAssertTrue(app.buttons["note.proposal.adopt"].waitForExistence(timeout:5))
-        app.buttons["关闭"].tap()
+        app.buttons["note.back"].tap()
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:5),"Closing an unadopted proposal returns to the original page")
     }
     func testWebAnswersHaveCompactExpandableSources() {

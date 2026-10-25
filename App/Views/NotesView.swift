@@ -56,8 +56,8 @@ struct NotesView:View {
             }
             FloatingSearchField(text:$query,prompt:"搜索备忘录")
         }.background {Theme.background(scheme).ignoresSafeArea()}.appClearChrome().toolbar(.hidden,for:.navigationBar)
-            .sheet(item:$editing) {note in NavigationStack {NoteEditor(note:note)}.environmentObject(store)}
-            .sheet(isPresented:$creating) {NavigationStack {NoteEditor(initialFolder:store.noteFolder)}.environmentObject(store)}
+            .fullScreenCover(item:$editing) {note in NavigationStack {NoteEditor(note:note)}.environmentObject(store)}
+            .fullScreenCover(isPresented:$creating) {NavigationStack {NoteEditor(initialFolder:store.noteFolder)}.environmentObject(store)}
             .onChange(of:folderFilter) {_,value in store.noteFolder=value.isEmpty ? "收件箱":value}
             .alert("新建文件夹",isPresented:$addingFolder) {TextField("名称",text:$folderName);Button("取消",role:.cancel) {};Button("创建") {let name=folderName.trimmingCharacters(in:.whitespacesAndNewlines);guard !name.isEmpty,name.count<=100 else {return};Task {if await store.commit({document in document.root.raw["noteFolders"] = .array(Array(Set(document.root.strings("noteFolders")+[name])).sorted().map(JSONValue.string))}) {folderFilter=name;folderName=""}}}}
             .confirmationDialog("永久删除这篇备忘录？",isPresented:Binding(get:{deleting != nil},set:{if !$0 {deleting=nil}}),titleVisibility:.visible) {Button("永久删除",role:.destructive) {guard let note=deleting else{return};Task {await store.commit {$0.notes.removeAll {$0.id==note.id}}};deleting=nil}}
@@ -98,7 +98,6 @@ struct NoteEditor:View {
     @State var scanner=false
     @State var dirty=false
     @State private var proposal:NoteAIProposal?
-    @State var confirmClose=false
     @State var savedTitle=""
     @State var savedBody=""
     @State var undo:(String,String)?
@@ -185,7 +184,7 @@ struct NoteEditor:View {
             }.padding(.vertical,8)}
     }
     @ToolbarContentBuilder private var editorToolbar:some ToolbarContent {
-                ToolbarItem(placement:.cancellationAction) {Button {proposal=nil;cancelOperation();if hasChanges && canSave {save()}else{dismiss()}} label:{Image(systemName:"chevron.left")}.accessibilityLabel("关闭")}
+                ToolbarItem(placement:.cancellationAction) {Button {discardAndClose()} label:{Image(systemName:"chevron.left")}.accessibilityLabel("返回").accessibilityIdentifier("note.back").disabled(store.busy)}
                 ToolbarItemGroup(placement:.topBarTrailing) {
                     ShareLink(item:NoteContent.text(snapshot())) {Image(systemName:"square.and.arrow.up")}.disabled(!canSave || working)
                     Menu {
@@ -202,7 +201,7 @@ struct NoteEditor:View {
             .background {Color(uiColor:.systemBackground).ignoresSafeArea()}
             .appClearChrome().navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar {editorToolbar}
-            .interactiveDismissDisabled(working || proposal != nil || hasChanges)
+            .interactiveDismissDisabled()
     }
     private var observedEditor:some View {
         editorSurface
@@ -341,6 +340,24 @@ struct NoteEditor:View {
         var draft=extras;draft.set("slot",baseNote?.id ?? "new");draft.set("baseUpdatedAt",baseNote?.int("updatedAt") ?? 0);draft.set("title",title);draft.set("body",bodyText)
         let key=store.key,salt=store.salt
         draftTask=Task {do {try await Task.sleep(nanoseconds:750_000_000);try Task.checkCancellation();let plain=try JSONEncoder().encode(draft);try PrivateFiles.write(VaultCrypto.encrypt(plain,key:key,salt:salt),name:"note-draft.pavault")}catch{}}
+    }
+    private func discardAndClose() {
+        // End composition before suppressing draft writes from the final text update.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
+        draftLoaded=false
+        proposal=nil
+        photoTask?.cancel()
+        cancelOperation()
+        draftTask?.cancel()
+        // The draft file is shared across notes; discard only this editor's slot.
+        if let url=try? PrivateFiles.url("note-draft.pavault"),
+           let bytes=try? PrivateFiles.boundedRead(url),
+           let plain=try? VaultCrypto.decrypt(bytes,key:store.key),
+           let draft=try? JSONDecoder().decode(Item.self,from:plain),
+           draft.text("slot") == (baseNote?.id ?? "new") {
+            try? FileManager.default.removeItem(at:url)
+        }
+        dismiss()
     }
     func save(close:Bool=true) {
         guard canSave else {return}

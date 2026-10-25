@@ -23,9 +23,9 @@ struct ConversationView:View {
     @Environment(\.scenePhase) private var scenePhase
     @State var history=false
     @State var modelMenu=false
+    @State private var voiceCall=false
     @State var follow=true
     @State var viewport:CGFloat=0
-    @State var availableModels=["deepseek-flash","deepseek-v4-pro"]
     @State private var photoPicker=false
     @State private var loadingPhotos=false
     @State private var selectedPhotos:[PhotosPickerItem]=[]
@@ -37,7 +37,7 @@ struct ConversationView:View {
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @State var focused=false
     @State private var composerVisible=false
-    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !modelMenu}
+    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !voiceCall}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -69,9 +69,12 @@ struct ConversationView:View {
             .onAppear {
                 composerVisible=true;refreshGreeting()
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--ui-voice-input-fixture") {voiceMode=true}
+                #endif
+                #if DEBUG
                 DebugFixtures.showThinking(in:store);DebugFixtures.showSearchResults(in:store)
                 #endif
-                store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}};if !availableModels.contains(store.model) {availableModels.append(store.model)}
+                store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}}
             }
             .onChange(of:speech.error) {_,error in if let error {cancelVoice();store.error=error;speech.error=nil}}
             .onDisappear {composerVisible=false;dismissComposer();photoTask?.cancel();cancelVoice();speech.onFinal=nil;if store.speech === speech {store.speech=nil}}
@@ -84,26 +87,20 @@ struct ConversationView:View {
             .onChange(of:selectedPhotos) {_,photos in loadPhotos(photos)}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .onChange(of:store.financeMode) {_,_ in refreshGreeting()}
+            .fullScreenCover(isPresented:$voiceCall) {VoiceCallView(onSend:{send(spoken:$0)}).environmentObject(store)}
             .sheet(isPresented:$preferences) {NavigationStack {ChatPreferencesView()}.environmentObject(store)}
-            .sheet(item:$openedItem) {receipt in NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)}
+            .fullScreenCover(item:Binding(get:{openedItem?.kind == .note ? openedItem:nil},set:{openedItem=$0})) {receipt in
+                NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)
+            }
+            .sheet(item:Binding(get:{openedItem?.kind == .note ? nil:openedItem},set:{openedItem=$0})) {receipt in NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)}
             .sheet(isPresented:$history) {NavigationStack {ChatHistoryView {session in Task {await store.newChat(finance:session.finance ?? finance);store.messages=session.messages;store.activeSessionID=session.id;history=false}}}.environmentObject(store)}
     }
     var header:some View {
         HStack(spacing:8) {
             Button {dismissComposer();onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
-                Button {dismissComposer();modelMenu=true} label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
-                    .popover(isPresented:$modelMenu,attachmentAnchor:.rect(.bounds),arrowEdge:.top) {modelChoices.presentationCompactAdaptation(.popover)}
-                    .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
             Spacer(minLength:0)
             HeaderControls(sheet:$sheet)
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
-    }
-    private var modelChoices:some View {
-        VStack(spacing:0) {ForEach(availableModels,id:\.self) {model in
-            Button {modelMenu=false;Task {await store.setting("model",.string(model))}} label:{
-                HStack(spacing:12) {Text(modelLabel(model)).font(.system(size:16)).lineLimit(1).foregroundStyle(.primary);Spacer(minLength:12);Image(systemName:"checkmark").foregroundStyle(Theme.accent).opacity(store.model==model ? 1:0).accessibilityHidden(true)}.padding(.horizontal,18).frame(height:46).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("chat.model.option."+model).accessibilityLabel(modelLabel(model)).accessibilityValue(store.model==model ? "已选择":"未选择").accessibilityAddTraits(store.model==model ? .isSelected:[])
-        }}.frame(width:240).padding(.vertical,6)
     }
     var modePicker:some View {
         HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
@@ -117,7 +114,32 @@ struct ConversationView:View {
             .accessibilityAddTraits(finance==target ? .isSelected:[]).disabled(store.assistantBusy || holding || speech.finishing)
     }
     var composer:some View {
-        HStack(alignment:.bottom,spacing:8) {
+        ZStack {
+            VStack(spacing:2) {
+                composerInput.padding(.horizontal,12)
+                HStack(alignment:.center,spacing:8) {
+                    composerMenu.opacity(modelMenu ? 0:1)
+                    Spacer(minLength:0)
+                    Button {withAnimation(Theme.normal) {modelMenu=true}} label:{
+                        HStack(spacing:5) {Text(modelLabel(store.model));Image(systemName:"chevron.up").font(.system(size:9,weight:.semibold))}
+                            .font(.system(size:13,weight:.medium)).padding(.horizontal,10).frame(height:36)
+                    }.buttonStyle(.plain).accessibilityIdentifier("chat.model").accessibilityLabel("选择模型，"+modelLabel(store.model))
+                        .disabled(store.assistantBusy || store.busy || holding || speech.finishing).opacity(modelMenu ? 0:1)
+                    composerVoiceButton.opacity(modelMenu ? 0:1)
+                    composerSendButton.opacity(modelMenu ? 0:1)
+                }
+            }.padding(.horizontal,8).padding(.vertical,6)
+                .background {if !modelMenu {RoundedRectangle(cornerRadius:24).fill(.clear).appGlass(RoundedRectangle(cornerRadius:24))}}
+                // Conceal only the text ink. Hiding/disabling the UIKit host dismisses its keyboard.
+                .accessibilityHidden(modelMenu)
+            if modelMenu {
+                ChatModelSlider(model:store.model,disabled:store.busy || store.assistantBusy,onClose:{withAnimation(Theme.normal) {modelMenu=false}}) {model in
+                    Task {await store.setting("model",.string(model))}
+                }
+            }
+        }.padding(.horizontal,12).padding(.bottom,8)
+    }
+    private var composerMenu:some View {
             Menu {
                 if DeepSeekModels.supportsImages(store.model) {
                     Section {Button("上传图片",systemImage:"photo") {dismissComposer();photoPicker=true}.accessibilityIdentifier("chat.menu.photos")} footer:{Text("最多 4 张。图片随消息发送给 DeepSeek Flash，并保存在本机加密聊天记录中。")}
@@ -126,12 +148,16 @@ struct ConversationView:View {
                     Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
                 } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
+                    Button("语音通话",systemImage:"waveform") {openVoiceCall()}.accessibilityIdentifier("chat.menu.voiceCall")
                     Button("回复风格",systemImage:"slider.horizontal.3") {dismissComposer();preferences=true}.accessibilityIdentifier("chat.menu.preferences")
                     Button("新对话",systemImage:"square.and.pencil") {dismissComposer();Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {dismissComposer();history=true}.accessibilityIdentifier("chat.menu.history")
                 }
             } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
+    }
+    @ViewBuilder private var composerInput:some View {
             if voiceMode {
+                if !modelMenu {
                 Text(holding ? "松开发送文字":"按住 说话").font(.system(size:16,weight:.medium)).frame(maxWidth:.infinity,minHeight:42)
                     .background(Theme.accent.opacity(holding ? 0.16:0.04),in:Capsule()).contentShape(Capsule())
                     .gesture(voiceGesture).accessibilityLabel("按住说话").accessibilityAddTraits(.isButton)
@@ -139,19 +165,30 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("开始录音")) {beginVoice()}
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
+                    .transition(.identity)
+                } else {
+                    Color.clear.frame(height:42).accessibilityHidden(true)
+                }
             } else {
-                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…")
+                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…",concealed:modelMenu)
             }
+    }
+    private var composerVoiceButton:some View {
             Button {
                 dismissComposer();voiceMode.toggle()
                 if voiceMode {Task {_=await speech.prepare()}}
             } label:{Image(systemName:voiceMode ? "keyboard":"mic").font(.system(size:20)).frame(width:36,height:42)}
                 .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || holding || speech.finishing)
+    }
+    @ViewBuilder private var composerSendButton:some View {
             if (!voiceMode && (!input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !store.chatImages.isEmpty)) || store.assistantBusy {
                 Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(loadingPhotos).padding(.bottom,4)
+            } else {
+                Button {openVoiceCall()} label:{Image(systemName:"waveform").font(.system(size:18,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}
+                    .accessibilityLabel("语音通话").accessibilityIdentifier("chat.voiceCall").disabled(store.busy || holding || speech.finishing)
             }
-        }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
     }
+    private func openVoiceCall() {dismissComposer();cancelVoice();modelMenu=false;voiceCall=true}
     @ViewBuilder private var attachmentPreview:some View {
         if loadingPhotos {ProgressView("正在准备图片…").font(.caption)}
         if !store.chatImages.isEmpty {
@@ -220,15 +257,15 @@ struct ConversationView:View {
         greeting=ChatGreetings.next(after:finance ? lastFinanceGreeting:lastGreeting,finance:finance)
         if finance {lastFinanceGreeting=greeting} else {lastGreeting=greeting}
     }
-    func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "DeepSeek Flash";case "deepseek-v4-pro":return "DeepSeek Pro";default:return m}}
+    func modelLabel(_ m:String)->String {switch m {case "deepseek-chat":return "DeepSeek Chat";case "deepseek-reasoner":return "DeepSeek Reasoner";case "deepseek-flash":return "Flash";case "deepseek-v4-pro":return "Pro";default:return m}}
     private func dismissComposer() {
         focused=false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
     }
-    func send() {
+    func send(spoken:String?=nil) {
         dismissComposer()
-        let images=store.chatImages
-        var question=input.trimmingCharacters(in:.whitespacesAndNewlines)
+        let images=spoken==nil ? store.chatImages:[]
+        var question=(spoken ?? input).trimmingCharacters(in:.whitespacesAndNewlines)
         guard (!question.isEmpty || !images.isEmpty),!store.assistantBusy,!loadingPhotos else{return}
         if question.isEmpty {question="请描述并分析这些图片。"}
         if !images.isEmpty {
@@ -237,10 +274,10 @@ struct ConversationView:View {
             guard stored+images.reduce(0,{$0+$1.jpeg.count})<=12*1024*1024 else {store.error="本对话图片较多，请新建对话后继续发送";return}
         }
         guard question.count<=20000 else {store.error="消息过长，请分段发送";return}
-        input="";focused=false;follow=true
+        if spoken==nil {input=""};focused=false;follow=true
         let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model,searchEnabled=webSearch
         let user=ChatMessage(role:"user",content:question,images:images.isEmpty ? nil:images)
-        store.messages.append(user);store.chatImages=[];selectedPhotos=[]
+        store.messages.append(user);if spoken==nil {store.chatImages=[];selectedPhotos=[]}
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
         let actions=ChatActionService(store:store,question:question,history:previous,images:images)
         let session=store.activeSessionID
@@ -249,7 +286,7 @@ struct ConversationView:View {
             do {
                 let response:(String,String)
                 if let local=try await savePreviousNote(question,previous:previous,actions:actions) {response=local}
-                else {response=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,localTools:actions.schemas,actionInstruction:actions.instruction,onTool:{name,arguments in
+                else {response=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,localTools:actions.schemas,actionInstruction:actions.instruction,voiceConversation:spoken != nil,onTool:{name,arguments in
                     let result=try await actions.perform(name,arguments:arguments)
                     if store.epoch==epoch,store.activeSessionID==session,!actions.created.isEmpty {finishAnswer(answerID,text:actions.confirmedText(""),source:"应用已确认保存",created:actions.created,after:user.id)}
                     return result
@@ -376,5 +413,64 @@ struct ChatHistoryView:View {
         ForEach(sessions) {s in Button {select(s)} label:{VStack(alignment:.leading,spacing:6) {Text(s.title).font(.subheadline).foregroundStyle(.primary);Text(s.messages.last?.content ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(2)}}.buttonStyle(.plain).contextMenu {Button("重命名",systemImage:"pencil") {renaming=s;title=s.title;rename=true}}.swipeActions(allowsFullSwipe:false) {Button(role:.destructive) {store.sessions.removeAll {$0.id==s.id};if store.activeSessionID==s.id {store.messages=[];store.activeSessionID=UUID().uuidString};Task {await store.saveHistory()}} label:{Label("删除",systemImage:"trash")}}}
     }.scrollContentBackground(.hidden).background(Theme.background(scheme)).searchable(text:$query,prompt:"搜索标题和对话").navigationTitle("历史对话").navigationBarTitleDisplayMode(.inline).toolbar {ToolbarItem(placement:.confirmationAction) {Button("完成") {dismiss()}}}
         .alert("重命名对话",isPresented:$rename) {TextField("标题",text:$title);Button("取消",role:.cancel) {};Button("保存") {if let s=renaming,let i=store.sessions.firstIndex(where:{$0.id==s.id}),!title.isEmpty {store.sessions[i].title=String(title.prefix(100));Task {await store.saveHistory()}}}}
+    }
+}
+
+/// Two real models, with a draggable selection ring and direct tap targets.
+private struct ChatModelSlider:View {
+    let model:String
+    let disabled:Bool
+    let onClose:()->Void
+    let select:(String)->Void
+    private let models=["deepseek-flash","deepseek-v4-pro"]
+    private let labels=["Flash","Pro"]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dragging:Int?
+    @Namespace private var selectionRing
+    private var active:Int {dragging ?? (model==models[1] ? 1:0)}
+    var body:some View {
+        VStack(spacing:18) {
+            Button(action:onClose) {Text(labels[active]).font(.system(size:19,weight:.semibold)).foregroundStyle(.primary)}
+                .buttonStyle(.plain).accessibilityIdentifier("chat.model.close").accessibilityLabel("收起模型选择")
+            GeometryReader {geometry in
+                HStack(spacing:0) {
+                    ForEach(0..<2,id:\.self) {index in
+                        Button {commit(index)} label:{
+                            VStack(spacing:8) {
+                                ZStack {
+                                    Circle().fill(.secondary.opacity(0.3)).frame(width:9,height:9)
+                                    if active==index {
+                                        Circle().fill(.background).overlay {Circle().strokeBorder(Theme.accent,lineWidth:4)}
+                                            .frame(width:34,height:34).matchedGeometryEffect(id:"modelRing",in:selectionRing)
+                                    }
+                                }.frame(height:34)
+                            }.foregroundStyle(active==index ? Theme.accent:Color.secondary)
+                                .frame(maxWidth:.infinity,maxHeight:.infinity).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                            .accessibilityIdentifier("chat.model.option."+models[index])
+                            .accessibilityLabel(labels[index])
+                            .accessibilityValue(model==models[index] ? "已选择":"未选择")
+                            .accessibilityAddTraits(model==models[index] ? .isSelected:[])
+                    }
+                }.padding(6).appGlass(Capsule())
+                    .simultaneousGesture(DragGesture(minimumDistance:8)
+                        .onChanged {value in
+                            guard !disabled else{return}
+                            let index=value.location.x < geometry.size.width/2 ? 0:1
+                            if dragging != index {dragging=index;UISelectionFeedbackGenerator().selectionChanged()}
+                        }
+                        .onEnded {value in
+                            guard !disabled else{dragging=nil;return}
+                            commit(value.location.x < geometry.size.width/2 ? 0:1);dragging=nil
+                        })
+            }.frame(height:70)
+        }.padding(.horizontal,16).padding(.vertical,6).frame(maxWidth:.infinity)
+            .animation(reduceMotion ? nil:Theme.normal,value:active)
+            .disabled(disabled)
+    }
+    private func commit(_ index:Int) {
+        guard !disabled,model != models[index] else{return}
+        UISelectionFeedbackGenerator().selectionChanged()
+        select(models[index])
     }
 }
