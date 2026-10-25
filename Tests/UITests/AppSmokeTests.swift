@@ -123,7 +123,7 @@ final class AppSmokeTests:XCTestCase {
         tapProductTab("助理",in:app)
         XCTAssertTrue(app.staticTexts["今天心情怎么样？"].waitForExistence(timeout:5))
         let back=app.buttons["返回"],model=app.buttons["chat.model"]
-        XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minX-back.frame.maxX,4)
+        XCTAssertTrue(model.exists);XCTAssertGreaterThan(model.frame.minY,back.frame.maxY+100)
         let orb=app.descendants(matching:.any).matching(identifier:"assistant.orb").firstMatch
         XCTAssertEqual(orb.frame.width,88,accuracy:1);XCTAssertEqual(orb.frame.height,88,accuracy:1)
         XCTAssertEqual(luminance(app,point:CGPoint(x:2,y:back.frame.midY)),luminance(app,point:CGPoint(x:2,y:back.frame.maxY+24)),accuracy:0.015)

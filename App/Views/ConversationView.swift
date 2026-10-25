@@ -36,7 +36,7 @@ struct ConversationView:View {
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @State var focused=false
     @State private var composerVisible=false
-    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !modelMenu}
+    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -93,19 +93,10 @@ struct ConversationView:View {
     var header:some View {
         HStack(spacing:8) {
             Button {dismissComposer();onBack?()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).accessibilityLabel("返回")
-                Button {dismissComposer();modelMenu=true} label:{HStack(spacing:5) {Text(modelLabel(store.model)).lineLimit(1).minimumScaleFactor(0.8);Image(systemName:"chevron.down").font(.system(size:9))}.font(.system(size:14,weight:.medium)).padding(.horizontal,12).frame(height:44).appGlass(Capsule(),interactive:true)}
-                    .popover(isPresented:$modelMenu,attachmentAnchor:.rect(.bounds),arrowEdge:.top) {modelChoices.presentationCompactAdaptation(.popover)}
-                    .accessibilityIdentifier("chat.model").disabled(store.assistantBusy)
             Spacer(minLength:0)
             HeaderControls(sheet:$sheet)
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
     }
-    private var modelChoices:some View {
-        ChatModelSlider(model:store.model,disabled:store.busy || store.assistantBusy) {model in
-            Task {await store.setting("model",.string(model))}
-        }
-    }
-
     var modePicker:some View {
         HStack(spacing:8) {mode("聊天",finance:false);mode("财务咨询",finance:true)}.padding(.top,6)
     }
@@ -118,7 +109,32 @@ struct ConversationView:View {
             .accessibilityAddTraits(finance==target ? .isSelected:[]).disabled(store.assistantBusy || holding || speech.finishing)
     }
     var composer:some View {
-        HStack(alignment:.bottom,spacing:8) {
+        ZStack {
+            VStack(spacing:2) {
+                composerInput.padding(.horizontal,12)
+                HStack(alignment:.center,spacing:8) {
+                    composerMenu
+                    Spacer(minLength:0)
+                    Button {withAnimation(Theme.normal) {modelMenu=true}} label:{
+                        HStack(spacing:5) {Text(modelLabel(store.model));Image(systemName:"chevron.up").font(.system(size:9,weight:.semibold))}
+                            .font(.system(size:13,weight:.medium)).padding(.horizontal,10).frame(height:36)
+                    }.buttonStyle(.plain).accessibilityIdentifier("chat.model").accessibilityLabel("选择模型，"+modelLabel(store.model))
+                        .disabled(store.assistantBusy || store.busy || holding || speech.finishing)
+                    composerVoiceButton
+                    composerSendButton
+                }
+            }.padding(.horizontal,8).padding(.vertical,6)
+                .appGlass(RoundedRectangle(cornerRadius:24))
+                // Keep the same UIKit text view mounted and focused while the selector covers it.
+                .opacity(modelMenu ? 0:1).allowsHitTesting(!modelMenu).accessibilityHidden(modelMenu)
+            if modelMenu {
+                ChatModelSlider(model:store.model,disabled:store.busy || store.assistantBusy,onClose:{withAnimation(Theme.normal) {modelMenu=false}}) {model in
+                    Task {await store.setting("model",.string(model))}
+                }
+            }
+        }.padding(.horizontal,12).padding(.bottom,8)
+    }
+    private var composerMenu:some View {
             Menu {
                 if DeepSeekModels.supportsImages(store.model) {
                     Section {Button("上传图片",systemImage:"photo") {dismissComposer();photoPicker=true}.accessibilityIdentifier("chat.menu.photos")} footer:{Text("最多 4 张。图片随消息发送给 DeepSeek Flash，并保存在本机加密聊天记录中。")}
@@ -132,6 +148,8 @@ struct ConversationView:View {
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {dismissComposer();history=true}.accessibilityIdentifier("chat.menu.history")
                 }
             } label:{Image(systemName:"plus").font(.system(size:20)).frame(width:36,height:42)}.accessibilityLabel("聊天功能").disabled(store.assistantBusy || holding || speech.finishing)
+    }
+    @ViewBuilder private var composerInput:some View {
             if voiceMode {
                 Text(holding ? "松开发送文字":"按住 说话").font(.system(size:16,weight:.medium)).frame(maxWidth:.infinity,minHeight:42)
                     .background(Theme.accent.opacity(holding ? 0.16:0.04),in:Capsule()).contentShape(Capsule())
@@ -143,15 +161,18 @@ struct ConversationView:View {
             } else {
                 ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…")
             }
+    }
+    private var composerVoiceButton:some View {
             Button {
                 dismissComposer();voiceMode.toggle()
                 if voiceMode {Task {_=await speech.prepare()}}
             } label:{Image(systemName:voiceMode ? "keyboard":"mic").font(.system(size:20)).frame(width:36,height:42)}
                 .accessibilityLabel(voiceMode ? "切换键盘输入":"切换语音输入").disabled(store.assistantBusy || holding || speech.finishing)
+    }
+    @ViewBuilder private var composerSendButton:some View {
             if (!voiceMode && (!input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !store.chatImages.isEmpty)) || store.assistantBusy {
                 Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(loadingPhotos).padding(.bottom,4)
             }
-        }.padding(.horizontal,8).padding(.vertical,4).appGlass(RoundedRectangle(cornerRadius:24)).padding(.horizontal,12).padding(.bottom,8)
     }
     @ViewBuilder private var attachmentPreview:some View {
         if loadingPhotos {ProgressView("正在准备图片…").font(.caption)}
@@ -384,6 +405,7 @@ struct ChatHistoryView:View {
 private struct ChatModelSlider:View {
     let model:String
     let disabled:Bool
+    let onClose:()->Void
     let select:(String)->Void
     private let models=["deepseek-flash","deepseek-v4-pro"]
     private let labels=["Flash","Pro"]
@@ -393,8 +415,8 @@ private struct ChatModelSlider:View {
     private var active:Int {dragging ?? (model==models[1] ? 1:0)}
     var body:some View {
         VStack(spacing:18) {
-            Text(labels[active]).font(.system(size:20,weight:.semibold))
-                .accessibilityHidden(true)
+            Button(action:onClose) {HStack(spacing:6) {Text(labels[active]).font(.system(size:19,weight:.semibold));Image(systemName:"chevron.right").font(.system(size:12,weight:.semibold))}.foregroundStyle(.primary)}
+                .buttonStyle(.plain).accessibilityIdentifier("chat.model.close").accessibilityLabel("收起模型选择")
             GeometryReader {geometry in
                 HStack(spacing:0) {
                     ForEach(0..<2,id:\.self) {index in
@@ -407,7 +429,6 @@ private struct ChatModelSlider:View {
                                             .frame(width:34,height:34).matchedGeometryEffect(id:"modelRing",in:selectionRing)
                                     }
                                 }.frame(height:34)
-                                Text(labels[index]).font(.system(size:14,weight:active==index ? .semibold:.regular))
                             }.foregroundStyle(active==index ? Theme.accent:Color.secondary)
                                 .frame(maxWidth:.infinity,maxHeight:.infinity).contentShape(Rectangle())
                         }.buttonStyle(.plain)
@@ -427,8 +448,8 @@ private struct ChatModelSlider:View {
                             guard !disabled else{dragging=nil;return}
                             commit(value.location.x < geometry.size.width/2 ? 0:1);dragging=nil
                         })
-            }.frame(height:86)
-        }.padding(20).frame(width:280)
+            }.frame(height:70)
+        }.padding(.horizontal,16).padding(.vertical,6).frame(maxWidth:.infinity)
             .animation(reduceMotion ? nil:Theme.normal,value:active)
             .disabled(disabled)
     }

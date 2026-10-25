@@ -41,19 +41,33 @@ final class NoteAndModelTests:XCTestCase {
     }
     func testModelSliderSwipesBothWaysAndPersistsSelection() {
         let app=launchProduct();tapProductTab("助理",in:app)
+        let input=app.textViews["chat.input"]
+        input.tap();input.typeText("模型切换草稿")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        let keyboardTop=app.keyboards.firstMatch.frame.minY
+        recordScreen(app,"ComposerModelEntry")
         app.buttons["chat.model"].tap()
         let flash=app.buttons["chat.model.option.deepseek-flash"]
         let pro=app.buttons["chat.model.option.deepseek-v4-pro"]
         XCTAssertTrue(flash.waitForExistence(timeout:5))
         XCTAssertEqual(flash.label,"Flash");XCTAssertEqual(pro.label,"Pro")
+        XCTAssertEqual(app.popovers.count,0)
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertLessThanOrEqual(pro.frame.maxY,keyboardTop+1)
+        XCTAssertGreaterThan(flash.frame.minY,app.buttons["返回"].frame.maxY+50)
         flash.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.4)).press(forDuration:0.1,thenDragTo:pro.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.4)))
         let selected=NSPredicate(format:"value == '已选择'")
         expectation(for:selected,evaluatedWith:pro);waitForExpectations(timeout:8)
         recordScreen(app,"ModelSliderPro")
-        app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+        app.buttons["chat.model.close"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertEqual(input.value as? String,"模型切换草稿")
         app.buttons["chat.model"].tap();XCTAssertEqual(pro.value as? String,"已选择")
         pro.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.4)).press(forDuration:0.1,thenDragTo:flash.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.4)))
         expectation(for:selected,evaluatedWith:flash);waitForExpectations(timeout:8)
         recordScreen(app,"ModelSliderFlash")
+        app.buttons["chat.model.close"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertEqual(input.value as? String,"模型切换草稿")
     }
 }
