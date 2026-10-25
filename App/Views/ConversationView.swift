@@ -23,6 +23,7 @@ struct ConversationView:View {
     @Environment(\.scenePhase) private var scenePhase
     @State var history=false
     @State var modelMenu=false
+    @State private var voiceCall=false
     @State var follow=true
     @State var viewport:CGFloat=0
     @State private var photoPicker=false
@@ -36,7 +37,7 @@ struct ConversationView:View {
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @State var focused=false
     @State private var composerVisible=false
-    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker}
+    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !voiceCall}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -68,6 +69,9 @@ struct ConversationView:View {
             .onAppear {
                 composerVisible=true;refreshGreeting()
                 #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--ui-voice-input-fixture") {voiceMode=true}
+                #endif
+                #if DEBUG
                 DebugFixtures.showThinking(in:store);DebugFixtures.showSearchResults(in:store)
                 #endif
                 store.speech=speech;speech.onFinal={text in let action=pendingVoice;pendingVoice=nil;holding=false;store.voiceCapture=nil;if action == .send {let draft=input;input=text;send();input=draft}else{input+=(input.isEmpty ? "":" ")+text;voiceMode=false;focused=true}}
@@ -83,6 +87,7 @@ struct ConversationView:View {
             .onChange(of:selectedPhotos) {_,photos in loadPhotos(photos)}
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .onChange(of:store.financeMode) {_,_ in refreshGreeting()}
+            .fullScreenCover(isPresented:$voiceCall) {VoiceCallView(onSend:{send(spoken:$0)}).environmentObject(store)}
             .sheet(isPresented:$preferences) {NavigationStack {ChatPreferencesView()}.environmentObject(store)}
             .fullScreenCover(item:Binding(get:{openedItem?.kind == .note ? openedItem:nil},set:{openedItem=$0})) {receipt in
                 NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)
@@ -143,6 +148,7 @@ struct ConversationView:View {
                     Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
                 } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
+                    Button("语音通话",systemImage:"waveform") {openVoiceCall()}.accessibilityIdentifier("chat.menu.voiceCall")
                     Button("回复风格",systemImage:"slider.horizontal.3") {dismissComposer();preferences=true}.accessibilityIdentifier("chat.menu.preferences")
                     Button("新对话",systemImage:"square.and.pencil") {dismissComposer();Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
                     Button("历史对话",systemImage:"clock.arrow.circlepath") {dismissComposer();history=true}.accessibilityIdentifier("chat.menu.history")
@@ -174,8 +180,12 @@ struct ConversationView:View {
     @ViewBuilder private var composerSendButton:some View {
             if (!voiceMode && (!input.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || !store.chatImages.isEmpty)) || store.assistantBusy {
                 Button {if store.assistantBusy {store.cancelReply()}else{send()}} label:{Image(systemName:store.assistantBusy ? "stop.fill":"arrow.up").font(.system(size:16,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}.accessibilityLabel(store.assistantBusy ? "停止回复":"发送").disabled(loadingPhotos).padding(.bottom,4)
+            } else {
+                Button {openVoiceCall()} label:{Image(systemName:"waveform").font(.system(size:18,weight:.semibold)).frame(width:34,height:34).background(Theme.accent,in:Circle()).foregroundStyle(.white)}
+                    .accessibilityLabel("语音通话").accessibilityIdentifier("chat.voiceCall").disabled(store.busy || holding || speech.finishing)
             }
     }
+    private func openVoiceCall() {dismissComposer();cancelVoice();modelMenu=false;voiceCall=true}
     @ViewBuilder private var attachmentPreview:some View {
         if loadingPhotos {ProgressView("正在准备图片…").font(.caption)}
         if !store.chatImages.isEmpty {
@@ -249,10 +259,10 @@ struct ConversationView:View {
         focused=false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
     }
-    func send() {
+    func send(spoken:String?=nil) {
         dismissComposer()
-        let images=store.chatImages
-        var question=input.trimmingCharacters(in:.whitespacesAndNewlines)
+        let images=spoken==nil ? store.chatImages:[]
+        var question=(spoken ?? input).trimmingCharacters(in:.whitespacesAndNewlines)
         guard (!question.isEmpty || !images.isEmpty),!store.assistantBusy,!loadingPhotos else{return}
         if question.isEmpty {question="请描述并分析这些图片。"}
         if !images.isEmpty {
@@ -261,10 +271,10 @@ struct ConversationView:View {
             guard stored+images.reduce(0,{$0+$1.jpeg.count})<=12*1024*1024 else {store.error="本对话图片较多，请新建对话后继续发送";return}
         }
         guard question.count<=20000 else {store.error="消息过长，请分段发送";return}
-        input="";focused=false;follow=true
+        if spoken==nil {input=""};focused=false;follow=true
         let previous=store.messages,epoch=store.epoch,d=store.current,mode=finance,cloud=store.cloudEnabled && store.hasAPIKey,model=store.model,searchEnabled=webSearch
         let user=ChatMessage(role:"user",content:question,images:images.isEmpty ? nil:images)
-        store.messages.append(user);store.chatImages=[];selectedPhotos=[]
+        store.messages.append(user);if spoken==nil {store.chatImages=[];selectedPhotos=[]}
         let answerID=UUID().uuidString;store.activeReplyID=answerID;store.messages.append(ChatMessage(id:answerID,role:"assistant",content:"",source:cloud ? "云端回答":"本机回答"));store.assistantBusy=true
         let actions=ChatActionService(store:store,question:question,history:previous,images:images)
         let session=store.activeSessionID
