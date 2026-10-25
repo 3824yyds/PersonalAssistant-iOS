@@ -25,7 +25,7 @@ import Combine
 
     override init() {
         super.init();synthesizer.delegate=self
-        speech.$text.sink {[weak self] text in
+        speech.$text.removeDuplicates().sink {[weak self] text in
             guard let self,self.active,self.phase == .listening else{return}
             self.transcript=text;self.lastActivity=ProcessInfo.processInfo.systemUptime
         }.store(in:&subscriptions)
