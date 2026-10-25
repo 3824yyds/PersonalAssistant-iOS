@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "duration_seconds": 45
+  },
+  "status": "keyframe_preview",
+  "frames": [
+    {
+      "id": 1,
+      "file": "01-opening",
+      "seconds": 5,
+      "copy": "让日常，更从容一点。"
+    },
+    {
+      "id": 2,
+      "file": "02-notes",
+      "seconds": 9,
+      "copy": "灵感来了，随手记下来。"
+    },
+    {
+      "id": 3,
+      "file": "03-finance",
+      "seconds": 11,
+      "copy": "钱花在哪，一眼看清。"
+    },
+    {
+      "id": 4,
+      "file": "04-voice",
+      "seconds": 10,
+      "copy": "有话，直接说。"
+    },
+    {
+      "id": 5,
+      "file": "05-privacy",
+      "seconds": 6,
+      "copy": "私人资料，安心收好。"
+    },
+    {
+      "id": 6,
+      "file": "06-ending",
+      "seconds": 4,
+      "copy": "个人助理。记下想法。看清收支。聊聊日常。"
+    }
+  ],
+  "capture_run": "https://github.com/3824yyds/PersonalAssistant-iOS/actions/runs/40194874943",
+  "capture_commit": "7c96621",
+  "voice_upgrade": "deferred",
+  "audio": "not_created"
+}

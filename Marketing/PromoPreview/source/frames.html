@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=1080,initial-scale=1">
+<title>个人助理 · 宣传片视觉预览</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#f8fafc;color:#131820;font-family:"Noto Sans CJK SC",sans-serif;-webkit-font-smoothing:antialiased}
+.scene{position:absolute;inset:0;overflow:hidden;display:none;background:radial-gradient(ellipse at 76% 79%,#d7e9ffb0,transparent 53%),linear-gradient(165deg,#fbfcfe 0%,#f7f9fc 55%,#e9f2ff 100%)}
+.scene.active{display:block}.scene:after{position:absolute;content:"";inset:0;pointer-events:none;background:url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="160" height="160"%3E%3Cfilter id="n"%3E%3CfeTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Cpath fill="%2390a2ba" opacity=".10" filter="url(%23n)" d="M0 0h160v160H0z"/%3E%3C/svg%3E');opacity:.13}
+.mast{position:absolute;top:90px;left:84px;right:84px;display:flex;align-items:center;justify-content:space-between;z-index:5}.brand{display:flex;gap:18px;align-items:center;font-size:28px;font-weight:600;letter-spacing:1px}.brand img{width:58px;height:58px;border-radius:15px;box-shadow:0 5px 16px #35456312}.chapter{font-size:22px;color:#758195;letter-spacing:2px}.copy{position:absolute;left:84px;right:70px;top:232px;z-index:4}.eyebrow{font-size:23px;color:#3e6ed7;letter-spacing:3px;font-weight:500;display:flex;align-items:center;gap:15px}.eyebrow:before{content:"";width:30px;height:2px;background:#5284f0}
+h1{font-size:94px;font-weight:700;line-height:1.26;letter-spacing:-4px;margin:32px 0 30px}h1 .blue{color:#3c6de5}p{font-size:29px;font-weight:400;line-height:1.8;color:#737f90;margin:0;letter-spacing:.1px}.footer{position:absolute;left:84px;right:84px;bottom:65px;display:flex;align-items:center;justify-content:space-between;font-size:20px;color:#8491a3;z-index:8;letter-spacing:1px}.footer .line{width:80px;height:2px;background:#b9c9df}
+.phone{position:absolute;background:linear-gradient(135deg,#43484f,#14171c 28%,#545b66 65%,#15181d);padding:10px;border-radius:72px;box-shadow:0 55px 90px -30px #21355050,0 18px 32px -14px #182a4430,0 0 0 1px #fff9;z-index:2;transform-origin:center}.phone .display{border-radius:62px;overflow:hidden;background:#f7f7f7;line-height:0}.phone img{width:100%;height:auto;display:block}.phone:before{position:absolute;content:"";left:-3px;top:220px;width:3px;height:68px;border-radius:3px 0 0 3px;background:#8d949e;box-shadow:0 100px #8d949e}.phone:after{position:absolute;content:"";right:-3px;top:300px;width:3px;height:110px;border-radius:0 3px 3px 0;background:#8d949e}
+.note-phone{left:240px;top:645px;width:600px}.ledger-phone{left:270px;top:652px;width:610px;transform:rotate(5deg)}.voice-phone{left:258px;top:640px;width:565px;transform:rotate(-2deg)}
+.cut-bottom{position:absolute;left:0;right:0;bottom:0;height:110px;background:linear-gradient(0deg,#eaf2ff,transparent);z-index:6;pointer-events:none}
+.hero .copy{top:248px}.hero h1{font-size:105px;margin-top:37px;line-height:1.23}.hero p{font-size:30px}.hero .phone.back{width:480px;left:-68px;top:885px;transform:rotate(-13deg);opacity:.98;z-index:1}.hero .phone.front{width:624px;left:418px;top:735px;transform:rotate(9deg)}.hero .glow{position:absolute;top:790px;left:60px;width:850px;height:850px;border-radius:50%;background:#91b7f5;filter:blur(150px);opacity:.23}
+.notes .copy,.finance .copy,.voice .copy{top:222px}.notes h1,.finance h1,.voice h1{font-size:91px}.notes .phone{transform:rotate(-3deg)}
+.detail{position:absolute;z-index:4;border-radius:30px;background:linear-gradient(130deg,#ffffffec,#f7fbfff0);border:1px solid #fff;box-shadow:0 18px 60px #355a8c16;backdrop-filter:blur(18px);padding:21px 28px;display:flex;align-items:center;gap:17px;color:#3a61a6;font-size:24px;font-weight:500}.detail svg{width:30px;height:30px;stroke:#3d73cf;stroke-width:1.8;fill:none}.notes .detail{left:64px;top:1450px;transform:rotate(2deg)}.finance .detail{left:65px;top:1480px;transform:rotate(-3deg)}.voice .detail{left:73px;top:1440px;transform:rotate(2deg)}
+.privacy{background:radial-gradient(ellipse at 50% 63%,#deebff 0%,transparent 54%),linear-gradient(160deg,#fbfcfe,#f4f8ff)}.privacy h1{font-size:91px}.lock-stage{position:absolute;left:150px;top:780px;width:780px;height:700px;display:flex;align-items:center;justify-content:center}.orbit{position:absolute;width:620px;height:620px;border:1px solid #bacde95c;border-radius:50%;transform:rotateX(55deg) rotate(-20deg)}.orbit.two{width:800px;height:800px;transform:rotateX(59deg) rotate(26deg);border-color:#b7c9e333}.lock-glass{position:absolute;left:171px;top:140px;width:438px;height:438px;border-radius:111px;display:flex;align-items:center;justify-content:center;background:linear-gradient(130deg,#ffffffee,#f9fcff9c 45%,#caddff99);border:2px solid #fff;box-shadow:0 44px 80px -35px #416faf55,inset 0 0 28px #ffffffd9;transform:rotate(-9deg)}.lock-glass svg{width:190px;height:215px;stroke:#3b72d4;stroke-width:10;fill:none;stroke-linejoin:round;stroke-linecap:round}.privacy .pills{position:absolute;left:84px;right:84px;top:1560px;display:flex;gap:15px;justify-content:center}.pill{padding:18px 28px;border-radius:99px;background:#ffffffb3;border:1px solid #fff;color:#526b8c;font-size:24px}.privacy .smallprint{position:absolute;left:100px;right:100px;top:1670px;text-align:center;font-size:22px;line-height:1.8;color:#8491a3}
+.outro{background:radial-gradient(ellipse at 50% 53%,#dbeaff 0%,transparent 55%),#f9fbfe}.outro .end-icon{position:absolute;top:350px;left:444px;width:192px;height:192px;border-radius:49px;box-shadow:0 26px 58px -16px #917f4050,0 1px 0 #fff}.outro .end-copy{position:absolute;top:585px;left:45px;right:45px;text-align:center}.outro h1{font-size:114px;letter-spacing:-3px;margin:15px 0 35px}.outro .tagline{font-size:43px;font-weight:500;color:#34425b;letter-spacing:2px}.outro p{font-size:27px;margin-top:30px}.outro .phone{padding:7px;border-radius:50px}.outro .phone .display{border-radius:43px}.outro .phone.a{width:390px;top:1110px;left:-25px;transform:rotate(-9deg)}.outro .phone.b{width:430px;top:1010px;left:325px;z-index:3}.outro .phone.c{width:390px;top:1110px;left:720px;transform:rotate(9deg)}.outro .cut-bottom{height:260px;background:linear-gradient(0deg,#edf5ff,transparent)}
+</style>
+<body>
+<section class="scene hero" data-id="1">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">让生活，轻一点</div></div>
+ <div class="copy"><div class="eyebrow">想法 · 收支 · 日常</div><h1>让日常，<br><span class="blue">更从容一点。</span></h1><p>把零散的小事，慢慢理清。</p></div><div class="glow"></div>
+ <div class="phone back"><div class="display"><img src="../assets/ledger.png"></div></div><div class="phone front"><div class="display"><img src="../assets/assistant.png"></div></div>
+ <div class="cut-bottom"></div><div class="footer"><span>为 iPhone 设计</span><span class="line"></span></div>
+</section>
+<section class="scene notes" data-id="2">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">01 / 记录灵感</div></div>
+ <div class="copy"><div class="eyebrow">把值得记住的，留下来</div><h1>灵感来了，<br><span class="blue">随手记下来。</span></h1><p>全屏书写 · 拍照识字 · AI 整理</p></div>
+ <div class="phone note-phone"><div class="display"><img src="../assets/note.png"></div></div>
+ <div class="detail"><svg viewBox="0 0 32 32"><path d="m6 17 6 6L27 8"/></svg>记好，保存。继续生活。</div>
+ <div class="cut-bottom"></div><div class="footer"><span>把想法，放在手边</span><span>界面为演示数据</span></div>
+</section>
+<section class="scene finance" data-id="3">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">02 / 管理收支</div></div>
+ <div class="copy"><div class="eyebrow">每一笔，都有迹可循</div><h1>钱花在哪，<br><span class="blue">一眼看清。</span></h1><p>多币种记账 · 分类统计 · 月度报告</p></div>
+ <div class="phone ledger-phone"><div class="display"><img src="../assets/statistics.png"></div></div>
+ <div class="detail"><svg viewBox="0 0 32 32"><path d="M5 25h23M9 21v-6m8 6V7m8 14V11"/></svg>收支有数，心里有底。</div>
+ <div class="cut-bottom"></div><div class="footer"><span>看见每一笔生活</span><span>金额均为演示数据</span></div>
+</section>
+<section class="scene voice" data-id="4">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">03 / 语音交流</div></div>
+ <div class="copy"><div class="eyebrow">给想法，一个出口</div><h1>有话，<br><span class="blue">直接说。</span></h1><p>语音提问，听见回答。</p></div>
+ <div class="phone voice-phone"><div class="display"><img src="../assets/voice.png"></div></div>
+ <div class="detail"><svg viewBox="0 0 32 32"><rect x="11" y="3" width="10" height="17" rx="5"/><path d="M6 15v2a10 10 0 0 0 20 0v-2M16 27v4"/></svg>聊聊日常，也理理思路。</div>
+ <div class="cut-bottom"></div><div class="footer"><span>用熟悉的方式交流</span><span>语音界面演示</span></div>
+</section>
+<section class="scene privacy" data-id="5">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">04 / 私人空间</div></div>
+ <div class="copy"><div class="eyebrow">你的生活，值得认真保管</div><h1>私人资料，<br><span class="blue">安心收好。</span></h1><p>资料在本地加密保存。</p></div>
+ <div class="lock-stage"><div class="orbit"></div><div class="orbit two"></div><div class="lock-glass"><svg viewBox="0 0 200 220"><path d="M54 96V62a46 46 0 0 1 92 0v34"/><rect x="30" y="94" width="140" height="112" rx="28"/><circle cx="100" cy="145" r="11"/><path d="M100 156v20"/></svg></div></div>
+ <div class="pills"><span class="pill">本地加密</span><span class="pill">自动锁定</span><span class="pill">加密备份</span></div>
+ <div class="smallprint">使用云端 AI 时，相关内容会发送至模型服务。</div>
+ <div class="footer"><span>为私人日常，留一处空间</span><span class="line"></span></div>
+</section>
+<section class="scene outro" data-id="6">
+ <div class="mast"><div class="brand"><img src="../assets/app-icon.png">个人助理</div><div class="chapter">你的日常，值得从容</div></div>
+ <img class="end-icon" src="../assets/app-icon.png"><div class="end-copy"><h1>个人助理</h1><div class="tagline">记下想法。看清收支。聊聊日常。</div><p>一个地方，装下你的日常。</p></div>
+ <div class="phone a"><div class="display"><img src="../assets/note.png"></div></div><div class="phone b"><div class="display"><img src="../assets/assistant.png"></div></div><div class="phone c"><div class="display"><img src="../assets/statistics.png"></div></div>
+ <div class="cut-bottom"></div><div class="footer"><span>为 iPhone 设计</span><span>个人助理 · 产品宣传片</span></div>
+</section>
+<script>const selected=Number(new URLSearchParams(location.search).get('frame')||1);document.querySelector(`[data-id="${selected}"]`).classList.add('active');</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{
+  "run_id": 40194874943,
+  "artifact_id": 12599592959,
+  "capture_commit": "7c96621",
+  "data": "synthetic",
+  "voice_state": "simulated listening; no audio captured",
+  "screenshots": [
+    {
+      "name": "voice",
+      "source": "F9296BDA-05E9-4B9A-97CB-48DD2BE24FDF.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "2d0e13feb7be1887caa46371c281d5f3b3b5a2f967ed5898e7ad5021c35a117b"
+    },
+    {
+      "name": "assistant",
+      "source": "C2B2CC99-97A8-4564-949E-47DC08250E42.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "629c0351bc968e2f023fe19d66c7d51b069c22217f4feaaddeeb5556e38e3de6"
+    },
+    {
+      "name": "statistics",
+      "source": "E7AA38A4-BE8E-4C7C-89A3-697F23059247.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "6e19427e013d055ebe102825eb4428b9b2aebc190fae9b0abd32b877213f5f2e"
+    },
+    {
+      "name": "ledger",
+      "source": "04A0C0AF-0D8C-4626-B036-64FF304078C4.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "43cabc0836d6fdb8cff1f9ddd74c52c054ce644d32404606283d5df49e360b48"
+    },
+    {
+      "name": "note",
+      "source": "4B92AB56-D5DB-4E15-AB2B-D4DD342CEB12.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "be39ae9e593c087189a22eeeae27bf1b6296c73b5ab31d914a15e5ce193b6749"
+    },
+    {
+      "name": "notes-list",
+      "source": "0D1A7A91-9672-4166-8AAA-901AE6AEE998.png",
+      "size": [
+        1178,
+        2556
+      ],
+      "sha256": "c4a20337c7d1f22d85aa269426f2fad71591ed1851c75b2952ebe67e3f2f8c45"
+    }
+  ]
+}
