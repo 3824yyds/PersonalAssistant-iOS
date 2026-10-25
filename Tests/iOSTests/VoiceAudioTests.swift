@@ -6,6 +6,7 @@ private final class VoicePCMStats:@unchecked Sendable {
     private let lock=NSLock()
     private var frames=0
     private var peak:Float=0
+    private var reported=false
     func append(_ buffer:AVAudioPCMBuffer) {
         lock.lock();defer{lock.unlock()}
         frames+=Int(buffer.frameLength)
@@ -14,6 +15,11 @@ private final class VoicePCMStats:@unchecked Sendable {
         }else if let samples=buffer.int16ChannelData?[0] {
             for i in 0..<Int(buffer.frameLength) {peak=max(peak,Float(abs(Int(samples[i])))/32768)}
         }
+    }
+    func reportAudibleOnce()->Bool {
+        lock.lock();defer{lock.unlock()}
+        guard !reported,frames>0,peak>0.00001 else{return false}
+        reported=true;return true
     }
     func result()->(Int,Float) {lock.lock();defer{lock.unlock()};return(frames,peak)}
 }
@@ -36,10 +42,11 @@ private final class VoicePCMStats:@unchecked Sendable {
         guard let voice=AVSpeechSynthesisVoice(language:"zh-CN") else{throw XCTSkip("Runner has no Chinese synthesis voice installed")}
         let synthesizer=AVSpeechSynthesizer(),text=AVSpeechUtterance(string:"你好，语音回复测试。")
         text.voice=voice
-        let stats=VoicePCMStats(),done=expectation(description:"synthesized audio stream completed")
+        let stats=VoicePCMStats(),done=expectation(description:"non-silent synthesized audio received")
         synthesizer.write(text) {buffer in
             guard let pcm=buffer as? AVAudioPCMBuffer else{return}
-            if pcm.frameLength==0 {done.fulfill()}else{stats.append(pcm)}
+            if pcm.frameLength>0 {stats.append(pcm)}
+            if stats.reportAudibleOnce() {done.fulfill()}
         }
         await fulfillment(of:[done],timeout:25)
         let(frames,peak)=stats.result()
