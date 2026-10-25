@@ -1,0 +1,448 @@
+[
+  {
+    "epoch": 1792934707.178083,
+    "name": "scene.notes"
+  },
+  {
+    "epoch": 1792934708.952497,
+    "kind": "tap",
+    "name": "notes.quick.begin",
+    "x": 0.8829516539440203,
+    "y": 0.9225352112676056
+  },
+  {
+    "epoch": 1792934710.397637,
+    "name": "notes.quick.end"
+  },
+  {
+    "epoch": 1792934711.555145,
+    "kind": "tap",
+    "name": "notes.new.begin",
+    "x": 0.8829516539440203,
+    "y": 0.7253521126760564
+  },
+  {
+    "epoch": 1792934713.834772,
+    "name": "notes.new.end"
+  },
+  {
+    "epoch": 1792934715.5131412,
+    "kind": "tap",
+    "name": "notes.title.focus.begin",
+    "x": 0.5,
+    "y": 0.2069640062597809
+  },
+  {
+    "epoch": 1792934718.040429,
+    "name": "notes.title.focus.end"
+  },
+  {
+    "epoch": 1792934718.0404348,
+    "kind": "type",
+    "name": "notes.title.begin"
+  },
+  {
+    "epoch": 1792934719.2306762,
+    "name": "notes.title.end"
+  },
+  {
+    "epoch": 1792934720.441894,
+    "kind": "tap",
+    "name": "notes.body.focus.begin",
+    "x": 0.5,
+    "y": 0.4287949921752738
+  },
+  {
+    "epoch": 1792934721.3385649,
+    "name": "notes.body.focus.end"
+  },
+  {
+    "epoch": 1792934721.3385758,
+    "kind": "type",
+    "name": "notes.body.begin"
+  },
+  {
+    "epoch": 1792934722.4017758,
+    "name": "notes.body.end"
+  },
+  {
+    "epoch": 1792934724.1125169,
+    "kind": "tap",
+    "name": "notes.save.begin",
+    "x": 0.8905852417302799,
+    "y": 0.09507042253521127
+  },
+  {
+    "epoch": 1792934725.776763,
+    "name": "notes.save.end"
+  },
+  {
+    "epoch": 1792934726.916039,
+    "name": "notes.saved"
+  },
+  {
+    "epoch": 1792934728.339452,
+    "name": "scene.ledger"
+  },
+  {
+    "epoch": 1792934730.093101,
+    "kind": "tap",
+    "name": "ledger.tab.begin",
+    "x": 0.3244274809160305,
+    "y": 0.9225352112676056
+  },
+  {
+    "epoch": 1792934731.003515,
+    "name": "ledger.tab.end"
+  },
+  {
+    "epoch": 1792934732.1845589,
+    "kind": "tap",
+    "name": "ledger.quick.begin",
+    "x": 0.8829516539440203,
+    "y": 0.9225352112676056
+  },
+  {
+    "epoch": 1792934733.653956,
+    "name": "ledger.quick.end"
+  },
+  {
+    "epoch": 1792934734.8079162,
+    "kind": "tap",
+    "name": "ledger.new.begin",
+    "x": 0.8829516539440203,
+    "y": 0.7887323943661971
+  },
+  {
+    "epoch": 1792934736.688171,
+    "name": "ledger.new.end"
+  },
+  {
+    "epoch": 1792934738.064769,
+    "kind": "tap",
+    "name": "ledger.amount.focus.begin",
+    "x": 0.5542832909245123,
+    "y": 0.3037949921752739
+  },
+  {
+    "epoch": 1792934739.5030298,
+    "name": "ledger.amount.focus.end"
+  },
+  {
+    "epoch": 1792934739.503038,
+    "kind": "type",
+    "name": "ledger.amount.begin"
+  },
+  {
+    "epoch": 1792934740.046358,
+    "name": "ledger.amount.end"
+  },
+  {
+    "epoch": 1792934741.5813031,
+    "kind": "tap",
+    "name": "ledger.title.focus.begin",
+    "x": 0.5,
+    "y": 0.3740219092331768
+  },
+  {
+    "epoch": 1792934743.085671,
+    "name": "ledger.title.focus.end"
+  },
+  {
+    "epoch": 1792934743.085676,
+    "kind": "type",
+    "name": "ledger.title.begin"
+  },
+  {
+    "epoch": 1792934743.602322,
+    "name": "ledger.title.end"
+  },
+  {
+    "epoch": 1792934744.908668,
+    "kind": "tap",
+    "name": "ledger.save.begin",
+    "x": 0.8854961832061069,
+    "y": 0.11384976525821597
+  },
+  {
+    "epoch": 1792934746.777353,
+    "name": "ledger.save.end"
+  },
+  {
+    "epoch": 1792934747.8984199,
+    "name": "ledger.saved"
+  },
+  {
+    "epoch": 1792934749.343869,
+    "name": "scene.statistics"
+  },
+  {
+    "epoch": 1792934751.2958179,
+    "kind": "tap",
+    "name": "statistics.open.begin",
+    "x": 0.3842239185750636,
+    "y": 0.17488262910798122
+  },
+  {
+    "epoch": 1792934753.0078049,
+    "name": "statistics.open.end"
+  },
+  {
+    "epoch": 1792934757.12311,
+    "kind": "tap",
+    "name": "statistics.calendar.begin",
+    "x": 0.6132315521628499,
+    "y": 0.17488262910798122
+  },
+  {
+    "epoch": 1792934759.478149,
+    "name": "statistics.calendar.end"
+  },
+  {
+    "epoch": 1792934760.58619,
+    "name": "scene.wallet"
+  },
+  {
+    "epoch": 1792934762.363909,
+    "kind": "tap",
+    "name": "wallet.open.begin",
+    "x": 0.7663273969072726,
+    "y": 0.0999608771155511
+  },
+  {
+    "epoch": 1792934763.798523,
+    "name": "wallet.open.end"
+  },
+  {
+    "epoch": 1792934767.096236,
+    "kind": "tap",
+    "name": "wallet.expand.begin",
+    "x": 0.8982188295165394,
+    "y": 0.1821205007824726
+  },
+  {
+    "epoch": 1792934767.769655,
+    "name": "wallet.expand.end"
+  },
+  {
+    "epoch": 1792934769.729758,
+    "kind": "tap",
+    "name": "wallet.card.begin",
+    "x": 0.5,
+    "y": 0.3464397496087637
+  },
+  {
+    "epoch": 1792934770.334969,
+    "name": "wallet.card.end"
+  },
+  {
+    "epoch": 1792934773.931356,
+    "kind": "tap",
+    "name": "wallet.close.begin",
+    "x": 0.11450381679389313,
+    "y": 0.11384976525821597
+  },
+  {
+    "epoch": 1792934775.368823,
+    "name": "wallet.close.end"
+  },
+  {
+    "epoch": 1792934775.3689718,
+    "name": "scene.models"
+  },
+  {
+    "epoch": 1792934777.1022,
+    "kind": "tap",
+    "name": "models.assistant.begin",
+    "x": 0.70186598812553,
+    "y": 0.9225352112676056
+  },
+  {
+    "epoch": 1792934777.934396,
+    "name": "models.assistant.end"
+  },
+  {
+    "epoch": 1792934779.083994,
+    "kind": "tap",
+    "name": "models.input.begin",
+    "x": 0.5,
+    "y": 0.8673708920187794
+  },
+  {
+    "epoch": 1792934780.047141,
+    "name": "models.input.end"
+  },
+  {
+    "epoch": 1792934781.512166,
+    "kind": "tap",
+    "name": "models.open.begin",
+    "x": 0.6424936386768448,
+    "y": 0.5645539727009518
+  },
+  {
+    "epoch": 1792934782.250366,
+    "name": "models.open.end"
+  },
+  {
+    "epoch": 1792934783.588791,
+    "kind": "swipe",
+    "name": "models.toPro.begin",
+    "toX": 0.7069550466497031,
+    "toY": 0.5481220657276995,
+    "x": 0.29346904156064463,
+    "y": 0.5481220657276995
+  },
+  {
+    "epoch": 1792934784.750799,
+    "name": "models.toPro.end"
+  },
+  {
+    "epoch": 1792934785.997721,
+    "kind": "swipe",
+    "name": "models.toFlash.begin",
+    "toX": 0.29346904156064463,
+    "toY": 0.5481220657276995,
+    "x": 0.7069550466497031,
+    "y": 0.5481220657276995
+  },
+  {
+    "epoch": 1792934787.156311,
+    "name": "models.toFlash.end"
+  },
+  {
+    "epoch": 1792934789.1250072,
+    "kind": "tap",
+    "name": "models.close.begin",
+    "x": 0.5,
+    "y": 0.4724178403755869
+  },
+  {
+    "epoch": 1792934789.779376,
+    "name": "models.close.end"
+  },
+  {
+    "epoch": 1792934789.7794561,
+    "name": "scene.chat"
+  },
+  {
+    "epoch": 1792934791.5906,
+    "kind": "tap",
+    "name": "chat.greeting.focus.begin",
+    "x": 0.5,
+    "y": 0.5129107981220657
+  },
+  {
+    "epoch": 1792934792.484439,
+    "name": "chat.greeting.focus.end"
+  },
+  {
+    "epoch": 1792934792.484448,
+    "kind": "type",
+    "name": "chat.greeting.begin"
+  },
+  {
+    "epoch": 1792934793.895771,
+    "name": "chat.greeting.end"
+  },
+  {
+    "epoch": 1792934795.0725589,
+    "kind": "tap",
+    "name": "chat.send.begin",
+    "x": 0.905852417302799,
+    "y": 0.562206572769953
+  },
+  {
+    "epoch": 1792934796.472464,
+    "name": "chat.send.end"
+  },
+  {
+    "epoch": 1792934797.5505161,
+    "name": "chat.replied"
+  },
+  {
+    "epoch": 1792934798.828325,
+    "name": "scene.voice"
+  },
+  {
+    "epoch": 1792934800.643429,
+    "kind": "tap",
+    "name": "voice.open.begin",
+    "x": 0.905852417302799,
+    "y": 0.9190140845070423
+  },
+  {
+    "epoch": 1792934801.535705,
+    "name": "voice.open.end"
+  },
+  {
+    "epoch": 1792934805.154839,
+    "kind": "tap",
+    "name": "voice.mute.begin",
+    "x": 0.3884648006785411,
+    "y": 0.8943661971830986
+  },
+  {
+    "epoch": 1792934806.486932,
+    "name": "voice.mute.end"
+  },
+  {
+    "epoch": 1792934808.377348,
+    "kind": "tap",
+    "name": "voice.unmute.begin",
+    "x": 0.3884648006785411,
+    "y": 0.8943661971830986
+  },
+  {
+    "epoch": 1792934809.718779,
+    "name": "voice.unmute.end"
+  },
+  {
+    "epoch": 1792934811.740549,
+    "kind": "tap",
+    "name": "voice.end.begin",
+    "x": 0.6123833757421543,
+    "y": 0.8943661971830986
+  },
+  {
+    "epoch": 1792934812.615855,
+    "name": "voice.end.end"
+  },
+  {
+    "epoch": 1792934812.615902,
+    "name": "scene.privacy"
+  },
+  {
+    "epoch": 1792934814.345845,
+    "kind": "tap",
+    "name": "privacy.profile.begin",
+    "x": 0.9007633587786259,
+    "y": 0.09976525821596244
+  },
+  {
+    "epoch": 1792934815.5690222,
+    "name": "privacy.profile.end"
+  },
+  {
+    "epoch": 1792934819.515343,
+    "name": "privacy.lockVisible"
+  },
+  {
+    "epoch": 1792934820.7824001,
+    "kind": "tap",
+    "name": "privacy.lock.begin",
+    "x": 0.5,
+    "y": 0.8034037558685446
+  },
+  {
+    "epoch": 1792934822.341475,
+    "name": "privacy.lock.end"
+  },
+  {
+    "epoch": 1792934823.378292,
+    "name": "privacy.locked"
+  },
+  {
+    "epoch": 1792934825.427311,
+    "name": "finished"
+  }
+]

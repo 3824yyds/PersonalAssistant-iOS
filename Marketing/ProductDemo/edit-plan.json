@@ -1,0 +1,737 @@
+{
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "duration": 45
+  },
+  "capture_clock_correction": 0.24751503944398223,
+  "scenes": [
+    {
+      "name": "notes",
+      "heading": "01 / 写下想法",
+      "caption": "新建笔记，写好后点 ✓ 保存。",
+      "start": 0,
+      "duration": 9.0,
+      "source_seconds": 12.665268726348884,
+      "source_start": 69.61113985061647,
+      "source_end": 90.77250893592836
+    },
+    {
+      "name": "ledger",
+      "heading": "02 / 随手记账",
+      "caption": "记下 28 元咖啡支出，保存即入账。",
+      "start": 9.0,
+      "duration": 8.5,
+      "source_seconds": 13.212419109344495,
+      "source_start": 90.77250893592836,
+      "source_end": 111.77692587852479
+    },
+    {
+      "name": "statistics",
+      "heading": "03 / 看清收支",
+      "caption": "从流水切到统计，再看看收支日历。",
+      "start": 17.5,
+      "duration": 4.0,
+      "source_seconds": 6.068041048049935,
+      "source_start": 111.77692587852479,
+      "source_end": 123.01924689292909
+    },
+    {
+      "name": "wallet",
+      "heading": "04 / 管理账户",
+      "caption": "展开卡包，查看账户与余额。",
+      "start": 21.5,
+      "duration": 4.0,
+      "source_seconds": 6.680859832763687,
+      "source_start": 123.01924689292909,
+      "source_end": 137.80202873229982
+    },
+    {
+      "name": "models",
+      "heading": "05 / 选择模型",
+      "caption": "点击展开，左右滑动切换 Flash / Pro。",
+      "start": 25.5,
+      "duration": 7.0,
+      "source_seconds": 8.528590221405068,
+      "source_start": 137.80202873229982,
+      "source_end": 152.21251304626466
+    },
+    {
+      "name": "chat",
+      "heading": "06 / 聊聊日常",
+      "caption": "本机问候示例：发出消息，收到简短回应。",
+      "start": 32.5,
+      "duration": 3.0,
+      "source_seconds": 6.195076217651376,
+      "source_start": 152.21251304626466,
+      "source_end": 161.2613819408417
+    },
+    {
+      "name": "voice",
+      "heading": "07 / 语音模式",
+      "caption": "进入语音模式，静音与退出一键完成。",
+      "start": 35.5,
+      "duration": 5.5,
+      "source_seconds": 7.261153049469044,
+      "source_start": 161.2613819408417,
+      "source_end": 175.0489588546753
+    },
+    {
+      "name": "privacy",
+      "heading": "08 / 私人资料",
+      "caption": "一键锁定资料库，保护私人记录。",
+      "start": 41.0,
+      "duration": 4.0,
+      "source_seconds": 6.413177194595363,
+      "source_start": 175.0489588546753,
+      "source_end": 187.86036785125734
+    }
+  ],
+  "pieces": [
+    {
+      "id": 0,
+      "scene": "notes",
+      "source_start": 69.69113985061647,
+      "source_end": 70.26113985061647,
+      "frames": 12,
+      "output_start": 0,
+      "output_duration": 0.4,
+      "speed": 1.4250000000000185
+    },
+    {
+      "id": 1,
+      "scene": "notes",
+      "source_start": 71.30555391311647,
+      "source_end": 73.0606937980652,
+      "frames": 37,
+      "output_start": 0.4,
+      "output_duration": 1.2333333333333334,
+      "speed": 1.423086393201675
+    },
+    {
+      "id": 2,
+      "scene": "notes",
+      "source_start": 74.63782901763918,
+      "source_end": 76.49782901763918,
+      "frames": 40,
+      "output_start": 1.6333333333333333,
+      "output_duration": 1.3333333333333333,
+      "speed": 1.3949999999999996
+    },
+    {
+      "id": 3,
+      "scene": "notes",
+      "source_start": 78.84348602294924,
+      "source_end": 81.89373308181764,
+      "frames": 65,
+      "output_start": 2.966666666666667,
+      "output_duration": 2.1666666666666665,
+      "speed": 1.4078063348623422
+    },
+    {
+      "id": 4,
+      "scene": "notes",
+      "source_start": 82.79495096206666,
+      "source_end": 85.0648327445984,
+      "frames": 48,
+      "output_start": 5.133333333333333,
+      "output_duration": 1.6,
+      "speed": 1.4186761140823378
+    },
+    {
+      "id": 5,
+      "scene": "notes",
+      "source_start": 86.57981986999513,
+      "source_end": 88.43981986999513,
+      "frames": 40,
+      "output_start": 6.7333333333333325,
+      "output_duration": 1.3333333333333333,
+      "speed": 1.3949999999999996
+    },
+    {
+      "id": 6,
+      "scene": "notes",
+      "source_start": 89.04909589767458,
+      "source_end": 90.34909589767457,
+      "frames": 28,
+      "output_start": 8.066666666666666,
+      "output_duration": 0.9333333333333333,
+      "speed": 1.3928571428571397
+    },
+    {
+      "id": 7,
+      "scene": "ledger",
+      "source_start": 90.85250893592836,
+      "source_end": 91.42250893592836,
+      "frames": 11,
+      "output_start": 9.0,
+      "output_duration": 0.36666666666666664,
+      "speed": 1.5545454545454749
+    },
+    {
+      "id": 8,
+      "scene": "ledger",
+      "source_start": 92.44615793228151,
+      "source_end": 93.66657191276552,
+      "frames": 24,
+      "output_start": 9.366666666666667,
+      "output_duration": 0.8,
+      "speed": 1.5255174756050138
+    },
+    {
+      "id": 9,
+      "scene": "ledger",
+      "source_start": 94.53761577606203,
+      "source_end": 96.31701284408571,
+      "frames": 34,
+      "output_start": 10.166666666666668,
+      "output_duration": 1.1333333333333333,
+      "speed": 1.5700562364914858
+    },
+    {
+      "id": 10,
+      "scene": "ledger",
+      "source_start": 97.49122781753542,
+      "source_end": 99.35122781753542,
+      "frames": 36,
+      "output_start": 11.3,
+      "output_duration": 1.2,
+      "speed": 1.5499999999999996
+    },
+    {
+      "id": 11,
+      "scene": "ledger",
+      "source_start": 100.41782593727113,
+      "source_end": 102.70941501617433,
+      "frames": 44,
+      "output_start": 12.5,
+      "output_duration": 1.4666666666666666,
+      "speed": 1.5624470992521822
+    },
+    {
+      "id": 12,
+      "scene": "ledger",
+      "source_start": 103.93436002731325,
+      "source_end": 106.26537900924684,
+      "frames": 45,
+      "output_start": 13.966666666666667,
+      "output_duration": 1.5,
+      "speed": 1.5540126546223973
+    },
+    {
+      "id": 13,
+      "scene": "ledger",
+      "source_start": 107.58040995597841,
+      "source_end": 109.44040995597841,
+      "frames": 36,
+      "output_start": 15.466666666666667,
+      "output_duration": 1.2,
+      "speed": 1.5499999999999996
+    },
+    {
+      "id": 14,
+      "scene": "ledger",
+      "source_start": 110.03147676467897,
+      "source_end": 111.33147676467897,
+      "frames": 25,
+      "output_start": 16.666666666666668,
+      "output_duration": 0.8333333333333334,
+      "speed": 1.5599999999999965
+    },
+    {
+      "id": 15,
+      "scene": "statistics",
+      "source_start": 111.85692587852479,
+      "source_end": 112.4269258785248,
+      "frames": 11,
+      "output_start": 17.5,
+      "output_duration": 0.36666666666666664,
+      "speed": 1.5545454545454749
+    },
+    {
+      "id": 16,
+      "scene": "statistics",
+      "source_start": 113.8108617782593,
+      "source_end": 116.5908617782593,
+      "frames": 55,
+      "output_start": 17.866666666666667,
+      "output_duration": 1.8333333333333333,
+      "speed": 1.516363636363637
+    },
+    {
+      "id": 17,
+      "scene": "statistics",
+      "source_start": 120.28120584487917,
+      "source_end": 122.9992468929291,
+      "frames": 54,
+      "output_start": 19.7,
+      "output_duration": 1.8,
+      "speed": 1.510022804472181
+    },
+    {
+      "id": 18,
+      "scene": "wallet",
+      "source_start": 123.09924689292909,
+      "source_end": 123.6692468929291,
+      "frames": 10,
+      "output_start": 21.5,
+      "output_duration": 0.3333333333333333,
+      "speed": 1.7100000000000222
+    },
+    {
+      "id": 19,
+      "scene": "wallet",
+      "source_start": 124.7169659137726,
+      "source_end": 126.46157985687258,
+      "frames": 31,
+      "output_start": 21.833333333333332,
+      "output_duration": 1.0333333333333334,
+      "speed": 1.6883360739677202
+    },
+    {
+      "id": 20,
+      "scene": "wallet",
+      "source_start": 129.4492928981781,
+      "source_end": 130.43271189689636,
+      "frames": 18,
+      "output_start": 22.866666666666667,
+      "output_duration": 0.6,
+      "speed": 1.6390316645304401
+    },
+    {
+      "id": 21,
+      "scene": "wallet",
+      "source_start": 132.0828149318695,
+      "source_end": 133.9680259513855,
+      "frames": 34,
+      "output_start": 23.46666666666667,
+      "output_duration": 1.1333333333333333,
+      "speed": 1.6634214878082285
+    },
+    {
+      "id": 22,
+      "scene": "wallet",
+      "source_start": 136.28441286087036,
+      "source_end": 137.7820287322998,
+      "frames": 27,
+      "output_start": 24.6,
+      "output_duration": 0.9,
+      "speed": 1.6640176349216063
+    },
+    {
+      "id": 23,
+      "scene": "models",
+      "source_start": 137.88202873229983,
+      "source_end": 138.45202873229982,
+      "frames": 14,
+      "output_start": 25.5,
+      "output_duration": 0.4666666666666667,
+      "speed": 1.2214285714285569
+    },
+    {
+      "id": 24,
+      "scene": "models",
+      "source_start": 139.45525693893433,
+      "source_end": 140.5974529361725,
+      "frames": 28,
+      "output_start": 25.966666666666665,
+      "output_duration": 0.9333333333333333,
+      "speed": 1.2237814256123158
+    },
+    {
+      "id": 25,
+      "scene": "models",
+      "source_start": 141.43705081939697,
+      "source_end": 142.7101979827881,
+      "frames": 31,
+      "output_start": 26.9,
+      "output_duration": 1.0333333333333334,
+      "speed": 1.232077900055918
+    },
+    {
+      "id": 26,
+      "scene": "models",
+      "source_start": 143.8652229309082,
+      "source_end": 144.91342288017273,
+      "frames": 26,
+      "output_start": 27.933333333333334,
+      "output_duration": 0.8666666666666667,
+      "speed": 1.20946147992061
+    },
+    {
+      "id": 27,
+      "scene": "models",
+      "source_start": 145.9418478012085,
+      "source_end": 147.8338558483124,
+      "frames": 47,
+      "output_start": 28.8,
+      "output_duration": 1.5666666666666667,
+      "speed": 1.207664710917383
+    },
+    {
+      "id": 28,
+      "scene": "models",
+      "source_start": 148.35077786445618,
+      "source_end": 150.23936794281008,
+      "frames": 47,
+      "output_start": 30.366666666666667,
+      "output_duration": 1.5666666666666667,
+      "speed": 1.205483028736532
+    },
+    {
+      "id": 29,
+      "scene": "models",
+      "source_start": 151.47806406021118,
+      "source_end": 152.19251304626465,
+      "frames": 17,
+      "output_start": 31.933333333333334,
+      "output_duration": 0.5666666666666667,
+      "speed": 1.2607923283296514
+    },
+    {
+      "id": 30,
+      "scene": "chat",
+      "source_start": 152.29251304626467,
+      "source_end": 152.86251304626467,
+      "frames": 8,
+      "output_start": 32.5,
+      "output_duration": 0.26666666666666666,
+      "speed": 2.1374999999999744
+    },
+    {
+      "id": 31,
+      "scene": "chat",
+      "source_start": 153.94365692138672,
+      "source_end": 156.55882793426514,
+      "frames": 38,
+      "output_start": 32.766666666666666,
+      "output_duration": 1.2666666666666666,
+      "speed": 2.0646086943777004
+    },
+    {
+      "id": 32,
+      "scene": "chat",
+      "source_start": 157.4256157875061,
+      "source_end": 159.13552099227906,
+      "frames": 25,
+      "output_start": 34.03333333333333,
+      "output_duration": 0.8333333333333334,
+      "speed": 2.0518862457275415
+    },
+    {
+      "id": 33,
+      "scene": "chat",
+      "source_start": 159.68357303619385,
+      "source_end": 160.98357303619386,
+      "frames": 19,
+      "output_start": 34.86666666666667,
+      "output_duration": 0.6333333333333333,
+      "speed": 2.0526315789473863
+    },
+    {
+      "id": 34,
+      "scene": "voice",
+      "source_start": 161.3413819408417,
+      "source_end": 161.9113819408417,
+      "frames": 13,
+      "output_start": 35.5,
+      "output_duration": 0.43333333333333335,
+      "speed": 1.3153846153845996
+    },
+    {
+      "id": 35,
+      "scene": "voice",
+      "source_start": 162.99648594856262,
+      "source_end": 164.61876199722292,
+      "frames": 37,
+      "output_start": 35.93333333333333,
+      "output_duration": 1.2333333333333334,
+      "speed": 1.3153589583732133
+    },
+    {
+      "id": 36,
+      "scene": "voice",
+      "source_start": 167.50789594650269,
+      "source_end": 169.5699889469147,
+      "frames": 47,
+      "output_start": 37.166666666666664,
+      "output_duration": 1.5666666666666667,
+      "speed": 1.3162295747310673
+    },
+    {
+      "id": 37,
+      "scene": "voice",
+      "source_start": 170.7304048538208,
+      "source_end": 172.80183599472048,
+      "frames": 47,
+      "output_start": 38.733333333333334,
+      "output_duration": 1.5666666666666667,
+      "speed": 1.3221900899359638
+    },
+    {
+      "id": 38,
+      "scene": "voice",
+      "source_start": 174.09360599517822,
+      "source_end": 175.0289588546753,
+      "frames": 21,
+      "output_start": 40.300000000000004,
+      "output_duration": 0.7,
+      "speed": 1.3362183707101039
+    },
+    {
+      "id": 39,
+      "scene": "privacy",
+      "source_start": 175.12895885467532,
+      "source_end": 175.6989588546753,
+      "frames": 11,
+      "output_start": 41.00000000000001,
+      "output_duration": 0.36666666666666664,
+      "speed": 1.554545454545436
+    },
+    {
+      "id": 40,
+      "scene": "privacy",
+      "source_start": 176.69890189170837,
+      "source_end": 178.2320790863037,
+      "frames": 29,
+      "output_start": 41.366666666666674,
+      "output_duration": 0.9666666666666667,
+      "speed": 1.5860453737193163
+    },
+    {
+      "id": 41,
+      "scene": "privacy",
+      "source_start": 181.79839985847474,
+      "source_end": 182.29839985847474,
+      "frames": 9,
+      "output_start": 42.33333333333334,
+      "output_duration": 0.3,
+      "speed": 1.6666666666666667
+    },
+    {
+      "id": 42,
+      "scene": "privacy",
+      "source_start": 183.144531917572,
+      "source_end": 185.00453191757202,
+      "frames": 35,
+      "output_start": 42.63333333333334,
+      "output_duration": 1.1666666666666667,
+      "speed": 1.5942857142857259
+    },
+    {
+      "id": 43,
+      "scene": "privacy",
+      "source_start": 185.51134899139404,
+      "source_end": 187.46134899139406,
+      "frames": 36,
+      "output_start": 43.800000000000004,
+      "output_duration": 1.2,
+      "speed": 1.6250000000000142
+    }
+  ],
+  "taps": [
+    {
+      "time": 0.8778346580000118,
+      "kind": "tap",
+      "x": 846.3613231552163,
+      "y": 1710.5211267605634,
+      "name": "notes.quick.begin"
+    },
+    {
+      "time": 5.474145350571485,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 853.3881064162753,
+      "name": "notes.body.focus.begin"
+    },
+    {
+      "time": 7.138891697271743,
+      "kind": "tap",
+      "x": 852.4681933842239,
+      "y": 274.0422535211268,
+      "name": "notes.save.begin"
+    },
+    {
+      "time": 9.687663508098195,
+      "kind": "tap",
+      "x": 399.5419847328244,
+      "y": 1710.5211267605634,
+      "name": "ledger.tab.begin"
+    },
+    {
+      "time": 10.599772172186361,
+      "kind": "tap",
+      "x": 846.3613231552163,
+      "y": 1710.5211267605634,
+      "name": "ledger.quick.begin"
+    },
+    {
+      "time": 11.525642099688124,
+      "kind": "tap",
+      "x": 846.3613231552163,
+      "y": 1478.2394366197182,
+      "name": "ledger.new.begin"
+    },
+    {
+      "time": 12.935214734838354,
+      "kind": "tap",
+      "x": 583.4266327396099,
+      "y": 636.3881064162755,
+      "name": "ledger.amount.focus.begin"
+    },
+    {
+      "time": 14.404243540945869,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 758.302034428795,
+      "name": "ledger.title.focus.begin"
+    },
+    {
+      "time": 15.699773113701927,
+      "kind": "tap",
+      "x": 848.3969465648855,
+      "y": 306.6431924882629,
+      "name": "ledger.save.begin"
+    },
+    {
+      "time": 18.208281942180015,
+      "kind": "tap",
+      "x": 447.3791348600509,
+      "y": 412.5962441314554,
+      "name": "statistics.open.begin"
+    },
+    {
+      "time": 22.236096746663677,
+      "kind": "tap",
+      "x": 753.0619175258181,
+      "y": 282.53208267259674,
+      "name": "wallet.open.begin"
+    },
+    {
+      "time": 23.100364744447827,
+      "kind": "tap",
+      "x": 858.5750636132316,
+      "y": 425.16118935837244,
+      "name": "wallet.expand.begin"
+    },
+    {
+      "time": 23.678486077059436,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 710.4194053208138,
+      "name": "wallet.card.begin"
+    },
+    {
+      "time": 25.00864951532322,
+      "kind": "tap",
+      "x": 231.6030534351145,
+      "y": 306.6431924882629,
+      "name": "wallet.close.begin"
+    },
+    {
+      "time": 26.338046873332072,
+      "kind": "tap",
+      "x": 701.492790500424,
+      "y": 1710.5211267605634,
+      "name": "models.assistant.begin"
+    },
+    {
+      "time": 27.316707599010343,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 1614.755868544601,
+      "name": "models.input.begin"
+    },
+    {
+      "time": 28.274137884790488,
+      "kind": "tap",
+      "x": 653.9949109414758,
+      "y": 1089.0656966088522,
+      "name": "models.open.begin"
+    },
+    {
+      "time": 29.299230966796053,
+      "kind": "swipe",
+      "x": 374.7752332485157,
+      "y": 1060.5399061032863,
+      "name": "models.toPro.begin",
+      "toX": 705.5640373197625,
+      "toY": 1060.5399061032863
+    },
+    {
+      "time": 30.86552523283789,
+      "kind": "swipe",
+      "x": 705.5640373197625,
+      "y": 1060.5399061032863,
+      "name": "models.toFlash.begin",
+      "toX": 374.7752332485157,
+      "toY": 1060.5399061032863
+    },
+    {
+      "time": 32.230341798899595,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 929.1173708920188,
+      "name": "models.close.begin"
+    },
+    {
+      "time": 33.000235138219665,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 999.4131455399062,
+      "name": "chat.greeting.focus.begin"
+    },
+    {
+      "time": 34.36473572048608,
+      "kind": "tap",
+      "x": 864.6819338422392,
+      "y": 1084.9906103286385,
+      "name": "chat.send.begin"
+    },
+    {
+      "time": 36.29941151969598,
+      "kind": "tap",
+      "x": 864.6819338422392,
+      "y": 1704.4084507042253,
+      "name": "voice.open.begin"
+    },
+    {
+      "time": 37.68286981483269,
+      "kind": "tap",
+      "x": 450.7718405428329,
+      "y": 1661.6197183098593,
+      "name": "voice.mute.begin"
+    },
+    {
+      "time": 39.247631545954896,
+      "kind": "tap",
+      "x": 450.7718405428329,
+      "y": 1661.6197183098593,
+      "name": "voice.unmute.begin"
+    },
+    {
+      "time": 40.65464835789888,
+      "kind": "tap",
+      "x": 629.9067005937234,
+      "y": 1661.6197183098593,
+      "name": "voice.end.begin"
+    },
+    {
+      "time": 41.76415197699518,
+      "kind": "tap",
+      "x": 860.6106870229007,
+      "y": 282.1924882629108,
+      "name": "privacy.profile.begin"
+    },
+    {
+      "time": 43.05416450261217,
+      "kind": "tap",
+      "x": 540.0,
+      "y": 1503.7089201877934,
+      "name": "privacy.lock.begin"
+    }
+  ],
+  "source_type": "continuous native Simulator screen recording",
+  "voice": "UI demonstration only; no recorded speech or fabricated reply"
+}

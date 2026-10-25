@@ -1,0 +1,14 @@
+/raw/
+/pieces/
+/review/
+/*.mp4
+/*.zip
+/*manifest.json
+/video-probe.json
+/render.log
+/labels.ass
+/assets/*.wav
+/assets/plate.png
+/assets/screen-mask.png
+/source/__pycache__/
+/source/plate.html
