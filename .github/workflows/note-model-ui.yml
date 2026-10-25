@@ -48,7 +48,7 @@ jobs:
       - name: Compile and test note editor and model slider on iOS 26
         run: |
           mkdir -p build
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/NoteModel.xcresult -only-testing:AssistantUITests/VoiceCallTests/testVoiceHoldAreaDisappearsBehindModelSelectorAndReturns -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/note-model.log 2>&1 || { grep -n -E -A 5 -B 2 "error:|failed|passed" build/note-model.log || true; tail -n 100 build/note-model.log; exit 1; }
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/NoteModel.xcresult -only-testing:AssistantUITests/VoiceCallTests -only-testing:AssistantUITests/NoteAndModelTests/testModelSliderSwipesBothWaysAndPersistsSelection -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/note-model.log 2>&1 || { grep -n -E -A 5 -B 2 "error:|failed|passed" build/note-model.log || true; tail -n 100 build/note-model.log; exit 1; }
       - name: Export screenshots
         if: always()
         run: |
