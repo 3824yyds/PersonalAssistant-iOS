@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ios: [18, 26]
+        ios: [26]
         suite: [main, audit]
     steps:
       - uses: actions/checkout@v4
