@@ -286,7 +286,7 @@ struct ConversationView:View {
             do {
                 let response:(String,String)
                 if let local=try await savePreviousNote(question,previous:previous,actions:actions) {response=local}
-                else {response=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,localTools:actions.schemas,actionInstruction:actions.instruction,onTool:{name,arguments in
+                else {response=try await AIService.reply(question,finance:mode,document:d,history:previous,cloud:cloud,model:model,webSearch:searchEnabled,images:images,localTools:actions.schemas,actionInstruction:actions.instruction,voiceConversation:spoken != nil,onTool:{name,arguments in
                     let result=try await actions.perform(name,arguments:arguments)
                     if store.epoch==epoch,store.activeSessionID==session,!actions.created.isEmpty {finishAnswer(answerID,text:actions.confirmedText(""),source:"应用已确认保存",created:actions.created,after:user.id)}
                     return result
