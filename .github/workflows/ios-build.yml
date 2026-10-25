@@ -33,19 +33,31 @@ jobs:
           python3 - <<'PY'
           import json,subprocess,os
           devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
-          candidates=[d for runtime,ds in devices.items() if 'iOS-${{ matrix.ios }}-' in runtime for d in ds if d['name'].startswith('iPhone')]
+          candidates=[dict(d,runtime=runtime) for runtime,ds in devices.items() if 'iOS-${{ matrix.ios }}-' in runtime for d in ds if d['name'].startswith('iPhone')]
           candidates.sort(key=lambda d:('Max' in d['name'],'Plus' in d['name'],'Pro' in d['name'],d['name']))
           assert candidates,'No available iPhone simulator'
           print('Simulator:',candidates[0]['name'])
-          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+candidates[0]['udid']+'\n')
+          selected=candidates[0];device=selected['udid']
+          if '${{ matrix.ios }}'=='26':
+              types=json.loads(subprocess.check_output(['xcrun','simctl','list','devicetypes','--json']))['devicetypes']
+              kind=next(t['identifier'] for t in types if t['name']==selected['name'])
+              device=subprocess.check_output(['xcrun','simctl','create','Assistant CI iPhone',kind,selected['runtime']],text=True,timeout=90).strip()
+          with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+device+'\n')
           PY
       - name: Wait for simulator startup
         run: |
           python3 - <<'PY'
           import os,subprocess
           device=os.environ['SIMULATOR_ID']
-          subprocess.run(['xcrun','simctl','boot',device],check=False,timeout=30)
-          subprocess.run(['xcrun','simctl','bootstatus',device,'-b'],check=True,timeout=240)
+          for attempt in range(2):
+              try:
+                  subprocess.run(['xcrun','simctl','boot',device],check=False,timeout=60)
+                  subprocess.run(['xcrun','simctl','bootstatus',device,'-b'],check=True,timeout=360)
+                  break
+              except (subprocess.TimeoutExpired,subprocess.CalledProcessError):
+                  if attempt:raise
+                  print('Simulator startup stalled; restarting once.',flush=True)
+                  subprocess.run(['xcrun','simctl','shutdown',device],check=False,timeout=60)
           PY
       - name: Focused iOS 26 chat regression
         if: matrix.ios == 26 && matrix.suite == 'main'
