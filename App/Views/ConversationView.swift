@@ -415,7 +415,7 @@ private struct ChatModelSlider:View {
     private var active:Int {dragging ?? (model==models[1] ? 1:0)}
     var body:some View {
         VStack(spacing:18) {
-            Button(action:onClose) {HStack(spacing:6) {Text(labels[active]).font(.system(size:19,weight:.semibold));Image(systemName:"chevron.right").font(.system(size:12,weight:.semibold))}.foregroundStyle(.primary)}
+            Button(action:onClose) {Text(labels[active]).font(.system(size:19,weight:.semibold)).foregroundStyle(.primary)}
                 .buttonStyle(.plain).accessibilityIdentifier("chat.model.close").accessibilityLabel("收起模型选择")
             GeometryReader {geometry in
                 HStack(spacing:0) {
