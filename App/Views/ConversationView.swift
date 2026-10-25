@@ -158,6 +158,8 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("开始录音")) {beginVoice()}
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
+                    .opacity(modelMenu ? 0:1)
+                    .allowsHitTesting(!modelMenu)
             } else {
                 ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…",concealed:modelMenu)
             }

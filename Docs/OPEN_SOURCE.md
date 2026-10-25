@@ -15,7 +15,7 @@
 1. 登录 GitHub，进入本项目的 **Actions → iOS build and unsigned IPA**。
 2. 点 **Run workflow**，选择 `main` 后运行。
 3. 核心测试在标准 Ubuntu runner 的 Swift 6.0.3 官方容器中执行；iOS 18 / 26 测试和 IPA 打包使用标准 `macos-15` runner。
-4. 全部测试通过后，下载 `PersonalAssistant-iOS-3.5.1-build7-unsigned` artifact，解压取得 IPA，再按已有方式自行签名安装。
+4. 全部测试通过后，下载 `PersonalAssistant-iOS-3.5.1-build8-unsigned` artifact，解压取得 IPA，再按已有方式自行签名安装。
 
 工作流只通过手动触发运行，普通提交、文档修改和 Fork 的拉取请求不会自动启动完整打包。没有使用付费 larger runner，工作流权限保持 `contents: read`，不需要上传 Apple 证书或 DeepSeek 密钥。
 
