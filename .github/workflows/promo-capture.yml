@@ -1,4 +1,4 @@
-name: Product presentation captures
+name: Product demo screen recording
 on:
   workflow_dispatch:
   push:
@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/promo-capture.yml'
       - 'Tests/UITests/PromoCaptureTests.swift'
+      - 'Tests/UITests/PromoDemoTests.swift'
+      - 'Scripts/record-product-demo.py'
       - 'App/Services/DebugFixtures.swift'
       - 'App/Views/VoiceCallView.swift'
 permissions:
@@ -13,7 +15,7 @@ permissions:
 jobs:
   capture:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - run: python3 Scripts/select-xcode.py
@@ -40,21 +42,27 @@ jobs:
                   subprocess.run(['xcrun','simctl','shutdown',device],check=False,timeout=60)
           subprocess.run(['xcrun','simctl','status_bar',device,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100'],check=True)
           PY
-      - name: Capture current product views using synthetic data
+      - name: Build the native product demonstration
         run: |
           mkdir -p build
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Promo.xcresult -only-testing:AssistantUITests/PromoCaptureTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 150 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/promo-capture.log 2>&1 || { tail -n 90 build/promo-capture.log; exit 1; }
-      - name: Export actual presentation screenshots
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -derivedDataPath build/DemoDerived -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -only-testing:AssistantUITests/PromoDemoTests CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build-for-testing > build/demo-build.log 2>&1 || { tail -n 90 build/demo-build.log; exit 1; }
+      - name: Record actual input, saves and navigation
+        run: python3 Scripts/record-product-demo.py
+      - name: Export operation timing and review frames
         if: always()
         run: |
-          if [ -d build/Promo.xcresult ]; then
-            xcrun xcresulttool export attachments --path build/Promo.xcresult --output-path build/Screenshots || true
+          if [ -d build/ProductDemo.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/ProductDemo.xcresult --output-path build/DemoAttachments || true
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: product-presentation-captures
+          name: product-demo-native-recording
           path: |
-            build/Screenshots
-            build/promo-capture.log
+            build/DemoAttachments
+            build/product-demo-raw.mp4
+            build/recording-metadata.json
+            build/screen-recording.log
+            build/product-demo.log
+            build/demo-build.log
           retention-days: 14
