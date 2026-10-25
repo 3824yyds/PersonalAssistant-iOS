@@ -15,6 +15,6 @@ rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R "$app" build/ipa/Payload/
 find build/ipa -name '*.dSYM' -type d -prune -exec rm -rf '{}' \;
-(cd build/ipa && /usr/bin/zip -qry ../PersonalAssistant-iOS-3.5.1-build6-unsigned.ipa Payload)
-python3 Scripts/verify_ipa.py build/PersonalAssistant-iOS-3.5.1-build6-unsigned.ipa
-shasum -a 256 build/PersonalAssistant-iOS-3.5.1-build6-unsigned.ipa > build/SHA256SUMS.txt
+(cd build/ipa && /usr/bin/zip -qry ../PersonalAssistant-iOS-3.5.1-build7-unsigned.ipa Payload)
+python3 Scripts/verify_ipa.py build/PersonalAssistant-iOS-3.5.1-build7-unsigned.ipa
+shasum -a 256 build/PersonalAssistant-iOS-3.5.1-build7-unsigned.ipa > build/SHA256SUMS.txt

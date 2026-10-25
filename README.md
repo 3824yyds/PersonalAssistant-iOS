@@ -1,12 +1,12 @@
-# 个人助理 iOS 3.5.1 · Build 5
+# 个人助理 iOS 3.5.1 · Build 7
 
 为 iPhone 设计的原生 SwiftUI 应用，包含加密笔记、多币种账本、卡包和智能助理。使用 iOS 26 SDK 构建，导航和控制层采用原生 Liquid Glass；最低支持 iOS 17，旧系统提供清晰的兼容显示。
 
 ## 安装者只有 iPhone
 
-交付目标为 `PersonalAssistant-iOS-3.5.1-build6-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
+交付目标为 `PersonalAssistant-iOS-3.5.1-build7-unsigned.ipa`。这是 iOS 真机 arm64 构建，需要你通过自己的签名工具、有效证书与描述文件签名后安装；不能在“文件”中直接点击未签名 IPA 安装。不需要把证书、私钥或 Apple ID 交给本工程。
 
-没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build6-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
+没有本地 Mac 时，项目的 GitHub Actions 可通过手动触发在云端运行测试并生成 IPA。项目 Actions → `iOS build and unsigned IPA` → 成功运行 → 下载 `PersonalAssistant-iOS-3.5.1-build7-unsigned` artifact。下载得到 ZIP，解压可取得 IPA。**源码 ZIP、模拟器 .app 和 Android APK 都不能当作 IPA 安装。**
 
 保持签名工具使用的 Bundle ID 和签名配置稳定，有助于后续覆盖升级；不同签名方式的数据保留行为以工具与 iOS 为准。免费开发签名通常有有效期限制。首次使用前请导出加密备份。
 
