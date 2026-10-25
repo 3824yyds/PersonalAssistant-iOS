@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import Combine
 
 struct VoiceCallView:View {
     @EnvironmentObject private var store:AppStore
@@ -67,7 +68,10 @@ struct VoiceCallView:View {
                 if let answer=store.messages.first(where:{$0.id==id}),!answer.content.isEmpty {call.speak(answer.content)}
                 else {call.fail(store.error ?? "没有收到回复，请继续通话后重试")}
             }
-            .onChange(of:scenePhase) {_,phase in if phase != .active {pause()}}
+            .onChange(of:scenePhase) {_,phase in
+                // Permission alerts temporarily make the app inactive before any recording starts.
+                if phase == .background || (phase == .inactive && call.phase != .connecting) {pause()}
+            }
             .onReceive(NotificationCenter.default.publisher(for:AVAudioSession.interruptionNotification)) {note in
                 if let kind=note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,kind==AVAudioSession.InterruptionType.began.rawValue {pause()}
             }

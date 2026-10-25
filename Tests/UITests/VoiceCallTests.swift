@@ -9,7 +9,8 @@ final class VoiceCallTests:XCTestCase {
         XCTAssertTrue(app.buttons["chat.model.option.deepseek-flash"].waitForExistence(timeout:5))
         XCTAssertFalse(hold.exists)
         recordScreen(app,"VoiceInputModelExpandedWithoutHoldLabel")
-        app.buttons["chat.model.option.deepseek-v4-pro"].tap()
+        let pro=app.buttons["chat.model.option.deepseek-v4-pro"];pro.tap()
+        expectation(for:NSPredicate(format:"value == '已选择'"),evaluatedWith:pro);waitForExpectations(timeout:8)
         app.buttons["chat.model.close"].tap()
         XCTAssertTrue(hold.waitForExistence(timeout:5));recordScreen(app,"VoiceInputRestoredAfterModelSelection")
     }

@@ -31,7 +31,7 @@ import Combine
         }.store(in:&subscriptions)
         speech.$error.sink {[weak self] error in
             guard let self,let error,self.active,self.phase == .connecting || self.phase == .listening else{return}
-            self.fail(error)
+            self.fail(error.replacingOccurrences(of:"请重新按住说话：",with:"请继续通话重试：").replacingOccurrences(of:"没有识别到文字，请靠近麦克风重新按住说话",with:"没有识别到文字，请靠近麦克风后点继续通话"))
         }.store(in:&subscriptions)
         speech.onFinal={[weak self] text in
             guard let self,self.active,!self.isMuted,self.phase == .listening else{return}
