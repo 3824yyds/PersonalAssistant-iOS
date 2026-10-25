@@ -41,6 +41,7 @@ struct MainTabs: View {
     @State private var previousTab=0
     @State var expanded = false
     @State var sheet: RootSheet?
+    @State private var creatingNote=false
     @StateObject private var keyboard = KeyboardVisibility()
     var body: some View {
         ZStack(alignment:.bottomTrailing) {
@@ -77,6 +78,9 @@ struct MainTabs: View {
         }
         .onChange(of:keyboard.visible) { _,visible in if visible {expanded=false} }
         .onChange(of:tab) {old,new in if new==3 && old != 3 {previousTab=old}}
+        .fullScreenCover(isPresented:$creatingNote) {
+            NavigationStack {NoteEditor(initialFolder:store.noteFolder)}.appClearChrome().environmentObject(store)
+        }
         .sheet(item:$sheet) { value in
             NavigationStack {
                 switch value { case .note:NoteEditor(initialFolder:store.noteFolder);case .entry:RecordEditor();case .reminder:ReminderEditor();case .wallet:WalletView();case .profile:SettingsView() }
@@ -94,7 +98,7 @@ struct MainTabs: View {
     func openQuick(_ target:RootSheet) {
         expanded=false
         // Finish removing the glass action surface before UIKit presents the editor sheet.
-        Task {try? await Task.sleep(nanoseconds:120_000_000);sheet=target}
+        Task {try? await Task.sleep(nanoseconds:120_000_000);if target == .note {creatingNote=true}else{sheet=target}}
     }
     func animate(_ body:()->Void) { withAnimation(reduceMotion ? nil:Theme.normal,body) }
 }

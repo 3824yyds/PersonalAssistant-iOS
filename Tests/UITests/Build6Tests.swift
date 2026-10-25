@@ -43,14 +43,15 @@ final class Build6Tests:XCTestCase {
         app.buttons["note.done"].tap();XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:8))
         app.buttons["note.row.00000000-0000-0000-0000-000000000100"].tap()
         XCTAssertTrue(((app.textViews["note.body"].value as? String) ?? "").contains("黄色完成保存检查"))
-        app.buttons["关闭"].tap()
+        app.buttons["note.back"].tap()
     }
-    func testModelPopoverHasNoRefreshAndSelectedMarkFollowsModelName() {
+    func testModelSliderHasOnlyTwoShortNames() {
         let app=launchProduct();tapProductTab("助理",in:app);app.buttons["chat.model"].tap()
         let flash=app.buttons["chat.model.option.deepseek-flash"]
         XCTAssertTrue(flash.waitForExistence(timeout:5));XCTAssertEqual(flash.value as? String,"已选择")
-        XCTAssertFalse(app.buttons["刷新可用模型"].exists);recordScreen(app,"ModelSelectionTrailingCheckmark")
-        app.buttons["chat.model.option.deepseek-v4-pro"].tap();app.buttons["chat.model"].tap()
+        XCTAssertFalse(app.buttons["刷新可用模型"].exists);recordScreen(app,"TwoModelGlassSlider")
+        app.buttons["chat.model.option.deepseek-v4-pro"].tap()
+        XCTAssertTrue(app.buttons["chat.model.option.deepseek-v4-pro"].waitForExistence(timeout:5))
         XCTAssertEqual(app.buttons["chat.model.option.deepseek-v4-pro"].value as? String,"已选择");XCTAssertEqual(app.buttons["chat.model.option.deepseek-flash"].value as? String,"未选择")
         app.buttons["chat.model.option.deepseek-flash"].tap()
     }
@@ -59,7 +60,7 @@ final class Build6Tests:XCTestCase {
         sendChat("帮我创建一个备忘录，内容是模拟器创建备忘录",in:app)
         XCTAssertTrue(app.buttons["chat.created.note"].waitForExistence(timeout:10));app.buttons["chat.created.note"].tap()
         XCTAssertTrue(app.textViews["note.body"].waitForExistence(timeout:5));XCTAssertEqual(app.textViews["note.body"].value as? String,"准备好水和运动鞋。")
-        app.buttons["关闭"].tap()
+        app.buttons["note.back"].tap()
         sendChat("今天午饭花了25元",in:app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '请选择收付款账户' OR label CONTAINS '请说明使用哪个账户'")).firstMatch.waitForExistence(timeout:8))
         XCTAssertFalse(app.buttons["chat.created.expense"].exists)

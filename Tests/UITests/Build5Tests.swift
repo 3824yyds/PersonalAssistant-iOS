@@ -57,8 +57,8 @@ final class Build5Tests:XCTestCase {
         app.buttons["助理"].firstMatch.tap();app.buttons["聊天功能"].tap();XCTAssertTrue(app.buttons["chat.menu.photos"].waitForExistence(timeout:5));app.buttons["chat.menu.preferences"].tap()
         for title in ["基本风格和语调","亲切程度","热情程度","表情符号","可视化回答"] {XCTAssertTrue(app.staticTexts[title].exists)}
         attach(app,"ChatResponsePreferences");app.buttons["保存"].tap()
-        app.buttons["chat.model"].tap();app.buttons["DeepSeek Pro"].tap();app.buttons["聊天功能"].tap();XCTAssertFalse(app.buttons["chat.menu.photos"].exists);app.buttons["chat.menu.new"].tap()
-        app.buttons["chat.model"].tap();app.buttons["DeepSeek Flash"].tap();app.buttons["chat.mode.finance"].tap()
+        app.buttons["chat.model"].tap();app.buttons["chat.model.option.deepseek-v4-pro"].tap();app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap();app.buttons["聊天功能"].tap();XCTAssertFalse(app.buttons["chat.menu.photos"].exists);app.buttons["chat.menu.new"].tap()
+        app.buttons["chat.model"].tap();app.buttons["chat.model.option.deepseek-flash"].tap();app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap();app.buttons["chat.mode.finance"].tap()
         XCTAssertEqual(app.buttons["chat.mode.finance"].label,"财务咨询")
         let duplicateHeadings=app.staticTexts.matching(NSPredicate(format:"label == '财务咨询'")).allElementsBoundByIndex.filter {$0.frame.minY<app.frame.height/2}
         XCTAssertTrue(duplicateHeadings.isEmpty,"No duplicate mode title in the header")
