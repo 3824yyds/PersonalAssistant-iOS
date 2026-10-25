@@ -113,20 +113,20 @@ struct ConversationView:View {
             VStack(spacing:2) {
                 composerInput.padding(.horizontal,12)
                 HStack(alignment:.center,spacing:8) {
-                    composerMenu
+                    composerMenu.opacity(modelMenu ? 0:1)
                     Spacer(minLength:0)
                     Button {withAnimation(Theme.normal) {modelMenu=true}} label:{
                         HStack(spacing:5) {Text(modelLabel(store.model));Image(systemName:"chevron.up").font(.system(size:9,weight:.semibold))}
                             .font(.system(size:13,weight:.medium)).padding(.horizontal,10).frame(height:36)
                     }.buttonStyle(.plain).accessibilityIdentifier("chat.model").accessibilityLabel("选择模型，"+modelLabel(store.model))
-                        .disabled(store.assistantBusy || store.busy || holding || speech.finishing)
-                    composerVoiceButton
-                    composerSendButton
+                        .disabled(store.assistantBusy || store.busy || holding || speech.finishing).opacity(modelMenu ? 0:1)
+                    composerVoiceButton.opacity(modelMenu ? 0:1)
+                    composerSendButton.opacity(modelMenu ? 0:1)
                 }
             }.padding(.horizontal,8).padding(.vertical,6)
-                .appGlass(RoundedRectangle(cornerRadius:24))
-                // Keep the same UIKit text view mounted and focused while the selector covers it.
-                .opacity(modelMenu ? 0:1).allowsHitTesting(!modelMenu).accessibilityHidden(modelMenu)
+                .background {if !modelMenu {RoundedRectangle(cornerRadius:24).fill(.clear).appGlass(RoundedRectangle(cornerRadius:24))}}
+                // Conceal only the text ink. Hiding/disabling the UIKit host dismisses its keyboard.
+                .accessibilityHidden(modelMenu)
             if modelMenu {
                 ChatModelSlider(model:store.model,disabled:store.busy || store.assistantBusy,onClose:{withAnimation(Theme.normal) {modelMenu=false}}) {model in
                     Task {await store.setting("model",.string(model))}
@@ -159,7 +159,7 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
             } else {
-                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…")
+                ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…",concealed:modelMenu)
             }
     }
     private var composerVoiceButton:some View {
