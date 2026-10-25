@@ -157,6 +157,7 @@ struct ConversationView:View {
     }
     @ViewBuilder private var composerInput:some View {
             if voiceMode {
+                if !modelMenu {
                 Text(holding ? "松开发送文字":"按住 说话").font(.system(size:16,weight:.medium)).frame(maxWidth:.infinity,minHeight:42)
                     .background(Theme.accent.opacity(holding ? 0.16:0.04),in:Capsule()).contentShape(Capsule())
                     .gesture(voiceGesture).accessibilityLabel("按住说话").accessibilityAddTraits(.isButton)
@@ -164,8 +165,10 @@ struct ConversationView:View {
                     .accessibilityAction(named:Text("开始录音")) {beginVoice()}
                     .accessibilityAction(named:Text("完成录音")) {endVoice(.text)}
                     .accessibilityAction(named:Text("取消录音")) {cancelVoice()}
-                    .opacity(modelMenu ? 0:1)
-                    .allowsHitTesting(!modelMenu)
+                    .transition(.identity)
+                } else {
+                    Color.clear.frame(height:42).accessibilityHidden(true)
+                }
             } else {
                 ComposingTextInput(text:$store.chatDraft,isFocused:Binding(get:{focused && composerAvailable},set:{requested in if requested && !composerAvailable {dismissComposer()}else{focused=requested}}),placeholder:finance ? "问问你的财务状况…":"发消息…",concealed:modelMenu)
             }
