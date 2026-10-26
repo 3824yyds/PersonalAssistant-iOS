@@ -54,6 +54,11 @@ struct VoiceCaptureState:Equatable {
     init() {
         if let files=try? FileManager.default.contentsOfDirectory(at:FileManager.default.temporaryDirectory,includingPropertiesForKeys:nil) {for file in files where file.lastPathComponent.hasPrefix("note-preview-") {try? FileManager.default.removeItem(at:file)}}
         hasVault = (try? PrivateFiles.url()).map { FileManager.default.fileExists(atPath:$0.path) } ?? false
+        if !hasVault {
+            // Keychain can survive uninstall; a fresh vault must not inherit old lockouts/biometric keys.
+            Keychain.delete("attempts");Keychain.delete("vault-biometric")
+            biometricEnabled=false;UserDefaults.standard.set(false,forKey:"biometricEnabled")
+        }
         hasAPIKey = (try? Keychain.read("deepseek")) != nil
     }
     var current: Document { document ?? Document() }
@@ -73,6 +78,7 @@ struct VoiceCaptureState:Equatable {
     }
     func present(_ error: Error) { if !(error is CancellationError) { self.error = error.localizedDescription } }
     func unlock(password: String, creating: Bool = false) async {
+        guard VaultPIN.valid(password) else {error="请输入4位数字PIN";return}
         guard !busy else { return }; busy = true; defer { busy = false }
         let unlockEpoch=epoch
         let attemptData = (try? Keychain.read("attempts")) ?? Data()
@@ -119,7 +125,7 @@ struct VoiceCaptureState:Equatable {
     func unlockBiometric() async {
         guard !busy else { return }; busy = true; defer { busy = false }
         do {
-            guard let saved = try Keychain.read("vault-biometric",prompt:"解锁个人助理资料库") else { throw AppError.message("请先用密码解锁，并在设置中启用系统解锁") }
+            guard let saved = try Keychain.read("vault-biometric",prompt:"解锁个人助理资料库") else { throw AppError.message("请先用PIN解锁，并在设置中启用系统解锁") }
             let encrypted = try PrivateFiles.boundedRead(PrivateFiles.url())
             let d = try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(encrypted,key:saved)).validated()
             key = saved; salt = try VaultCrypto.salt(encrypted); vaultBytes=encrypted.count; var next = d; next.accounts = Finance.accounts(d); next=Loans.refreshReminders(next);document = next

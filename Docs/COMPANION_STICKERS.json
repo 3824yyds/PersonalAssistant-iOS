@@ -1,6 +1,6 @@
 {
   "reference": "App/Resources/Assets.xcassets/CompanionAvatar.imageset/avatar.png",
-  "creation": "Each sticker generated individually with image_gen using the avatar and first sticker as visual references. Original generated files retained. No sheet slicing, reused expression overlays or image edits.",
+  "creation": "Build12: six individually painted avatar-reference stickers. Build13: four individually generated exaggerated comic meme stickers, varied styles as requested. Original generated PNG files retained; no sheet slicing.",
   "stickers": [
     {
       "id": "happy",
@@ -31,6 +31,26 @@
       "id": "goodnight",
       "sha256": "92ae3d3fe954127c8e6b0e5ec8dda0377db5eb30f9f9289cb4e55f6cd46cd6f6",
       "original_generated_file": "exec-60c3902b-f19c-4ed7-adc3-86cf176fad5a.png"
+    },
+    {
+      "id": "meme_laugh",
+      "sha256": "2915590515bb16d385b2eb37c63f987e294e3015647b234ad979f0d0da936498",
+      "original_generated_file": "exec-3b3157b5-59fa-4c1b-b043-1adbe5f76e95.png"
+    },
+    {
+      "id": "meme_melon",
+      "sha256": "5864d1cf4097a06d3dd18771961dd6e473f03b4a5bf912253a45790c8c74596a",
+      "original_generated_file": "exec-b54e95d7-1571-4e62-8e3b-c904854199a1.png"
+    },
+    {
+      "id": "meme_cracked",
+      "sha256": "b960314bf09b0e207fcc4fa272e7fae22e8687dd6806cf32646151a40858391d",
+      "original_generated_file": "exec-bf57fa59-9f0f-4fda-bec7-edd18ca4a4c4.png"
+    },
+    {
+      "id": "meme_justthis",
+      "sha256": "f4d10b0cf5f67964e88bbc2047317b40501766ec13269398b55edd7eaa7d39f1",
+      "original_generated_file": "exec-2f1a98b8-1dd0-4844-9d2f-3bf318af48ac.png"
     }
   ]
 }

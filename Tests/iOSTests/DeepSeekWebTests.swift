@@ -17,6 +17,50 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testQuotedReplyCarriesSelectedSpeakerAndNeverExposesRenameTool() async throws {
+        let original=CompanionMessage(role:"assistant",content:"旧消息：先聊长沙计划")
+        var data=CompanionData();data.messages=[original];let quote=CompanionQuote.snapshot(original,data:data)
+        WebProtocol.handler={request in
+            let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let text=messages.last?["content"] as? String ?? ""
+            XCTAssertTrue(text.contains("旧消息：先聊长沙计划"));XCTAssertTrue(text.contains("assistant"));XCTAssertTrue(text.contains("本条新发言：这条先展开"))
+            let tools=body["tools"] as? [[String:Any]] ?? []
+            XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="propose_companion_name"})
+            return (200,try self.sse(["content":"那先说长沙的安排。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"这条先展开",data:data,history:[],client:client(),replyTo:quote)
+        XCTAssertNil(result.3);XCTAssertTrue(result.0.contains("长沙"))
+    }
+    @MainActor func testCustomStickerToolOnlyOffersAllowedIDsAndNeverUploadsPictureBytes() async throws {
+        let png=Data(base64Encoded:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j7GQAAAAASUVORK5CYII=")!
+        let allowed=CompanionCustomSticker(title:"自定义招呼",meaning:"挥手打招呼",image:png),privateImage=CompanionCustomSticker(title:"自己用",meaning:"只供用户发送",image:png,allowAssistant:false)
+        var data=CompanionData();try data.addSticker(allowed);try data.addSticker(privateImage);var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request)
+            XCTAssertFalse(String(describing:body).contains(png.base64EncodedString()))
+            if calls==1 {
+                let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
+                let function=try XCTUnwrap(tools.compactMap {$0["function"] as? [String:Any]}.first {$0["name"] as? String=="send_companion_sticker"})
+                let parameters=function["parameters"] as? [String:Any],properties=parameters?["properties"] as? [String:Any],field=properties?["id"] as? [String:Any],ids=field?["enum"] as? [String] ?? []
+                XCTAssertTrue(ids.contains(allowed.id));XCTAssertFalse(ids.contains(privateImage.id))
+                let arguments=String(decoding:try JSONSerialization.data(withJSONObject:["id":allowed.id]),as:UTF8.self)
+                return (200,try self.sse(["tool_calls":[["index":0,"id":"custom","function":["name":"send_companion_sticker","arguments":arguments]]]]))
+            }
+            return (200,try self.sse(["content":"嗨，我们接着聊。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"发个表情包打个招呼",data:data,history:[],client:client())
+        XCTAssertEqual(result.4,allowed.id)
+    }
+    @MainActor func testPrivateQuotedNumbersCannotBecomeSearchQuery() async throws {
+        let original=CompanionMessage(role:"user",content:"私人号码9876543210，帮我保留")
+        var data=CompanionData();data.messages=[original];let quote=CompanionQuote.snapshot(original,data:data)
+        WebProtocol.handler={request in
+            XCTAssertEqual(request.url!.path,"/chat/completions")
+            return (200,try self.sse(["tool_calls":[["index":0,"id":"quote-search","function":["name":"web_search","arguments":"{\"query\":\"9876543210\"}"]]]]))
+        }
+        do {_=try await CompanionReplyService.answer(question:"查一下这个话题",data:data,history:[],client:client(),replyTo:quote);XCTFail("Quoted private numbers must not be forwarded")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("私人"))}
+    }
     @MainActor func testStickerToolAttachesOneKnownImageAndPreservesTextAnswer() async throws {
         var calls=0
         WebProtocol.handler={request in

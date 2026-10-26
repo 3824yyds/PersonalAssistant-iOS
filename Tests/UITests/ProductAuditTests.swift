@@ -150,9 +150,9 @@ final class ProductAuditTests:XCTestCase {
     func testManualLockWrongPasswordAndUnlockAgain() {
         let app=launch();app.buttons["个人详情"].tap();let lock=app.buttons["锁定资料库"];reveal(lock,in:app);lock.tap()
         XCTAssertTrue(app.buttons["解锁"].waitForExistence(timeout:8));XCTAssertFalse(app.buttons["展开快捷操作"].exists);recordScreen(app,"AuditVaultLocked")
-        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("wrong-password-351");app.buttons["解锁"].tap()
+        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("9999");app.buttons["解锁"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout:8));recordScreen(app,"AuditWrongPasswordRejected");app.buttons["知道了"].tap()
-        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()
+        app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20));recordScreen(app,"AuditUnlockedAgain")
     }
 

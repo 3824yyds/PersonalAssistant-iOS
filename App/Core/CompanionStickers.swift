@@ -14,9 +14,16 @@ struct CompanionSticker: Identifiable, Equatable, Sendable {
         .init(id:"confused",title:"疑惑",meaning:"歪头思考、带问号，表示没听懂或需要澄清",scene:"轻松的困惑；仍要用文字提出具体问题"),
         .init(id:"speechless",title:"无语",meaning:"半眯眼、无奈叹气，表示熟人之间轻轻吐槽",scene:"双方轻松互损；不用于脆弱倾诉、痛苦或温柔语气"),
         .init(id:"smug",title:"得意",meaning:"俏皮挑眉、自信的小笑，表示小得意或善意调侃",scene:"玩笑和小成就；不嘲笑用户的失败或脆弱"),
-        .init(id:"goodnight",title:"晚安",meaning:"抱着枕头、困倦闭眼，表示晚安和结束聊天",scene:"用户道晚安或准备休息；不主动赶用户离开")
+        .init(id:"goodnight",title:"晚安",meaning:"抱着枕头、困倦闭眼，表示晚安和结束聊天",scene:"用户道晚安或准备休息；不主动赶用户离开"),
+        .init(id:"meme_laugh",title:"绷不住了",meaning:"夸张地笑到打滚、眼泪乱飞，表示被逗笑或笑到绷不住",scene:"轻松笑话或共同玩梗，不嘲笑认真困扰"),
+        .init(id:"meme_melon",title:"吃瓜",meaning:"蓝发小土豆抱着大西瓜，表示好奇围观、听趣事",scene:"闲聊趣事和八卦，不把传言当已核实事实"),
+        .init(id:"meme_cracked",title:"我裂开了",meaning:"蓝发土豆夸张地裂成几块，表示小事带来的无奈和破防",scene:"吐槽小失误或游戏，不用于真实伤害、危机或严肃倾诉"),
+        .init(id:"meme_justthis",title:"就这？",meaning:"眯眼挑眉、比出一点点的手势，表示熟人间不服气的轻调侃",scene:"双方愿意互损的玩笑，不贬低用户认真努力")
     ]
     static func find(_ id:String?) -> Self? { all.first { $0.id == id } }
+    static func find(_ id:String?,in data:CompanionData) -> Self? {
+        find(id) ?? (data.customStickers ?? []).first(where:{$0.id==id})?.descriptor
+    }
     static var guide: String { all.map { "\($0.id)｜\($0.description)｜适用：\($0.scene)" }.joined(separator:"\n") }
 }
 
@@ -29,12 +36,12 @@ enum CompanionStickerRules {
         }
     }
     static func allowed(_ id:String,question:String,data:CompanionData,history:[CompanionMessage],proactive:Bool) -> Bool {
-        guard CompanionSticker.find(id) != nil, data.profile.stickers != false, !proactive else { return false }
+        guard data.assistantStickers.contains(where:{$0.id==id}), data.profile.stickers != false, !proactive else { return false }
         let continuation=["嗯","嗯嗯","好","好的","谢谢","唉","😭","😢","💔","🥲"].contains(question.trimmingCharacters(in:.whitespacesAndNewlines))
         let emotionalContext=(continuation ? (history.last(where:{$0.role=="user"})?.content ?? ""):"")+question
         let sensitive=emotionalContext.range(of:"难过|伤心|崩溃|失恋|去世|抑郁|痛苦|害怕|生病|别开玩笑|别损|😭|😢|💔|🥲|😞|😔",options:.regularExpression) != nil
         if sensitive && !["hug","confused"].contains(id) { return false }
-        if data.profile.effectiveTone() == .gentle && ["speechless","smug"].contains(id) { return false }
+        if data.profile.effectiveTone() == .gentle && ["speechless","smug","meme_justthis"].contains(id) { return false }
         let recent=history.filter { $0.role == "assistant" }
         // Even an explicit request cannot bypass the emotional suitability checks above.
         if question.range(of:"(?:发|来|给我).{0,10}表情包",options:.regularExpression) != nil && question.range(of:"别发|不要发|不用|关闭",options:.regularExpression) == nil { return true }
@@ -48,7 +55,7 @@ enum CompanionStickerRules {
 
 extension CompanionMessage {
     var contextText:String {
-        guard let sticker=CompanionSticker.find(stickerID) else { return content }
-        return content + "\n[本角色表情包：" + sticker.description + "]"
+        let meaning=stickerMeaning ?? CompanionSticker.find(stickerID)?.description
+        return (replyTo.map {$0.contextText+"\n本条新发言："} ?? "")+content+(meaning.map {"\n[表情包："+$0+"]"} ?? "")
     }
 }

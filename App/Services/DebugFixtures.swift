@@ -72,6 +72,11 @@ enum DebugFixtures {
             state.messages=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这是送我的名字吗？"),CompanionMessage(role:"user",content:"名字"),CompanionMessage(role:"assistant",content:"确认一下，是叫我“大肥鱼”对吧？")]
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-quote-fixture") {
+            var state=CompanionData();state.profile.name="小鱼";state.profile.proactive=false;state.profile.nameRecoveryChecked=true
+            state.messages=[CompanionMessage(id:"quoted-first",role:"assistant",content:"先聊长沙计划，还是西安？"),CompanionMessage(id:"quoted-user",role:"user",content:"西安先排五天"),CompanionMessage(id:"quoted-last",role:"assistant",content:"好，西安可以先留五天。")]
+            try? state.write(to:&d)
+        }
         if ProcessInfo.processInfo.arguments.contains("--ui-companion-long-context-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-full-context-fixture") {
             var state=CompanionData();state.profile.name="大肥鱼";state.profile.proactive=false
             state.memories=[CompanionMemory(text:"喜欢安静的地方")]

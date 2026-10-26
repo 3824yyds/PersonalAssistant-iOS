@@ -126,7 +126,7 @@ struct AboutView:View {
     var body:some View {List {
         Section("个人助理 · iOS 3.5.1 (9)") {Text("记录生活，理清财务。为 iPhone 设计的笔记、账本与智能助理。")}
         Section("使用与隐私") {
-            Text("笔记、账本和个人头像在本机加密保存。请定期导出加密备份，并妥善保管资料库密码。")
+            Text("笔记、账本和个人头像在本机加密保存。请定期导出加密备份，并妥善保管资料库PIN。")
             Text("卡包展示你记录的账户与交易，余额随账本更新，不连接银行账户或提供支付服务。")
             Text("云端智能可在设置中关闭；开启后，问题及相关资料会发送至 DeepSeek。")
             Text("安装更新时请使用同一签名与应用标识，以保留本机资料。")
@@ -153,11 +153,11 @@ struct BackupView:View {
     @State var file=DataFile(data:Data())
     var body:some View {Form {
         Section {Button("导出完整加密备份",systemImage:"square.and.arrow.up") {Task {do {file=DataFile(data:try await store.backup());exporting=true}catch{store.present(error)}}};Button("从完整备份恢复",systemImage:"square.and.arrow.down") {importing=true}}
-        Section {Text("备份使用当前资料库密码加密。恢复将替换当前笔记、账本、账户等资料，请先导出当前备份。").font(.caption).foregroundStyle(.secondary)}
+        Section {Text("备份使用当前4位PIN加密。仅支持本版本PIN备份。恢复将替换当前资料，请先导出当前备份。").font(.caption).foregroundStyle(.secondary)}
     }.navigationTitle("加密备份与恢复").navigationBarTitleDisplayMode(.inline).appErrorScope()
         .fileExporter(isPresented:$exporting,document:file,contentType:.data,defaultFilename:"PersonalAssistant-\(Clock.day()).pavault") {result in if case .failure(let error)=result {store.present(error)}}
         .fileImporter(isPresented:$importing,allowedContentTypes:[.data,.item]) {result in do {let url=try result.get();let access=url.startAccessingSecurityScopedResource();defer{if access {url.stopAccessingSecurityScopedResource()}};bytes=try PrivateFiles.boundedRead(url);_=try VaultCrypto.salt(bytes);restore=true}catch{store.present(error)}}
-        .alert("输入备份密码",isPresented:$restore) {SecureField("备份原密码",text:$password);Button("取消",role:.cancel) {password="";bytes=Data()};Button("继续") {confirm=true}} message:{Text("请填写导出这份备份时使用的密码；当前资料库密码不会改变。")}
+        .alert("输入备份PIN",isPresented:$restore) {SecureField("导出时的4位PIN",text:$password).keyboardType(.numberPad);Button("取消",role:.cancel) {password="";bytes=Data()};Button("继续") {confirm=true}.disabled(!VaultPIN.valid(password))} message:{Text("请填写导出这份备份时使用的PIN；当前资料库PIN不会改变。")}
         .confirmationDialog("恢复将替换当前资料，确定继续？",isPresented:$confirm,titleVisibility:.visible) {Button("恢复并替换",role:.destructive) {Task {if await store.importBackup(bytes,password:password) {store.error="备份已恢复"};password="";bytes=Data()}};Button("取消",role:.cancel) {password="";bytes=Data()}}
     }
 }

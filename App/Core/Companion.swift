@@ -11,6 +11,7 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     var gentleUntil: Date? = nil
     var nameRecoveryChecked: Bool? = nil
     var stickers: Bool? = nil
+    var avatarMotion:Bool? = nil
     var title: String { name ?? "伙伴" }
     func effectiveTone(at now:Date = Date()) -> CompanionTone {
         if let gentleUntil, gentleUntil > now {return .gentle}
@@ -40,6 +41,8 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
     var renamedTo: String? = nil
     var nameProposal: String? = nil
     var stickerID: String? = nil
+    var stickerMeaning: String? = nil
+    var replyTo:CompanionQuote? = nil
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
@@ -50,6 +53,7 @@ struct CompanionData: Codable, Equatable, Sendable {
     var lastProactive: Date? = nil
     var awaitingProactiveReply = false
     var windows: [CompanionWindow]? = nil
+    var customStickers:[CompanionCustomSticker]? = nil
     static func read(_ document: Document) throws -> Self {
         guard let raw = document.root.raw["companionResearch"] else { return Self() }
         do { return try JSONDecoder().decode(Self.self, from: JSONEncoder().encode(raw)) }
@@ -65,10 +69,13 @@ struct CompanionData: Codable, Equatable, Sendable {
               !profile.personality.isEmpty, profile.personality.count <= 200,
               memories.count <= 200, messages.count <= Self.messageLimit,
               CompanionContext.validWindows(windows ?? [],messageCount:messages.count),
+              (customStickers?.count ?? 0)<=CompanionCustomSticker.limit,
+              (customStickers ?? []).allSatisfy(\.valid),
+              Set((customStickers ?? []).map(\.id)).count==(customStickers?.count ?? 0),
               Set(memories.map(\.id)).count == memories.count,
               Set(messages.map(\.id)).count == messages.count,
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),
-              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || CompanionSticker.find($0.stickerID) != nil) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
+              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || descriptor($0.stickerID) != nil) && ($0.stickerMeaning?.count ?? 0)<=160 && ($0.replyTo == nil || ($0.role=="user" && $0.replyTo!.valid)) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
         else { throw AppError.message("伙伴资料内容无效或容量已满，请先导出备份并清理不需要的聊天或记忆") }
     }
 }

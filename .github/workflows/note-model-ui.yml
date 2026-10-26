@@ -22,7 +22,7 @@ jobs:
       - run: python3 Scripts/verify_companion_stickers.py
   focused-ios:
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - run: python3 Scripts/select-xcode.py
@@ -52,7 +52,8 @@ jobs:
       - name: Companion UI, crypto and network tool integration
         run: |
           mkdir -p build
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Companion.xcresult -only-testing:AssistantTests/DeepSeekWebTests -only-testing:AssistantTests/CompositionTests -only-testing:AssistantUITests/CompanionUITests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test > build/companion-tests.log 2>&1 || { tail -n 120 build/companion-tests.log; exit 1; }
+          set -o pipefail
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Companion.xcresult -only-testing:AssistantTests/DeepSeekWebTests -only-testing:AssistantTests/CompositionTests -only-testing:AssistantTests/VaultTests -only-testing:AssistantTests/PINAndAttachmentTests -only-testing:AssistantUITests/CompanionUITests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test 2>&1 | tee build/companion-tests.log
       - name: Export UI screenshots
         if: always()
         run: xcrun xcresulttool export attachments --path build/Companion.xcresult --output-path build/Screenshots || true

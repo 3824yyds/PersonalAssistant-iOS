@@ -65,7 +65,7 @@ final class VaultTests:XCTestCase {
         store.cancelReply();XCTAssertEqual(store.messages.last?.content,"你好！");XCTAssertFalse(store.assistantBusy)
     }
     func testEnvelopeRoundTripAndAuthentication() throws {
-        let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"test-password-351",salt:salt),plain=Data("测试笔记与财务资料".utf8)
+        let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"0426",salt:salt),plain=Data("测试笔记与财务资料".utf8)
         let encrypted=try VaultCrypto.encrypt(plain,key:key,salt:salt)
         XCTAssertEqual(try VaultCrypto.decrypt(encrypted,key:key),plain)
         XCTAssertEqual(try VaultCrypto.salt(encrypted),salt)
@@ -75,9 +75,9 @@ final class VaultTests:XCTestCase {
         XCTAssertThrowsError(try VaultCrypto.decrypt(header,key:key))
     }
     func testWrongPasswordRejected() throws {
-        let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"test-password-351",salt:salt)
+        let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"0426",salt:salt)
         let encrypted=try VaultCrypto.encrypt(Data("private".utf8),key:key,salt:salt)
-        let other=try VaultCrypto.derive(password:"wrong-password-351",salt:salt)
+        let other=try VaultCrypto.derive(password:"9999",salt:salt)
         XCTAssertThrowsError(try VaultCrypto.decrypt(encrypted,key:other))
     }
     func testRandomNonces() throws {
@@ -87,13 +87,10 @@ final class VaultTests:XCTestCase {
     func testStableWealthIDsMatchAndroidJavaUUID() {
         XCTAssertEqual(WealthOperations.stableID("subscription","test"),"ec0b7364-1678-388a-ab83-2e0192ede0f4")
     }
-    func testAndroidEnvelopeFixture() throws {
+    func testLegacyTwelveCharacterEnvelopeIsNotSupported() throws {
         let envelope=Data(base64Encoded:"UEFWQVVMVAEACSfAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAQIDBAUGBwgJCgvEnfSZgbNGobnAvmCRmtsw1OTjBvXQZ0A3AZyGb1mhIg78N/e5QNt+bbGeftkdd/qVCse6fADYEAew/jnZI41y/dsugnnRBN+si0UYqW76Q1cZStysYc6uF+3YoADtOn35ejMxeJgc7yMrQS4vOwADRB3V0EPeWiVSpIGAQ1/9j2/VNCoVDA64LHBtgbHWYuxdklxhN9llLa5v6l4m/t2vLISzEHEQyxBfqOQ0q3teibJXNyD1R+3E")!
-        let key=try VaultCrypto.derive(password:"fixture-password-351",salt:VaultCrypto.salt(envelope))
-        let d=try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(envelope,key:key)).validated()
-        XCTAssertEqual(d.records.first?.int("cents"),120000)
-        XCTAssertEqual(d.records.first?.text("currency"),"HKD")
-        XCTAssertEqual(d.records.first?.text("kind"),"expense")
+        XCTAssertThrowsError(try VaultCrypto.salt(envelope))
+        XCTAssertThrowsError(try VaultCrypto.derive(password:"fixture-password-351",salt:Data(repeating:0,count:32)))
     }
     func testAAExpenseOnlyCountsOwnShare() throws {
         var d=Document();let a=Item.make(["name":.string("现金"),"currency":.string("CNY"),"openingCents":.int(100000),"openingDate":.int(1)])
