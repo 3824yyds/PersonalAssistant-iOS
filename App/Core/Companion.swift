@@ -129,6 +129,7 @@ enum CompanionRules {
         }
         let fact=text.replacingOccurrences(of:#"^(?:其实|现在|其实现在)?我(?:现在)?"#,with:"",options:.regularExpression)
         guard text.count <= 100, text != fact, fact.range(of: #"^(?:喜欢|不喜欢|更喜欢)[^？?。！!\n]+[。！!]*$"#, options: .regularExpression) != nil,
+              text.range(of:"🙂|🙃|😅|😂|🤣|🥲|😏|💀|👎",options:.regularExpression)==nil,
               fact.range(of:"如果|假如|要是|以前|过去|但是|不过|但|也不|吗|呢|就|，|,",options:.regularExpression) == nil else { return nil }
         let clean=fact.trimmingCharacters(in:CharacterSet(charactersIn:"。！!" )).replacingOccurrences(of:"了$",with:"",options:.regularExpression)
         return CompanionMemory(text: clean, quote: text)

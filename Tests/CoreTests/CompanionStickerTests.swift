@@ -97,4 +97,17 @@ final class CompanionStickerTests:XCTestCase {
         var data=CompanionData()
         XCTAssertTrue(try CompanionRules.appendUserTurn("以后叫你🐟吧",to:&data));XCTAssertEqual(data.profile.name,"🐟")
     }
+    func testAmbiguousIronicEmojiCannotAutomaticallyCreateALongTermPreference() throws {
+        for q in ["我喜欢加班🙂","我喜欢加班🙃","我喜欢加班😂","我喜欢加班👎"] {
+            var data=CompanionData();XCTAssertFalse(try CompanionRules.appendUserTurn(q,to:&data))
+            XCTAssertTrue(data.memories.isEmpty);XCTAssertEqual(data.messages.last?.content,q)
+        }
+    }
+    func testDecorativeEmojiDoesNotPreventPreferenceCorrectionAndUndo() throws {
+        var data=CompanionData();_=try CompanionRules.appendUserTurn("我喜欢咖啡☕️",to:&data)
+        let original=try XCTUnwrap(data.memories.first)
+        _=try CompanionRules.appendUserTurn("我不喜欢咖啡",to:&data)
+        XCTAssertEqual(data.memories.map(\.text),["不喜欢咖啡"])
+        XCTAssertTrue(CompanionRules.undoMemory(data.messages.last!,in:&data));XCTAssertEqual(data.memories,[original])
+    }
 }

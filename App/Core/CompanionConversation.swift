@@ -50,7 +50,11 @@ extension CompanionRules {
     static func preferenceSubject(_ memory:CompanionMemory)->String? {
         if memory.kind=="preference",memory.text.hasPrefix("用户称呼：") {return "identity:name"}
         guard memory.kind=="preference",let range=memory.text.range(of:#"^(?:不喜欢|更喜欢|喜欢)"#,options:.regularExpression) else {return nil}
-        return "preference:"+String(memory.text[range.upperBound...])
+        let original=String(memory.text[range.upperBound...])
+        let withoutEmoji=String(original.filter {character in
+            !character.unicodeScalars.contains {$0.properties.isEmojiPresentation || ($0.properties.isEmoji && !$0.isASCII) || $0.value==0xFE0F}
+        }).trimmingCharacters(in:.whitespacesAndNewlines)
+        return "preference:"+(withoutEmoji.isEmpty ? original:withoutEmoji)
     }
     static func memoriesToForget(_ question:String,data:CompanionData)->[String]? {
         guard let regex=try? NSRegularExpression(pattern:#"^(?:忘掉|忘记|删除记忆)[：:]?(.+?)[。！!]*$"#),
