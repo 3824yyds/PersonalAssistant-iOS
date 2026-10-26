@@ -58,6 +58,7 @@ struct CompanionWindowHistoryView:View {
                         ForEach(messages(index)) {message in
                             VStack(alignment:.leading,spacing:5) {
                                 Text(message.role=="user" ? "你":"伙伴").font(.caption).foregroundStyle(.secondary)
+                                if let sticker=CompanionSticker.find(message.stickerID) {CompanionStickerImage(sticker:sticker,size:110)}
                                 Text(message.content).textSelection(.enabled)
                             }.padding(.vertical,5)
                         }

@@ -67,6 +67,11 @@ enum DebugFixtures {
             state.messages=[CompanionMessage(role:"user",content:"想好啦，以后你就用小鱼这个名字"),CompanionMessage(role:"assistant",content:"你想叫我小鱼吗？确认后我就用这个名字。",source:"名字待确认",nameProposal:"小鱼")]
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-plain-name-fixture") {
+            var state=CompanionData();state.profile.nameRecoveryChecked=true;state.profile.proactive=false
+            state.messages=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这是送我的名字吗？"),CompanionMessage(role:"user",content:"名字"),CompanionMessage(role:"assistant",content:"确认一下，是叫我“大肥鱼”对吧？")]
+            try? state.write(to:&d)
+        }
         if ProcessInfo.processInfo.arguments.contains("--ui-companion-long-context-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-full-context-fixture") {
             var state=CompanionData();state.profile.name="大肥鱼";state.profile.proactive=false
             state.memories=[CompanionMemory(text:"喜欢安静的地方")]

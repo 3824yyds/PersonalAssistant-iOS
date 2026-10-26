@@ -1,0 +1,36 @@
+{
+  "reference": "App/Resources/Assets.xcassets/CompanionAvatar.imageset/avatar.png",
+  "creation": "Each sticker generated individually with image_gen using the avatar and first sticker as visual references. Original generated files retained. No sheet slicing, reused expression overlays or image edits.",
+  "stickers": [
+    {
+      "id": "happy",
+      "sha256": "1b4faec08d3be0e8000382468e68b9ba428b39ce6964b7b3503743c58c69b449",
+      "original_generated_file": "exec-9ab5c3b7-f50f-403f-a186-7b5798ad035a.png"
+    },
+    {
+      "id": "hug",
+      "sha256": "85ba8a2b48b962f2e68a554e97238aeaf0f1536a7e0bc41438b4e947dec1d2a2",
+      "original_generated_file": "exec-4eb2576f-d31e-4f8e-8713-61e82cd8db6a.png"
+    },
+    {
+      "id": "confused",
+      "sha256": "4b7405bec8170b70bd84881009723b0609c41b17e543813acf0d7bb81b5f9232",
+      "original_generated_file": "exec-24974164-cf3c-4ad9-9d64-24be90954da8.png"
+    },
+    {
+      "id": "speechless",
+      "sha256": "c6fbd21adeef143247e56535be9fe9fb175b76c8bd01369c91566f112973d832",
+      "original_generated_file": "exec-ff80e1e8-f3d6-4ab2-b526-0a7a584edc9f.png"
+    },
+    {
+      "id": "smug",
+      "sha256": "958ce4e74763207406b056cb9320c784ecdb53adb6024359993ce4fb7626f45e",
+      "original_generated_file": "exec-a7b9d46c-d335-4e45-a184-2e52a7864e40.png"
+    },
+    {
+      "id": "goodnight",
+      "sha256": "92ae3d3fe954127c8e6b0e5ec8dda0377db5eb30f9f9289cb4e55f6cd46cd6f6",
+      "original_generated_file": "exec-60c3902b-f19c-4ed7-adc3-86cf176fad5a.png"
+    }
+  ]
+}

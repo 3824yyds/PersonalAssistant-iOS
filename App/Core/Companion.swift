@@ -10,6 +10,7 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     var tone: CompanionTone? = nil
     var gentleUntil: Date? = nil
     var nameRecoveryChecked: Bool? = nil
+    var stickers: Bool? = nil
     var title: String { name ?? "伙伴" }
     func effectiveTone(at now:Date = Date()) -> CompanionTone {
         if let gentleUntil, gentleUntil > now {return .gentle}
@@ -38,6 +39,7 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
     var renamedFrom: String? = nil
     var renamedTo: String? = nil
     var nameProposal: String? = nil
+    var stickerID: String? = nil
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
@@ -66,7 +68,7 @@ struct CompanionData: Codable, Equatable, Sendable {
               Set(memories.map(\.id)).count == memories.count,
               Set(messages.map(\.id)).count == messages.count,
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),
-              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
+              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || CompanionSticker.find($0.stickerID) != nil) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
         else { throw AppError.message("伙伴资料内容无效或容量已满，请先导出备份并清理不需要的聊天或记忆") }
     }
 }
@@ -107,7 +109,9 @@ enum CompanionRules {
         return cleanName(name)
     }
     private static func contextualName(_ name:String)->String? {
-        guard name.range(of:"我|你|他说|她说|取名|起名|叫|今天|帮忙|以后|给你|吃饭|睡觉|累了|不想|不知道",options:.regularExpression)==nil else {return nil}
+        let words=String(name.filter {$0.isLetter || $0.isNumber})
+        guard !words.isEmpty,!["嗯","嗯嗯","哦","好","好的","好呀","好吧","对","对的","是","是的","谢谢","名字","你的名字"].contains(words),
+              name.range(of:"我|你|他说|她说|取名|起名|叫|今天|帮忙|以后|给你|吃饭|睡觉|累了|不想|不知道",options:.regularExpression)==nil else {return nil}
         return validProposedName(name)
     }
     static func newMemory(_ input: String) -> CompanionMemory? {
@@ -125,6 +129,7 @@ enum CompanionRules {
         }
         let fact=text.replacingOccurrences(of:#"^(?:其实|现在|其实现在)?我(?:现在)?"#,with:"",options:.regularExpression)
         guard text.count <= 100, text != fact, fact.range(of: #"^(?:喜欢|不喜欢|更喜欢)[^？?。！!\n]+[。！!]*$"#, options: .regularExpression) != nil,
+              text.range(of:"🙂|🙃|😅|😂|🤣|🥲|😏|💀|👎",options:.regularExpression)==nil,
               fact.range(of:"如果|假如|要是|以前|过去|但是|不过|但|也不|吗|呢|就|，|,",options:.regularExpression) == nil else { return nil }
         let clean=fact.trimmingCharacters(in:CharacterSet(charactersIn:"。！!" )).replacingOccurrences(of:"了$",with:"",options:.regularExpression)
         return CompanionMemory(text: clean, quote: text)

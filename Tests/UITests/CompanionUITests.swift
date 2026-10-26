@@ -1,6 +1,38 @@
 import XCTest
 
 final class CompanionUITests:XCTestCase {
+    func testPlainTextNameConfirmationFromScreenshotUpdatesHeaderAndPersists() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-plain-name-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("对的",app)
+        XCTAssertTrue(app.staticTexts["名字已更新为「大肥鱼」"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼");recordScreen(app,"CompanionPlainTextNameConfirmationFixed")
+    }
+    func testStickerPickerSendingAndReplyKeepDraftAndSurviveReopening() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-sticker-fixture"]);tapProductTab("助理",in:app);enter(app)
+        let input=app.textViews["companion.input"];input.tap();input.typeText("这段草稿保留🙂")
+        app.buttons["companion.stickers"].tap();XCTAssertTrue(app.navigationBars["表情包"].waitForExistence(timeout:5))
+        recordScreen(app,"CompanionStickerPicker")
+        app.buttons["companion.sticker.send.happy"].tap()
+        XCTAssertTrue(app.images["companion.sticker.image.hug"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.images["companion.sticker.image.happy"].exists)
+        XCTAssertEqual(app.textViews["companion.input"].value as? String,"这段草稿保留🙂")
+        recordScreen(app,"CompanionStickerConversation")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertTrue(app.images["companion.sticker.image.hug"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.images["companion.sticker.image.happy"].exists)
+    }
+    func testEmojiRoundTripAndTextCommandDisableAutomaticStickers() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-sticker-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("别发表情包",app)
+        XCTAssertTrue(app.staticTexts["好，接下来我只用文字回复。"].waitForExistence(timeout:8))
+        send("又加班🙂👩🏽‍💻",app)
+        XCTAssertTrue(app.staticTexts["我在呢，接着聊。"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["又加班🙂👩🏽‍💻"].exists)
+        XCTAssertFalse(app.images["companion.sticker.image.hug"].exists)
+        recordScreen(app,"CompanionEmojiAndStickerPreference")
+    }
     private func enter(_ app:XCUIApplication) {
         app.buttons["聊天功能"].tap();app.buttons["chat.menu.companion"].tap()
         XCTAssertTrue(app.buttons["companion.back"].waitForExistence(timeout:8))
@@ -113,6 +145,7 @@ final class CompanionUITests:XCTestCase {
         app.buttons["companion.context.compress"].tap();XCTAssertTrue(app.navigationBars["精简预览"].waitForExistence(timeout:8))
         app.buttons["companion.compression.confirm"].tap()
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.context.summary").firstMatch.waitForExistence(timeout:8));XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        XCTAssertFalse(app.staticTexts["这句话还没有回复"].exists)
         XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
         send("我喜欢什么样的地方，你还记得吗？",app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我记下的是' AND label CONTAINS '安静的地方'")).firstMatch.waitForExistence(timeout:8))
@@ -134,6 +167,7 @@ final class CompanionUITests:XCTestCase {
         XCTAssertTrue(app.textViews["companion.input"].waitForExistence(timeout:8))
         XCTAssertEqual(app.textViews["companion.input"].value as? String,"这段输入留到新窗口")
         XCTAssertTrue(app.buttons["companion.send"].isEnabled);XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        XCTAssertFalse(app.staticTexts["这句话还没有回复"].exists)
         recordScreen(app,"CompanionNewWindowPreservesDraft")
     }
 }

@@ -110,7 +110,7 @@ final class DeepSeekWebClient {
                 guard !call.id.isEmpty else {throw AppError.message("云端工具调用缺少标识，请重试")}
                 var toolResult:[String:Any]
                 if localNames.contains(call.name),let onTool {
-                    await onStatus?(call.name=="propose_companion_name" ? "正在确认名字…":"正在保存到应用…")
+                    await onStatus?(call.name=="propose_companion_name" ? "正在确认名字…":(call.name=="send_companion_sticker" ? "正在选表情…":"正在保存到应用…"))
                     let value=try await onTool(call.name,call.arguments)
                     toolResult=(try JSONSerialization.jsonObject(with:JSONEncoder().encode(value)) as? [String:Any]) ?? ["saved":false]
                 } else if webSearch,call.name=="web_search",searches<2,let data=call.arguments.data(using:.utf8),

@@ -9,7 +9,7 @@ enum CompanionCompressionService {
     static func batches(_ source:[CompanionMessage])->[[CompanionMessage]] {
         var result:[[CompanionMessage]]=[],batch:[CompanionMessage]=[],count=0
         for item in source {
-            let cost=item.content.count+item.id.count+100
+            let cost=item.contextText.count+item.id.count+100
             if count+cost>28000,!batch.isEmpty {result.append(batch);batch=[];count=0}
             batch.append(item);count+=cost
         }
@@ -26,7 +26,7 @@ enum CompanionCompressionService {
         for (index,part) in parts.enumerated() {
             try Task.checkCancellation()
             await onStatus?("正在精简上下文 \(index+1)/\(parts.count)…")
-            let input:[[String:Any]]=part.map {["id":$0.id,"role":$0.role,"text":$0.content]}
+            let input:[[String:Any]]=part.map {["id":$0.id,"role":$0.role,"text":$0.contextText]}
             let carried=facts.map {["messageID":$0.messageID,"text":$0.text,"quote":$0.quote,"role":byID[$0.messageID]?.role ?? "user"]}
             let body=String(decoding:try JSONSerialization.data(withJSONObject:["previous_facts":carried,"messages":input],options:[.sortedKeys]),as:UTF8.self)
             let instruction="""

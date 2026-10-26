@@ -30,7 +30,7 @@ enum CompanionContext {
     static func start(_ data:CompanionData)->Int {max(0,min(data.messages.count,data.windows?.last?.startIndex ?? 0))}
     static func current(_ data:CompanionData)->[CompanionMessage] {Array(data.messages.dropFirst(start(data)))}
     static func summary(_ data:CompanionData)->String {data.windows?.last?.summary ?? ""}
-    static func count(_ data:CompanionData)->Int {summary(data).count+current(data).reduce(0) {$0+$1.content.count}}
+    static func count(_ data:CompanionData)->Int {summary(data).count+current(data).reduce(0) {$0+$1.contextText.count}}
     static func full(_ data:CompanionData)->Bool {count(data)>=limit}
     static func canSend(_ question:String,data:CompanionData)->Bool {count(data)+question.count<limit}
     static func validWindows(_ windows:[CompanionWindow],messageCount:Int)->Bool {
@@ -63,7 +63,7 @@ enum CompanionContext {
         var lines:[String]=[]
         for fact in values {
             guard !fact.text.isEmpty,fact.text.count<=180,!fact.quote.isEmpty,fact.quote.count<=500,
-                  let message=byID[fact.messageID],message.content.contains(fact.quote) else {return nil}
+                  let message=byID[fact.messageID],message.contextText.contains(fact.quote) else {return nil}
             lines.append((message.role=="user" ? "用户说：":"伙伴曾回复：")+fact.text)
         }
         let text=lines.joined(separator:"\n")

@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history; var id:String {rawValue} }
+private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history, stickers; var id:String {rawValue} }
 
 struct CompanionAvatar: View {
     var size:CGFloat = 36
@@ -27,7 +27,9 @@ struct CompanionView: View {
         VStack(spacing:0) {
             header
             contextBar
-            conversation
+            // A new window needs a fresh scroll layout. Reusing the long old window's
+            // LazyVStack can retain an out-of-range offset and hide the new summary.
+            conversation.id(session.data.windows?.last?.id ?? "companion.initial-window")
             if !session.cloudAvailable {
                 Label("伙伴聊天需要开启云端智能并配置 DeepSeek",systemImage:"network").font(.caption).foregroundStyle(.secondary).padding(.horizontal).padding(.bottom,6)
             }
@@ -35,12 +37,12 @@ struct CompanionView: View {
                 VStack(alignment:.leading,spacing:6) {
                     Text(error).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("companion.error.message")
                     HStack {
-                        if session.data.messages.last?.role=="user" {Button("重试这句话") {session.error=nil;session.retryLast()}}
+                        if CompanionContext.current(session.data).last?.role=="user" {Button("重试这句话") {session.error=nil;session.retryLast()}}
                         Spacer();Button("收起") {session.error=nil}
                     }.font(.footnote)
                 }.padding(12).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14)).padding(.horizontal,14).padding(.bottom,8)
             }
-            if !session.busy,session.error==nil,session.data.messages.last?.role=="user" {
+            if !session.busy,session.error==nil,CompanionContext.current(session.data).last?.role=="user" {
                 HStack {Text("这句话还没有回复").foregroundStyle(.secondary);Spacer();Button("重试这句话") {session.retryLast()}}
                     .font(.footnote).padding(.horizontal,18).padding(.bottom,8)
             }
@@ -69,6 +71,7 @@ struct CompanionView: View {
                     case .memory:CompanionMemoryView(session:session)
                     case .compression:CompanionCompressionView(session:session)
                     case .history:CompanionWindowHistoryView(data:session.data)
+                    case .stickers:CompanionStickerPicker(session:session)
                     }
                 }.environmentObject(store)
             }
@@ -170,10 +173,15 @@ struct CompanionView: View {
         HStack(alignment:.top,spacing:10) {
             if message.role=="user" {Spacer(minLength:38)}else{CompanionAvatar()}
             VStack(alignment:.leading,spacing:8) {
+                if let sticker=CompanionSticker.find(message.stickerID) {
+                    CompanionStickerImage(sticker:sticker)
+                }
+                if message.role != "user" || message.stickerID == nil {
                 Text(.init(WebEvidence.cited(message.content,sources:message.sources))).textSelection(.enabled)
                     .padding(.horizontal,15).padding(.vertical,12)
                     .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
                     .accessibilityIdentifier("companion.message.\(message.id)")
+                }
                 if let name=message.renamedTo,CompanionRules.canUndoName(message,data:session.data) {
                     HStack(spacing:8) {Text("名字已更新为「\(name)」");Button("撤销") {Task {await session.undoName(message)}}.disabled(session.busy || store.busy)}
                         .font(.caption).foregroundStyle(Theme.accent).padding(.horizontal,5)
@@ -193,6 +201,8 @@ struct CompanionView: View {
     }
     private var composer:some View {
         HStack(alignment:.bottom,spacing:10) {
+            Button {open(.stickers)} label:{Image(systemName:"face.smiling").font(.system(size:22)).frame(width:36,height:52)}
+                .buttonStyle(.plain).accessibilityLabel("伙伴表情包").accessibilityIdentifier("companion.stickers").disabled(session.busy || store.busy)
             ComposingTextInput(text:$session.draft,isFocused:$focused,placeholder:session.data.profile.name.map {"和\($0)说点什么…"} ?? "说点什么…",accessibilityID:"companion.input")
             sendWithContextRing
         }.padding(.horizontal,12).padding(.vertical,7).appGlass(RoundedRectangle(cornerRadius:26))
@@ -238,6 +248,7 @@ struct CompanionProfileView:View {
             Section {
                 Toggle("主动接话",isOn:Binding(get:{session.data.profile.proactive},set:{value in Task {_=await session.update {$0.profile.proactive=value}}})).accessibilityIdentifier("companion.proactive")
                 Toggle("需要时联网查询",isOn:Binding(get:{session.data.profile.web},set:{value in Task {_=await session.update {$0.profile.web=value}}})).accessibilityIdentifier("companion.web")
+                Toggle("适时发表情包",isOn:Binding(get:{session.data.profile.stickers != false},set:{value in Task {_=await session.update {$0.profile.stickers=value}}})).accessibilityIdentifier("companion.stickers.enabled")
             } footer:{Text("聊天和自动精简使用 DeepSeek Flash，需要联网并产生 API 费用。会发送当前窗口的完整对话、交接摘要和相关记忆，不发送整份笔记或账本。按需搜索另有费用，搜索词仅使用必要公开关键词。主动接话只在此页打开时发生。")}
             Section {Button {memory=true} label:{Label("查看你们的记忆",systemImage:"bookmark")}}
             if let error=session.error {Section {Text(error).font(.footnote).foregroundStyle(.red)}}
