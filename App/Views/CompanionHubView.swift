@@ -17,7 +17,7 @@ struct CompanionHubView:View {
             Section("单独聊天") {
                 ForEach(CompanionPersona.allCases) {persona in
                     NavigationLink(value:CompanionSpace.direct(persona)) {
-                        HStack(spacing:14) {CompanionAvatar(size:54,persona:persona);VStack(alignment:.leading,spacing:5) {Text(profile(persona).name ?? persona.label).font(.headline);Text(persona == .male ? "冷静、细心，偶尔干幽默":"热情亲近，愿意主动接话").font(.caption).foregroundStyle(.secondary)}}.padding(.vertical,7)
+                        HStack(spacing:14) {CompanionAvatar(size:54,persona:persona);VStack(alignment:.leading,spacing:5) {Text(profile(persona).name ?? persona.label).font(.headline);Text(persona == .male ? "温柔稳重，耐心倾听与安慰":"热情亲近，愿意主动接话").font(.caption).foregroundStyle(.secondary)}}.padding(.vertical,7)
                     }.accessibilityIdentifier("companion.hub."+persona.rawValue)
                 }
             }

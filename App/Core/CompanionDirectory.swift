@@ -12,8 +12,8 @@ enum CompanionPersona:String,Codable,CaseIterable,Identifiable,Sendable {
         if self == .male {
             data.profile.personaID=rawValue
             data.profile.appearance="黑色微乱短发、琥珀色眼睛，戴小银色耳钉和细银链，穿黑色高领衫与深灰色开衫。"
-            data.profile.personality="冷静克制、细心，善于观察和倾听，偶尔用干幽默接话。话少但有具体内容，关心通过记住细节和实际支持表达，不故作高冷、不居高临下，不照搬热情女生的撒娇口吻。"
-            data.profile.proactive=false
+            data.profile.personality="温柔稳重、耐心细致，善于倾听和安慰。先接住情绪，听完再给具体支持，不急着说教、不否定感受；表达克制真诚，不强装高冷，不照搬热情女生的撒娇口吻，不编造现实身体、承诺或经历。"
+            data.profile.proactive=false;data.profile.tone = .gentle
         }
         return data
     }
