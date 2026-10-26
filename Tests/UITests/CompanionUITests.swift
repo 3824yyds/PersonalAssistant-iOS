@@ -40,4 +40,50 @@ final class CompanionUITests:XCTestCase {
         XCTAssertFalse(app.buttons["chat.source.1"].exists)
         recordScreen(app,"CompanionWebFailureHasNoInventedSources")
     }
+    func testNaturalNamingSuggestionCorrectionAndUndoKeepHeaderConsistent() {
+        let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("大肥鱼怎么样？",app)
+        XCTAssertTrue(app.staticTexts["名字已更新为「大肥鱼」"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+        send("我说给你取名小鲸鱼",app)
+        XCTAssertTrue(app.staticTexts["名字已更新为「小鲸鱼」"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"小鲸鱼")
+        app.buttons["撤销"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"identifier == 'companion.title' AND label == '大肥鱼'")).firstMatch.waitForExistence(timeout:8))
+        send("你叫什么名字？",app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我叫大肥鱼' AND label CONTAINS '呀'")).firstMatch.waitForExistence(timeout:8))
+        recordScreen(app,"CompanionNaturalNamesAndUndo")
+    }
+    func testToneCommandsPersistAndTodayOverrideCanBeResetInProfile() {
+        let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("嘴再毒一点",app)
+        XCTAssertTrue(app.staticTexts["好，聊天语气已改成“贴吧老哥”。"].waitForExistence(timeout:8))
+        app.buttons["companion.profile"].tap();XCTAssertTrue(app.staticTexts["贴吧老哥"].waitForExistence(timeout:5));recordScreen(app,"CompanionToneProfile")
+        app.buttons["完成"].tap()
+        send("今天别损我",app)
+        XCTAssertTrue(app.staticTexts["好，今天我收着点，陪你好好聊。"].waitForExistence(timeout:8))
+        app.buttons["companion.back"].tap();enter(app);app.buttons["companion.profile"].tap()
+        XCTAssertTrue(app.staticTexts["温柔一点"].waitForExistence(timeout:5));app.buttons["完成"].tap()
+        send("恢复互损",app)
+        XCTAssertTrue(app.staticTexts["好，聊天语气已改成“适度互损”。"].waitForExistence(timeout:8))
+    }
+    func testCancelAndRetryDoNotDuplicateUserMessageOrAppendLateReply() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-slow-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("这条消息检查取消和重试",app)
+        XCTAssertTrue(app.buttons["停止伙伴回复"].waitForExistence(timeout:5));app.buttons["companion.send"].tap()
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == '这条消息检查取消和重试'")).count,1)
+        XCTAssertFalse(app.staticTexts["我在呢，接着聊。"].exists)
+        XCTAssertTrue(app.buttons["重试这句话"].waitForExistence(timeout:5))
+        app.buttons["重试这句话"].tap()
+        XCTAssertTrue(app.staticTexts["我在呢，接着聊。"].waitForExistence(timeout:10))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == '这条消息检查取消和重试'")).count,1)
+    }
+    func testOrdinaryCompanionWithMissingKeyShowsErrorWithoutLocalFallback() {
+        let app=launchProduct();tapProductTab("助理",in:app);enter(app);send("你好，今天聊点什么？",app)
+        XCTAssertTrue(app.buttons["重试这句话"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'DeepSeek API Key'")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["你好！今天想聊点什么？"].exists)
+        recordScreen(app,"CompanionCloudFailureRemainsRetryable")
+    }
 }

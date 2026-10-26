@@ -17,26 +17,138 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
-    @MainActor func testCompanionSearchRetainsPersonaAndExcludesPrivateMemory() async throws {
-        var data=CompanionData();data.profile.name="小澜"
-        data.memories=[CompanionMemory(text:"私密余额987654321")]
-        var calls=0
+    @MainActor func testSemanticNamingToolReturnsConfirmationWithoutPretendingNameWasSaved() async throws {
+        let data=CompanionData();var calls=0
+        WebProtocol.handler={request in
+            calls+=1
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"name-proposal","function":["name":"propose_companion_name","arguments":"{\"name\":\"小鱼\",\"quote\":\"以后你就用小鱼这个名字\"}"]]]]))}
+            return (200,try self.sse(["content":"我已经改名叫小鱼了。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"我决定了，以后你就用小鱼这个名字",data:data,history:[],client:client())
+        XCTAssertEqual(result.3,"小鱼");XCTAssertTrue(result.0.contains("确认后"));XCTAssertFalse(result.0.contains("已经改名"))
+        XCTAssertNil(data.profile.name)
+    }
+    @MainActor func testCompanionOrdinaryChatUsesFlashFullContextAndSelectedTone() async throws {
+        var data=CompanionData();data.profile.name="大肥鱼";data.profile.tone = .spicy;data.memories=[CompanionMemory(text:"喜欢安静的地方")]
+        let history=[CompanionMessage(role:"user",content:"这个点吃饭？"),CompanionMessage(role:"assistant",content:"我一个人，你呢？"),CompanionMessage(role:"user",content:"我说的是时间")]
+        var count=0
+        WebProtocol.handler={request in
+            count+=1;XCTAssertEqual(request.url!.path,"/chat/completions")
+            let body=try self.body(request);XCTAssertEqual(body["model"] as? String,"deepseek-flash");XCTAssertEqual(body["max_tokens"] as? Int,768)
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertEqual(messages.count,5);XCTAssertEqual(messages[1]["content"] as? String,"这个点吃饭？")
+            let system=try XCTUnwrap(messages[0]["content"] as? String)
+            XCTAssertTrue(system.contains("大肥鱼"));XCTAssertTrue(system.contains("贴吧老哥"));XCTAssertTrue(system.contains("喜欢安静的地方"))
+            XCTAssertFalse(system.contains("再给必要的2–4个要点"))
+            let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
+            XCTAssertEqual(tools.count,2);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"web_search")
+            return (200,try self.sse(["content":"哦，你问的是时间，我刚才听岔了。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"我问为什么这么晚",data:data,history:history,client:client())
+        XCTAssertEqual(count,1);XCTAssertEqual(result.1,"DeepSeek Flash");XCTAssertTrue(result.2.isEmpty)
+    }
+    @MainActor func testCompanionDisabledSearchAndPerTurnNoWebNeverExposeSearchTool() async throws {
+        for disabled in [true,false] {
+            var data=CompanionData();data.profile.web = !disabled
+            WebProtocol.handler={request in
+                let body=try self.body(request)
+                XCTAssertFalse((body["tools"] as? [[String:Any]] ?? []).contains {($0["function"] as? [String:Any])?["name"] as? String=="web_search"})
+                XCTAssertEqual(request.url!.path,"/chat/completions")
+                return (200,try self.sse(["content":"这轮没有联网核实，我们可以先聊你发来的这句话。 "]))
+            }
+            _=try await CompanionReplyService.answer(question:disabled ? "这个词最近很火吗？":"不要联网，聊聊这个梗",data:data,history:[],client:client())
+        }
+    }
+    @MainActor func testUnknownMemeCanSearchAndKeepsRealSourcesAndPersona() async throws {
+        var data=CompanionData();data.profile.name="大肥鱼";var chats=0,queries:[String]=[]
         WebProtocol.handler={request in
             let body=try self.body(request)
-            if request.url!.path=="/v1/tools/search" {return (200,Data(#"{"results":[{"title":"天气来源","url":"https://example.com/weather","content":"天气证据"}]}"#.utf8))}
-            XCTAssertEqual(request.url!.path,"/chat/completions")
+            if request.url!.path=="/v1/tools/search" {
+                queries.append(body["query"] as? String ?? "")
+                return (200,Data(#"{"results":[{"title":"梗的原始发布","url":"https://example.com/meme","content":"这个词的原始语境说明","date":"2026-10-26"}]}"#.utf8))
+            }
+            chats+=1
             let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
-            let system=try XCTUnwrap(messages.first?["content"] as? String)
-            XCTAssertTrue(system.contains("小澜"));XCTAssertTrue(system.contains("女性"));XCTAssertTrue(system.contains("白色围裙"))
-            XCTAssertTrue(system.contains("简短口语伙伴"));XCTAssertFalse(system.contains("再给必要的2–4个要点"))
-            XCTAssertFalse(String(describing:messages).contains("987654321"))
-            calls+=1
-            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"companion-search","function":["name":"web_search","arguments":"{\"query\":\"杭州周末天气\"}"]]]]))}
-            return (200,try self.sse(["content":"我查到了这条天气信息。[1]"]))
+            XCTAssertTrue((messages.first?["content"] as? String ?? "").contains("大肥鱼"))
+            if chats==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"meme-search","function":["name":"web_search","arguments":"{\"query\":\"示例新梗 含义 原始语境\"}"]]]]))}
+            return (200,try self.sse(["content":"找到原始语境了，这句话是在调侃那种情况。[1]"]))
         }
-        var sources:[WebSource]=[]
-        let result=try await client().answer(messages:CompanionWeb.messages("帮我查杭州周末天气",data:data,previousQuestion:nil),model:"deepseek-flash",responseStyle:"简短口语伙伴",onPartial:nil,onSources:{sources=$0},onStatus:nil)
-        XCTAssertEqual(result.1,"联网搜索 · 1 个来源");XCTAssertEqual(sources.first?.url,"https://example.com/weather")
+        let result=try await CompanionReplyService.answer(question:"这个示例新词是什么梗？",data:data,history:[],client:client())
+        XCTAssertEqual(chats,2);XCTAssertEqual(queries,["示例新梗 含义 原始语境"])
+        XCTAssertEqual(result.2.first?.url,"https://example.com/meme");XCTAssertEqual(result.1,"联网搜索 · 1 个来源")
+    }
+    @MainActor func testRepeatedAnswerGetsOnlyOneRepairWithoutAnotherSearchBudget() async throws {
+        let history=[CompanionMessage(role:"assistant",content:"我一个人，你呢？")]
+        var calls=0,statuses:[String]=[]
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request)
+            if calls==2 {
+                XCTAssertFalse((body["tools"] as? [[String:Any]] ?? []).contains {($0["function"] as? [String:Any])?["name"] as? String=="web_search"})
+                let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+                XCTAssertTrue((messages.first?["content"] as? String ?? "").contains("未发给用户"))
+                return (200,try self.sse(["content":"哦，你问的是时间，我刚才听岔了。 "]))
+            }
+            return (200,try self.sse(["content":"那我一个人，你呢？"]))
+        }
+        let result=try await CompanionReplyService.answer(question:"我说的是时间",data:CompanionData(),history:history,client:client(),onStatus:{statuses.append($0)})
+        XCTAssertEqual(calls,2);XCTAssertTrue(result.0.contains("时间"));XCTAssertTrue(statuses.contains("正在换个说法…"))
+    }
+    @MainActor func testPersistentRepetitionFailsRatherThanLoopingOrReturningCannedSuccess() async throws {
+        var calls=0;WebProtocol.handler={_ in calls+=1;return (200,try self.sse(["content":"我一个人，你呢？"]))}
+        do {
+            _=try await CompanionReplyService.answer(question:"你听懂我了吗？",data:CompanionData(),history:[CompanionMessage(role:"assistant",content:"我一个人，你呢？")],client:client())
+            XCTFail("Repeated response should be rejected")
+        } catch {XCTAssertTrue(error.localizedDescription.contains("重复"))}
+        XCTAssertEqual(calls,2)
+    }
+    @MainActor func testCompanionFailureDoesNotSilentlyFallBackToTrainedModel() async throws {
+        for code in [401,402,429,500] {
+            var calls=0;WebProtocol.handler={_ in calls+=1;return(code,Data())}
+            do {_=try await CompanionReplyService.answer(question:"聊点什么？",data:CompanionData(),history:[],client:client());XCTFail("Expected failure \(code)")}
+            catch {XCTAssertFalse(error.localizedDescription.isEmpty)}
+            XCTAssertEqual(calls,1)
+        }
+    }
+    @MainActor func testCompanionTransportFailureAndTruncatedStreamDoNotProduceCompletedReply() async throws {
+        WebProtocol.handler={_ in throw URLError(.notConnectedToInternet)}
+        do {_=try await CompanionReplyService.answer(question:"你好",data:CompanionData(),history:[],client:client());XCTFail("Expected offline error")}
+        catch {XCTAssertEqual((error as? URLError)?.code,.notConnectedToInternet)}
+        WebProtocol.handler={_ in
+            let raw=try JSONSerialization.data(withJSONObject:["choices":[["delta":["content":"只有半句"]]]])
+            return (200,Data(("data: "+String(decoding:raw,as:UTF8.self)+"\n\n").utf8))
+        }
+        do {_=try await CompanionReplyService.answer(question:"你好",data:CompanionData(),history:[],client:client());XCTFail("Expected truncated stream error")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("未完成"))}
+    }
+    @MainActor func testCompanionRejectsTokenLimitAndAllowsExplicitDetailedReplyBudget() async throws {
+        WebProtocol.handler={request in
+            let body=try self.body(request);XCTAssertEqual(body["max_tokens"] as? Int,3072)
+            let raw=try JSONSerialization.data(withJSONObject:["choices":[["delta":["content":"半篇正文"],"finish_reason":"length"]]])
+            return (200,Data(("data: "+String(decoding:raw,as:UTF8.self)+"\n\ndata: [DONE]\n\n").utf8))
+        }
+        do {_=try await CompanionReplyService.answer(question:"详细解释一下",data:CompanionData(),history:[],client:client());XCTFail("Expected length error")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("长度上限"))}
+    }
+    @MainActor func testCompanionPrivateMemoryCannotBeCopiedIntoSearchQuery() async throws {
+        var data=CompanionData();data.memories=[CompanionMemory(text:"秘密号码9876543210")]
+        WebProtocol.handler={request in
+            XCTAssertEqual(request.url!.path,"/chat/completions","Private search must never be sent")
+            return (200,try self.sse(["tool_calls":[["index":0,"id":"private","function":["name":"web_search","arguments":"{\"query\":\"9876543210\"}"]]]]))
+        }
+        do {_=try await CompanionReplyService.answer(question:"帮我查一个公开梗",data:data,history:[],client:client());XCTFail("Expected privacy guard")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("私人资料"))}
+    }
+    @MainActor func testCancelledCompanionDoesNotSendAnyRequestAndProactiveCannotSearch() async throws {
+        let client=client();WebProtocol.handler={_ in XCTFail("Cancelled call must not run");throw URLError(.cancelled)}
+        let task=Task {try await CompanionReplyService.answer(question:"你好",data:CompanionData(),history:[],client:client)}
+        task.cancel()
+        do {_=try await task.value;XCTFail("Expected cancellation")}
+        catch {XCTAssertTrue(error is CancellationError)}
+        WebProtocol.handler={request in
+            let body=try self.body(request);XCTAssertNil(body["tools"])
+            return (200,try self.sse(["content":"刚才那个话题，我想到一点。 "]))
+        }
+        _=try await CompanionReplyService.answer(question:"主动接一句",data:CompanionData(),history:[],proactive:true,client:client)
     }
     func testCompanionEncryptedBackupKeepsNameAndUserMemorySeparate() throws {
         let key=try VaultCrypto.random(32),salt=try VaultCrypto.random(32)

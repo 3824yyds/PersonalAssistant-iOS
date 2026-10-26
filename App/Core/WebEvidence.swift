@@ -70,11 +70,14 @@ struct DeepSeekToolCall:Equatable {
 }
 struct DeepSeekStreamMessage {
     var content=""
+    var finishReason:String?
     var calls:[Int:DeepSeekToolCall]=[:]
     mutating func consume(_ data:Data) throws {
         let root=try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
         if root["error"] != nil {throw AppError.message("云端生成中断，请重试")}
-        guard let choice=(root["choices"] as? [[String:Any]])?.first,let delta=choice["delta"] as? [String:Any] else {return}
+        guard let choice=(root["choices"] as? [[String:Any]])?.first else {return}
+        if let reason=choice["finish_reason"] as? String {finishReason=reason}
+        guard let delta=choice["delta"] as? [String:Any] else {return}
         content += delta["content"] as? String ?? ""
         for fragment in delta["tool_calls"] as? [[String:Any]] ?? [] {
             guard let index=fragment["index"] as? Int,(0..<4).contains(index) else {throw AppError.message("云端工具调用过多，请简化问题")}

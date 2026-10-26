@@ -26,8 +26,8 @@ struct CompanionView: View {
         VStack(spacing:0) {
             header
             conversation
-            if !session.modelAvailable {
-                Label("缺少伙伴模型，请安装完整版本",systemImage:"exclamationmark.triangle").font(.caption).foregroundStyle(.orange).padding(.horizontal)
+            if !session.cloudAvailable {
+                Label("伙伴聊天需要开启云端智能并配置 DeepSeek",systemImage:"network").font(.caption).foregroundStyle(.secondary).padding(.horizontal).padding(.bottom,6)
             }
             if let error=session.error {
                 VStack(alignment:.leading,spacing:6) {
@@ -38,6 +38,10 @@ struct CompanionView: View {
                     }.font(.footnote)
                 }.padding(12).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14)).padding(.horizontal,14).padding(.bottom,8)
                     .accessibilityIdentifier("companion.error")
+            }
+            if !session.busy,session.error==nil,session.data.messages.last?.role=="user" {
+                HStack {Text("这句话还没有回复").foregroundStyle(.secondary);Spacer();Button("重试这句话") {session.retryLast()}}
+                    .font(.footnote).padding(.horizontal,18).padding(.bottom,8)
             }
             composer
         }.background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar).appErrorScope()
@@ -69,7 +73,7 @@ struct CompanionView: View {
             Button {dismissKeyboard();session.close();dismiss()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}
                 .buttonStyle(.plain).accessibilityLabel("返回普通聊天").accessibilityIdentifier("companion.back")
             Spacer(minLength:4)
-            Button {open(.profile)} label:{HStack(spacing:8) {CompanionAvatar(size:32);Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title")}}
+            Button {open(.profile)} label:{HStack(spacing:8) {CompanionAvatar(size:32);VStack(alignment:.leading,spacing:2) {Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title");Text("Flash · 文字伙伴").font(.caption2).foregroundStyle(.secondary)}}}
                 .buttonStyle(.plain).accessibilityIdentifier("companion.profile").disabled(session.busy || store.busy)
             Spacer(minLength:4)
             HStack(spacing:0) {
@@ -137,12 +141,15 @@ struct CompanionView: View {
                     .padding(.horizontal,15).padding(.vertical,12)
                     .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
                     .accessibilityIdentifier("companion.message.\(message.id)")
-                if let name=message.renamedTo,session.data.profile.name==name {
+                if let name=message.renamedTo,CompanionRules.canUndoName(message,data:session.data) {
                     HStack(spacing:8) {Text("名字已更新为「\(name)」");Button("撤销") {Task {await session.undoName(message)}}.disabled(session.busy || store.busy)}
                         .font(.caption).foregroundStyle(Theme.accent).padding(.horizontal,5)
                 }
+                if let name=message.nameProposal,session.data.messages.last?.id==message.id {
+                    Button("就叫“\(name)”") {Task {await session.confirmName(message)}}.font(.subheadline).buttonStyle(.bordered).disabled(session.busy || store.busy).accessibilityIdentifier("companion.name.confirm")
+                }
                 if let id=message.memoryID,let memory=session.data.memories.first(where:{$0.id==id}) {
-                    HStack(alignment:.top,spacing:6) {Image(systemName:"bookmark");Text("已记住："+memory.text);Button("撤销") {Task {await session.removeMemory(id)}}.disabled(session.busy || store.busy)}
+                    HStack(alignment:.top,spacing:6) {Image(systemName:"bookmark");Text("已记住："+memory.text);Button("撤销") {Task {await session.undoMemory(message)}}.disabled(session.busy || store.busy)}
                         .font(.caption).foregroundStyle(Theme.accent).padding(.horizontal,5)
                 }
                 if !message.sources.isEmpty {WebSourcesView(sources:message.sources).font(.caption)}
@@ -175,11 +182,16 @@ struct CompanionProfileView:View {
                 VStack(spacing:12) {CompanionAvatar(size:100);Text(session.title).font(.title2.bold());Text("女性").font(.caption).foregroundStyle(.secondary)}.frame(maxWidth:.infinity).padding(.vertical,12).listRowBackground(Color.clear)
             }
             Section("性格") {Text(session.data.profile.personality)}
+            Section {
+                Picker("聊天语气",selection:Binding(get:{session.data.profile.effectiveTone()},set:{tone in Task {_=await session.update {$0.profile.tone=tone;$0.profile.gentleUntil=nil}}})) {
+                    ForEach(CompanionTone.allCases) {tone in Text(tone.title).tag(tone)}
+                }.accessibilityIdentifier("companion.tone")
+            } footer:{Text("也可以直接说“嘴再毒一点”或“今天别损我”。今天收敛后，明天恢复平常语气。认真求助时会优先照顾你的感受。")}
             Section("形象") {Text(session.data.profile.appearance)}
             Section {
                 Toggle("主动接话",isOn:Binding(get:{session.data.profile.proactive},set:{value in Task {_=await session.update {$0.profile.proactive=value}}})).accessibilityIdentifier("companion.proactive")
                 Toggle("需要时联网查询",isOn:Binding(get:{session.data.profile.web},set:{value in Task {_=await session.update {$0.profile.web=value}}})).accessibilityIdentifier("companion.web")
-            } footer:{Text("主动接话仅在伙伴页面打开时发生。联网查询使用已配置的 DeepSeek，可能产生 API 费用；仅发送当前问题及必要查询条件。")}
+            } footer:{Text("聊天使用 DeepSeek Flash，需要联网并产生 API 费用。会发送当前消息、近期对话、少量相关旧对话和记忆，不发送整份笔记或账本。按需搜索另有费用，搜索词仅使用必要公开关键词。主动接话只在此页打开时发生。")}
             Section {Button {memory=true} label:{Label("查看你们的记忆",systemImage:"bookmark")}}
             if let error=session.error {Section {Text(error).font(.footnote).foregroundStyle(.red)}}
         }.scrollContentBackground(.hidden).background {ConversationBackground()}.navigationTitle("她的资料").navigationBarTitleDisplayMode(.inline)
@@ -216,7 +228,11 @@ private struct CompanionProfileEditor:View {
         guard clean.isEmpty || CompanionRules.cleanName(clean) != nil else {error="名字请使用1到20个字符";return}
         saving=true
         Task {
-            let saved=await session.update {$0.profile.name=clean.isEmpty ? nil:clean;$0.profile.appearance=appearance.trimmingCharacters(in:.whitespacesAndNewlines);$0.profile.personality=personality.trimmingCharacters(in:.whitespacesAndNewlines)}
+            let saved=await session.update {state in
+                let nextName=clean.isEmpty ? nil:clean
+                if state.profile.name != nextName {for i in state.messages.indices {state.messages[i].renamedFrom=nil;state.messages[i].renamedTo=nil}}
+                state.profile.name=nextName;state.profile.appearance=appearance.trimmingCharacters(in:.whitespacesAndNewlines);state.profile.personality=personality.trimmingCharacters(in:.whitespacesAndNewlines)
+            }
             saving=false;if saved {dismiss()}else{error=session.error}
         }
     }
