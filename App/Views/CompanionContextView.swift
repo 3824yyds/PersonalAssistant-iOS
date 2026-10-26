@@ -41,6 +41,7 @@ struct CompanionCompressionView:View {
 
 struct CompanionWindowHistoryView:View {
     let data:CompanionData
+    var names:[String:String]=[:]
     @Environment(\.dismiss) private var dismiss
     private var windows:[CompanionWindow] {data.windows ?? []}
     private func messages(_ index:Int)->[CompanionMessage] {
@@ -57,7 +58,7 @@ struct CompanionWindowHistoryView:View {
                         if index>0 {Section("当时带入的要点") {Text(windows[index-1].summary).textSelection(.enabled)}}
                         ForEach(messages(index)) {message in
                             VStack(alignment:.leading,spacing:5) {
-                                Text(message.role=="user" ? "你":"伙伴").font(.caption).foregroundStyle(.secondary)
+                                Text(message.role=="user" ? "你":(message.speakerID.flatMap {names[$0]} ?? data.profile.title)).font(.caption).foregroundStyle(.secondary)
                                 if let sticker=data.descriptor(message.stickerID) {CompanionStickerImage(sticker:sticker,data:data,size:110)}
                                 Text(message.content).textSelection(.enabled)
                                 if let quote=message.replyTo {Text("引用"+(quote.role=="assistant" ? "伙伴":"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)}

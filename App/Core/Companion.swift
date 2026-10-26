@@ -12,7 +12,10 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     var nameRecoveryChecked: Bool? = nil
     var stickers: Bool? = nil
     var avatarMotion:Bool? = nil
-    var title: String { name ?? "伙伴" }
+    var personaID:String? = nil
+    var sharedRoom:Bool? = nil
+    var growthEnabled:Bool? = nil
+    var title: String { name ?? (personaID=="male" ? "男生伙伴":"伙伴") }
     func effectiveTone(at now:Date = Date()) -> CompanionTone {
         if let gentleUntil, gentleUntil > now {return .gentle}
         return tone ?? .playful
@@ -43,6 +46,9 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
     var stickerID: String? = nil
     var stickerMeaning: String? = nil
     var replyTo:CompanionQuote? = nil
+    var speakerID:String? = nil
+    var turnID:String? = nil
+    var recipients:[String]? = nil
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
@@ -54,6 +60,7 @@ struct CompanionData: Codable, Equatable, Sendable {
     var awaitingProactiveReply = false
     var windows: [CompanionWindow]? = nil
     var customStickers:[CompanionCustomSticker]? = nil
+    var experiences:[CompanionExperience]? = nil
     static func read(_ document: Document) throws -> Self {
         guard let raw = document.root.raw["companionResearch"] else { return Self() }
         do { return try JSONDecoder().decode(Self.self, from: JSONEncoder().encode(raw)) }
@@ -64,18 +71,26 @@ struct CompanionData: Codable, Equatable, Sendable {
         document.root.raw["companionResearch"] = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
     }
     func validate() throws {
-        guard profile.name == nil || CompanionRules.cleanName(profile.name!) == profile.name,
+        guard profile.personaID == nil || CompanionPersona(rawValue:profile.personaID!) != nil,
+              profile.name == nil || CompanionRules.cleanName(profile.name!) == profile.name,
               !profile.appearance.isEmpty, profile.appearance.count <= 400,
               !profile.personality.isEmpty, profile.personality.count <= 200,
               memories.count <= 200, messages.count <= Self.messageLimit,
               CompanionContext.validWindows(windows ?? [],messageCount:messages.count),
               (customStickers?.count ?? 0)<=CompanionCustomSticker.limit,
+              (experiences?.count ?? 0)<=24,(experiences ?? []).allSatisfy(\.valid),
+              Set((experiences ?? []).map { $0.ownerID+"|"+$0.facet }).count==(experiences?.count ?? 0),
               (customStickers ?? []).allSatisfy(\.valid),
               Set((customStickers ?? []).map(\.id)).count==(customStickers?.count ?? 0),
               Set(memories.map(\.id)).count == memories.count,
               Set(messages.map(\.id)).count == messages.count,
+              messages.allSatisfy({m in
+                  (m.speakerID==nil || (m.role=="assistant" && CompanionPersona(rawValue:m.speakerID!) != nil)) &&
+                  (m.turnID==nil || (m.role=="assistant" && !m.turnID!.isEmpty && m.turnID!.count<=100)) &&
+                  (m.recipients==nil || (m.role=="user" && !(m.recipients ?? []).isEmpty && (m.recipients?.count ?? 0)<=2 && Set(m.recipients ?? []).count==m.recipients?.count && (m.recipients ?? []).allSatisfy {CompanionPersona(rawValue:$0) != nil}))
+              }),
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),
-              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || descriptor($0.stickerID) != nil) && ($0.stickerMeaning?.count ?? 0)<=160 && ($0.replyTo == nil || ($0.role=="user" && $0.replyTo!.valid)) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
+              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && (!$0.content.isEmpty || $0.stickerID != nil) && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || descriptor($0.stickerID) != nil) && ($0.stickerMeaning?.count ?? 0)<=160 && ($0.replyTo == nil || ($0.role=="user" && $0.replyTo!.valid)) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
         else { throw AppError.message("伙伴资料内容无效或容量已满，请先导出备份并清理不需要的聊天或记忆") }
     }
 }
@@ -148,7 +163,7 @@ enum CompanionRules {
     }
     static func selfReply(_ question: String, profile: CompanionProfile) -> String? {
         let value = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.range(of: #"^(?:你|那你)(?:是男生还是女生|是男的还是女的|是什么性别|的性别是什么|是女生吗|是女孩吗)[？?。！!]*$"#, options: .regularExpression) != nil { return "我是女生呀。" }
+        if value.range(of: #"^(?:你|那你)(?:是男生还是女生|是男的还是女的|是什么性别|的性别是什么|是女生吗|是女孩吗|是男生吗|是男孩吗)[？?。！!]*$"#, options: .regularExpression) != nil { return profile.persona == .male ? "我是男生。":"我是女生呀。" }
         if value.range(of: #"^(?:你|那你)(?:叫什么|叫什么名字|叫啥|叫啥名字|的名字是什么|名字是什么|的名字是啥|是谁)[？?。！!]*$"#, options: .regularExpression) != nil {
             return profile.name.map { "我叫\($0)呀。" } ?? "还没取名字呢，你想怎么叫我？"
         }

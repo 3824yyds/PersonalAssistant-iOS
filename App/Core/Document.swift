@@ -109,6 +109,7 @@ public struct Document: Codable, Equatable, Sendable {
         }
         try Validation.extra(self)
         if root.raw["companionResearch"] != nil {try CompanionData.read(self).validate()}
+        try CompanionDirectory.validate(self)
         return self
     }
 }

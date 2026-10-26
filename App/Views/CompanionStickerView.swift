@@ -27,7 +27,7 @@ struct CompanionStickerDock:View {
     @State private var loading=false
     @State private var imported:StickerImport?
     @State private var photoTask:Task<Void,Never>?
-    private var items:[CompanionSticker] {mine ? (session.data.customStickers ?? []).filter {!$0.archived}.map(\.descriptor):CompanionSticker.all}
+    private var items:[CompanionSticker] {mine ? (session.data.customStickers ?? []).filter {!$0.archived}.map(\.descriptor):session.data.builtinStickers}
     var body:some View {
         VStack(spacing:0) {
             HStack(spacing:18) {
@@ -50,7 +50,7 @@ struct CompanionStickerDock:View {
                             .contextMenu {
                                 if sticker.id.hasPrefix("custom:") {
                                     let allowed=session.data.customStickers?.first(where:{$0.id==sticker.id})?.allowAssistant ?? false
-                                    Button(allowed ? "不让她使用":"允许她使用") {Task {await session.setStickerAllowed(sticker.id,!allowed)}}
+                                    Button(allowed ? "不让伙伴使用":"允许伙伴使用") {Task {await session.setStickerAllowed(sticker.id,!allowed)}}
                                     Button("移除表情",role:.destructive) {Task {await session.removeSticker(sticker.id)}}
                                 }
                             }
@@ -108,7 +108,7 @@ private struct CompanionStickerEditor:View {
                 TextField("它表达什么意思？",text:$meaning,axis:.vertical).lineLimit(2...4).accessibilityIdentifier("companion.sticker.meaning")
             } footer:{Text("名称最多16字，含义最多120字，例如“捂脸苦笑，表示无奈”。")}
             Section {
-                Toggle("允许她使用这张表情",isOn:$allow)
+                Toggle("允许伙伴使用这张表情",isOn:$allow)
             } footer:{Text("照片保存在本机加密资料中；对话只发送名称和含义。移除已发过的表情时，聊天原图会保留。")}
             if let error=session.error {Section {Text(error).foregroundStyle(.red)}}
         }.navigationTitle("添加表情").navigationBarTitleDisplayMode(.inline)
