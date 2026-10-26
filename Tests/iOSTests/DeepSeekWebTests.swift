@@ -17,6 +17,38 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testCompanionSearchRetainsPersonaAndExcludesPrivateMemory() async throws {
+        var data=CompanionData();data.profile.name="小澜"
+        data.memories=[CompanionMemory(text:"私密余额987654321")]
+        var calls=0
+        WebProtocol.handler={request in
+            let body=try self.body(request)
+            if request.url!.path=="/v1/tools/search" {return (200,Data(#"{"results":[{"title":"天气来源","url":"https://example.com/weather","content":"天气证据"}]}"#.utf8))}
+            XCTAssertEqual(request.url!.path,"/chat/completions")
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let system=try XCTUnwrap(messages.first?["content"] as? String)
+            XCTAssertTrue(system.contains("小澜"));XCTAssertTrue(system.contains("女性"));XCTAssertTrue(system.contains("白色围裙"))
+            XCTAssertTrue(system.contains("简短口语伙伴"));XCTAssertFalse(system.contains("再给必要的2–4个要点"))
+            XCTAssertFalse(String(describing:messages).contains("987654321"))
+            calls+=1
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"companion-search","function":["name":"web_search","arguments":"{\"query\":\"杭州周末天气\"}"]]]]))}
+            return (200,try self.sse(["content":"我查到了这条天气信息。[1]"]))
+        }
+        var sources:[WebSource]=[]
+        let result=try await client().answer(messages:CompanionWeb.messages("帮我查杭州周末天气",data:data,previousQuestion:nil),model:"deepseek-flash",responseStyle:"简短口语伙伴",onPartial:nil,onSources:{sources=$0},onStatus:nil)
+        XCTAssertEqual(result.1,"联网搜索 · 1 个来源");XCTAssertEqual(sources.first?.url,"https://example.com/weather")
+    }
+    func testCompanionEncryptedBackupKeepsNameAndUserMemorySeparate() throws {
+        let key=try VaultCrypto.random(32),salt=try VaultCrypto.random(32)
+        var document=Document(),data=CompanionData();data.profile.name="小澜"
+        data.memories=[CompanionMemory(text:"喜欢公园")]
+        try data.write(to:&document)
+        let envelope=try VaultCrypto.encrypt(document.encoded(),key:key,salt:salt)
+        XCTAssertFalse(String(decoding:envelope,as:UTF8.self).contains("小澜"))
+        let restored=try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(envelope,key:key))
+        XCTAssertEqual(try CompanionData.read(restored),data)
+        XCTAssertNil(restored.root.raw["assistantMemory"])
+    }
     override func tearDown() {WebProtocol.handler=nil;super.tearDown()}
     func client()->DeepSeekWebClient {
         let config=URLSessionConfiguration.ephemeral;config.protocolClasses=[WebProtocol.self]
