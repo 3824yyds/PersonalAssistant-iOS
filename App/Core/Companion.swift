@@ -109,7 +109,9 @@ enum CompanionRules {
         return cleanName(name)
     }
     private static func contextualName(_ name:String)->String? {
-        guard name.range(of:"我|你|他说|她说|取名|起名|叫|今天|帮忙|以后|给你|吃饭|睡觉|累了|不想|不知道",options:.regularExpression)==nil else {return nil}
+        let words=String(name.filter {$0.isLetter || $0.isNumber})
+        guard !words.isEmpty,!["嗯","嗯嗯","哦","好","好的","好呀","好吧","对","对的","是","是的","谢谢","名字","你的名字"].contains(words),
+              name.range(of:"我|你|他说|她说|取名|起名|叫|今天|帮忙|以后|给你|吃饭|睡觉|累了|不想|不知道",options:.regularExpression)==nil else {return nil}
         return validProposedName(name)
     }
     static func newMemory(_ input: String) -> CompanionMemory? {

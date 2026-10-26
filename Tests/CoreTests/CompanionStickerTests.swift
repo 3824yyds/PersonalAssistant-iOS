@@ -89,4 +89,12 @@ final class CompanionStickerTests:XCTestCase {
         XCTAssertFalse(CompanionNaming.validEvidence(name:"大肥鱼",quote:"大肥鱼",question:"吃饭",history:Array(flow.dropLast())))
         XCTAssertFalse(CompanionNaming.validEvidence(name:"大肥鱼",quote:"大肥鱼",question:"名字",history:[CompanionMessage(role:"user",content:"我朋友叫大肥鱼"),CompanionMessage(role:"assistant",content:"什么名字？")]))
     }
+    func testEmojiAndAcknowledgementsAfterNamingInvitationAreNotNames() throws {
+        for q in ["👍","😂","🙏","好👍","名字"] {
+            var data=CompanionData();data.messages=[CompanionMessage(role:"assistant",content:"你想怎么叫我？")]
+            XCTAssertFalse(try CompanionRules.appendUserTurn(q,to:&data),q);XCTAssertNil(data.profile.name,q)
+        }
+        var data=CompanionData()
+        XCTAssertTrue(try CompanionRules.appendUserTurn("以后叫你🐟吧",to:&data));XCTAssertEqual(data.profile.name,"🐟")
+    }
 }
