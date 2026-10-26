@@ -1,0 +1,69 @@
+{
+  "model_name": "companion-checkpoint225-q4_k_m.gguf",
+  "model_bytes": 986048064,
+  "model_sha256": "07fcb0fdd9a9e116f3ddb0926a5f9059fc8f9e3369f6455b80397cab562c4f4f",
+  "checkpoint": 225,
+  "kind": "binary transport volumes; assemble before inference",
+  "parts": [
+    {
+      "name": "checkpoint225.gguf.part01",
+      "bytes": 83886080,
+      "sha256": "d3c4c212ff4d8430f663624afe5ab35c7561451d30239d8b3994e3a6e4882129"
+    },
+    {
+      "name": "checkpoint225.gguf.part02",
+      "bytes": 83886080,
+      "sha256": "b9f4f923ba29cacabfb309885d6948d31756c8ba6338df171a389b8d4508e98c"
+    },
+    {
+      "name": "checkpoint225.gguf.part03",
+      "bytes": 83886080,
+      "sha256": "23476bf0e0ee868a6db15942146def2183bdefc23e7cad7a789e869288ae8a43"
+    },
+    {
+      "name": "checkpoint225.gguf.part04",
+      "bytes": 83886080,
+      "sha256": "b290907c7b48d7b5ba607910fef0eebc589e84cc9f22e56689e5e76d36711d0d"
+    },
+    {
+      "name": "checkpoint225.gguf.part05",
+      "bytes": 83886080,
+      "sha256": "699a02fba0ff4e8e1cbc7e4c6099cc2c21a9315430ab9d3159ef197248906ff8"
+    },
+    {
+      "name": "checkpoint225.gguf.part06",
+      "bytes": 83886080,
+      "sha256": "0a61a7ad3fe920fd40a9c4357a717db0e6582884777d62060e1d3b4ad598c849"
+    },
+    {
+      "name": "checkpoint225.gguf.part07",
+      "bytes": 83886080,
+      "sha256": "9cc9be9de550c0ce7ac2c2b2236f035f44be3a108e248a7f6b1ab1cac49587c4"
+    },
+    {
+      "name": "checkpoint225.gguf.part08",
+      "bytes": 83886080,
+      "sha256": "7223ab21e7b8b812a6d4208669c3164e1c667594b361d7ba83114436f1190f4a"
+    },
+    {
+      "name": "checkpoint225.gguf.part09",
+      "bytes": 83886080,
+      "sha256": "46af483a74e45e0fb5b7c3c20fe99dfb5781ae214517233c7c8c7e5afe832ee2"
+    },
+    {
+      "name": "checkpoint225.gguf.part10",
+      "bytes": 83886080,
+      "sha256": "8bdc5cf47dc6996d04a1e615b334cd5b19246156a90e1eebb55788c5b97ddf57"
+    },
+    {
+      "name": "checkpoint225.gguf.part11",
+      "bytes": 83886080,
+      "sha256": "2e66fc4ce4d92df1c90e73cc0c8d446a5a10f2a570c7358a10c7e59a13e6f8b9"
+    },
+    {
+      "name": "checkpoint225.gguf.part12",
+      "bytes": 63301184,
+      "sha256": "dc2888ae723204905692410862a5fe2dc03b73a99053b52f3810c6fb83a6bfc6"
+    }
+  ]
+}
