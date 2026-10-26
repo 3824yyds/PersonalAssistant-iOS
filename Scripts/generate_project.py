@@ -24,13 +24,10 @@ for p in sorted((ROOT/'App').rglob('*')):
 for p in [ROOT/'App/Resources/Assets.xcassets',ROOT/'App/Resources/AccountPresets.json',ROOT/'App/Resources/CardArtwork.json',ROOT/'App/Resources/PrivacyInfo.xcprivacy',ROOT/'App/Resources/OpenSourceLicenses.txt']:
     file=ref(str(p.relative_to(ROOT)),'folder.assetcatalog' if p.suffix=='.xcassets' else 'text.plist.xml' if p.suffix=='.xcprivacy' else 'text' if p.suffix=='.txt' else 'text.json');resources.append(build(file));groups.append(file)
 app=add('product','PBXFileReference',explicitFileType='wrapper.application',path='PersonalAssistant.app',sourceTree='BUILT_PRODUCTS_DIR')
-companion_model=ROOT/'App/Resources/CompanionModel.gguf'
-if companion_model.exists():
-    file=ref(str(companion_model.relative_to(ROOT)),'file');resources.append(build(file));groups.append(file)
 product_refs=[app]
 app_id=uid('app-target')
 app_config={
- 'PRODUCT_NAME':'PersonalAssistant','PRODUCT_BUNDLE_IDENTIFIER':'cn.local.assistant.ios','INFOPLIST_FILE':'App/Info.plist','MARKETING_VERSION':'3.5.1','CURRENT_PROJECT_VERSION':'10',
+ 'PRODUCT_NAME':'PersonalAssistant','PRODUCT_BUNDLE_IDENTIFIER':'cn.local.assistant.ios','INFOPLIST_FILE':'App/Info.plist','MARKETING_VERSION':'3.5.1','CURRENT_PROJECT_VERSION':'11',
  'SWIFT_VERSION':'5.0','SWIFT_OBJC_BRIDGING_HEADER':'App/Native/BridgingHeader.h','CLANG_CXX_LANGUAGE_STANDARD':'c++17',
  'CODE_SIGN_STYLE':'Automatic','TARGETED_DEVICE_FAMILY':'1','IPHONEOS_DEPLOYMENT_TARGET':'17.0','SDKROOT':'iphoneos',
  'ASSETCATALOG_COMPILER_APPICON_NAME':'AppIcon','ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES':'AppIconSky AppIconPeach','ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS':'YES',

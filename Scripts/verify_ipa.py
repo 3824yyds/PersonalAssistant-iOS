@@ -20,14 +20,9 @@ with zipfile.ZipFile(p) as z:
     assert b'--ui-companion-fixture' not in binary, 'Release build must not contain simulated companion replies'
     assert b'MIT' in z.read('Payload/PersonalAssistant.app/OpenSourceLicenses.txt'),'Bundled open-source license is required'
     assert info['CFBundleShortVersionString']=='3.5.1'
-    assert info['CFBundleVersion']=='10'
+    assert info['CFBundleVersion']=='11'
     assert str(info.get('DTSDKName','')).startswith('iphoneos26'), 'An iOS 26 SDK build is required'
-    model_hash=hashlib.sha256()
-    model_size=0
-    with z.open('Payload/PersonalAssistant.app/CompanionModel.gguf') as model:
-        while chunk:=model.read(4*1024*1024):
-            model_hash.update(chunk);model_size+=len(chunk)
-    assert model_size==986048064 and model_hash.hexdigest()=='07fcb0fdd9a9e116f3ddb0926a5f9059fc8f9e3369f6455b80397cab562c4f4f', 'Wrong companion model'
-    result={'version':'3.5.1','build':'10','sdk':info.get('DTSDKName'),'platform':'iOS device','architecture':'arm64','unsigned':True,'fairplay_encrypted':False,'minimum_ios':info.get('MinimumOSVersion'),'bundle_id':info['CFBundleIdentifier'],'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'device_installation_verified':False,'companion_checkpoint':225,'companion_model_sha256':model_hash.hexdigest(),'companion_model_bytes':model_size}
+    assert 'Payload/PersonalAssistant.app/CompanionModel.gguf' not in z.namelist(), 'Retired companion weights must not be bundled'
+    result={'version':'3.5.1','build':'11','sdk':info.get('DTSDKName'),'platform':'iOS device','architecture':'arm64','unsigned':True,'fairplay_encrypted':False,'minimum_ios':info.get('MinimumOSVersion'),'bundle_id':info['CFBundleIdentifier'],'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'device_installation_verified':False,'companion_engine':'deepseek-flash','companion_model_bundled':False,'live_conversation_evaluation_performed':False}
     p.with_suffix('.verification.json').write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result,indent=2))

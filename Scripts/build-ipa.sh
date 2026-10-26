@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-python3 Scripts/verify_companion_model.py
 python3 Scripts/generate_project.py
 if [ ! -f NativeBuild/iphoneos/lib/libllama.a ]; then bash Scripts/build-native.sh; fi
 mkdir -p build
@@ -16,6 +15,6 @@ rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R "$app" build/ipa/Payload/
 find build/ipa -name '*.dSYM' -type d -prune -exec rm -rf '{}' \;
-(cd build/ipa && /usr/bin/zip -qry ../PersonalAssistant-iOS-3.5.1-build10-unsigned.ipa Payload)
-python3 Scripts/verify_ipa.py build/PersonalAssistant-iOS-3.5.1-build10-unsigned.ipa
-shasum -a 256 build/PersonalAssistant-iOS-3.5.1-build10-unsigned.ipa > build/SHA256SUMS.txt
+(cd build/ipa && /usr/bin/zip -qry ../PersonalAssistant-iOS-3.5.1-build11-unsigned.ipa Payload)
+python3 Scripts/verify_ipa.py build/PersonalAssistant-iOS-3.5.1-build11-unsigned.ipa
+shasum -a 256 build/PersonalAssistant-iOS-3.5.1-build11-unsigned.ipa > build/SHA256SUMS.txt

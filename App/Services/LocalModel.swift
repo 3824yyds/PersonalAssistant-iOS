@@ -14,15 +14,6 @@ final class LocalModel: @unchecked Sendable {
     private var lastActive = Date()
     var file: URL { get throws { try PrivateFiles.url("qwen2.5-1.5b-q4_k_m.gguf") } }
     var available: Bool { guard let file = try? file, let attributes = try? FileManager.default.attributesOfItem(atPath:file.path), let size = attributes[.size] as? NSNumber else { return false }; return size.int64Value == Self.size }
-    static let companionSize: Int64 = 986_048_064
-    static let companionHash = "07fcb0fdd9a9e116f3ddb0926a5f9059fc8f9e3369f6455b80397cab562c4f4f"
-    var companionFile: URL? {
-        guard let url = Bundle.main.url(forResource:"CompanionModel",withExtension:"gguf"),
-              let attributes = try? FileManager.default.attributesOfItem(atPath:url.path),
-              (attributes[.size] as? NSNumber)?.int64Value == Self.companionSize else { return nil }
-        return url
-    }
-    var companionAvailable: Bool { companionFile != nil }
     func cancel() { lock.lock(); let id = current; lock.unlock(); if id > 0 { pa_cancel(id) } }
     func release() { queue.async { pa_release() } }
     func install(_ source: URL, progress: @Sendable (Double)->Void = {_ in}) throws {
@@ -49,12 +40,6 @@ final class LocalModel: @unchecked Sendable {
         let clean = input.replacingOccurrences(of:"<|",with:"＜｜").replacingOccurrences(of:"|>",with:"｜＞")
         let prompt = "<|im_start|>system\n\(system)<|im_end|>\n<|im_start|>user\n\(clean)<|im_end|>\n<|im_start|>assistant\n"
         return try await generatePrompt(prompt,at:try file,maxTokens:maxTokens)
-    }
-    /// All model variants share one native queue, model cache and cancellation sequence.
-    func companion(system:String, history:[CompanionMessage], input:String, maxTokens:Int = 240) async throws -> String {
-        guard let file=companionFile else {throw AppError.message("此安装包缺少伙伴模型，请安装完整版本")}
-        let prompt=CompanionRules.prompt(system:system,history:history,input:input)
-        return try await generatePrompt(prompt,at:file,maxTokens:maxTokens)
     }
     private func generatePrompt(_ prompt:String,at file:URL,maxTokens:Int) async throws -> String {
         lock.lock(); sequence += 1; let id = sequence; current = id; lock.unlock()
