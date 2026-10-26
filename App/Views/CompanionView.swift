@@ -27,7 +27,7 @@ struct CompanionView: View {
             header
             conversation
             if !session.modelAvailable {
-                Label("缺少伙伴模型，请安装完整内部研究版",systemImage:"exclamationmark.triangle").font(.caption).foregroundStyle(.orange).padding(.horizontal)
+                Label("缺少伙伴模型，请安装完整版本",systemImage:"exclamationmark.triangle").font(.caption).foregroundStyle(.orange).padding(.horizontal)
             }
             if let error=session.error {
                 VStack(alignment:.leading,spacing:6) {
@@ -53,7 +53,8 @@ struct CompanionView: View {
             .onChange(of:phase) {_,value in session.active=value == .active;if value != .active {session.cancel()}else{session.touch()}}
             .onChange(of:focused) {_,value in session.editing=value;session.touch()}
             .onChange(of:session.draft) {_,_ in session.touch()}
-            .onChange(of:panel) {_,value in session.panelOpen=value != nil;session.touch()}
+            .onChange(of:panel) {_,value in session.panelOpen=value != nil || clearHistory;session.touch()}
+            .onChange(of:clearHistory) {_,value in session.panelOpen=value || panel != nil;session.touch()}
             .sheet(item:$panel) {value in
                 NavigationStack {
                     if value == .profile {CompanionProfileView(session:session)}else{CompanionMemoryView(session:session)}
@@ -62,7 +63,6 @@ struct CompanionView: View {
             .confirmationDialog("清理此页聊天？人物资料和记忆会保留。",isPresented:$clearHistory,titleVisibility:.visible) {
                 Button("清理聊天",role:.destructive) {Task {_=await session.update {$0.messages=[];$0.awaitingProactiveReply=false;$0.lastProactive=Date()}}}
             }
-            .accessibilityIdentifier("companion.page")
     }
     private var header:some View {
         HStack(spacing:8) {
@@ -77,7 +77,7 @@ struct CompanionView: View {
                 Menu {
                     Button("她的资料",systemImage:"person.crop.circle") {open(.profile)}
                     Button("你们的记忆",systemImage:"bookmark") {open(.memory)}
-                    Button("清理聊天",systemImage:"trash",role:.destructive) {focused=false;clearHistory=true}
+                    Button("清理聊天",systemImage:"trash",role:.destructive) {dismissKeyboard();clearHistory=true}
                 } label:{Image(systemName:"ellipsis").frame(width:40,height:44)}.accessibilityLabel("伙伴更多功能")
             }.appGlass(Capsule(),interactive:true).disabled(session.busy || store.busy)
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)

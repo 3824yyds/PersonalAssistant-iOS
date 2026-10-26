@@ -31,7 +31,12 @@ enum CompanionWeb {
     var editing = false
     var panelOpen = false
     var title: String { data.profile.title }
-    var modelAvailable: Bool { LocalModel.shared.companionAvailable }
+    var modelAvailable: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture") {return true}
+        #endif
+        return LocalModel.shared.companionAvailable
+    }
     init(store: AppStore) {
         self.store = store; epoch = store.epoch
         do { data = try CompanionData.read(store.current) }

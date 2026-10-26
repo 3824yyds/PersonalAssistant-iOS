@@ -52,7 +52,7 @@ final class LocalModel: @unchecked Sendable {
     }
     /// All model variants share one native queue, model cache and cancellation sequence.
     func companion(system:String, history:[CompanionMessage], input:String, maxTokens:Int = 240) async throws -> String {
-        guard let file=companionFile else {throw AppError.message("此安装包缺少伙伴模型，请安装完整的内部研究版")}
+        guard let file=companionFile else {throw AppError.message("此安装包缺少伙伴模型，请安装完整版本")}
         let prompt=CompanionRules.prompt(system:system,history:history,input:input)
         return try await generatePrompt(prompt,at:file,maxTokens:maxTokens)
     }

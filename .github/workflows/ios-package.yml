@@ -1,6 +1,11 @@
 name: iOS device IPA package only
 on:
   workflow_dispatch:
+    inputs:
+      ui_run_id:
+        description: Companion verification run for the same commit
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -8,6 +13,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ipa:
+    permissions:
+      contents: write
+      actions: read
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -40,6 +48,27 @@ jobs:
             build/SHA256SUMS.txt
             build/device-build.log
           retention-days: 14
+      - name: Require successful companion checks before release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 Scripts/wait_companion_checks.py '${{ inputs.ui_run_id }}'
+      - name: Publish verified install package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PYCODE'
+          import json,os,subprocess
+          from pathlib import Path
+          verification=next(Path('build').glob('*.verification.json'))
+          result=json.loads(verification.read_text())
+          note=Path('build/release-notes.md')
+          note.write_text(Path('Docs/BUILD10_RELEASE.md').read_text()+f"\n安装包 SHA-256：{result['sha256']}\n")
+          repo=os.environ['GITHUB_REPOSITORY'];tag='v3.5.1-build10'
+          existing=subprocess.run(['gh','release','view',tag,'--repo',repo],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          if existing.returncode:
+              subprocess.run(['gh','release','create',tag,'--repo',repo,'--target',os.environ['GITHUB_SHA'],'--prerelease','--latest=false','--title','个人助理 3.5.1 Build 10','--notes-file',str(note)],check=True)
+          subprocess.run(['gh','release','upload',tag,'--repo',repo,*map(str,Path('build').glob('*.ipa')),str(verification),'build/SHA256SUMS.txt','--clobber'],check=True)
+          PYCODE
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
