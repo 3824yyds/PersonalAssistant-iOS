@@ -1,36 +1,36 @@
-# PersonalAssistant-iOS · Build 12 交接
+# PersonalAssistant-iOS · Build 13 交接
 
-2026-10-26。最新交付为 **3.5.1（Build 12）**，六张角色表情包、emoji语境指引和多轮取名修复已发布。
+2026-10-26。最新交付为 **3.5.1（Build 13）**。应用源提交9cc77ab22b1939b056e41f5498d7be82ee9a52e4；分支codex/companion-composer-build13，草稿PR5基于Build12分支；未合并main。
 
 ## 交付事实
 
-- 应用源提交：08e76e7c412ea6261780b304b6b4668cba29197b；分支codex/companion-stickers-build12。之后仅文档提交，不改变IPA或Release标签。
-- Release：https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build12
-- IPA：https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build12/PersonalAssistant-iOS-3.5.1-build12-unsigned.ipa
-- 本地：/workspace/deliverables/build12-device/PersonalAssistant-iOS-3.5.1-build12-unsigned.ipa
-- 大小92,181,107字节，SHA256 b6a40625d422fe6a34e00b74a02416b5589accf6bc74aaec4f6dd16a86704aac。
-- 同源检查40323257996、设备构建与发布40323476490均成功。
-- PR4草稿：https://github.com/3824yyds/PersonalAssistant-iOS/pull/4，基于Build11分支；未合并main。
-- 未签名iPhone arm64，最低iOS17，SDK iphoneos26.2；Bundle ID cn.local.assistant.ios。沿用原签名身份覆盖安装，不卸载、不清库、不改变Keychain服务。
+- Release：https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build13
+- IPA：https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build13/PersonalAssistant-iOS-3.5.1-build13-unsigned.ipa
+- 本地最终包：/workspace/deliverables/build13-release-device/PersonalAssistant-iOS-3.5.1-build13-unsigned.ipa
+- 大小96,788,818字节，SHA256 dd80479027ef7ee25fbb2cd1b91c9dc444a1b11322c77817ab9e6b9f771e0064。本地CRC/arm64设备Mach-O/版本13/SDK26/BundleID/无FairPlay/无DEBUG夹具与旧GGUF检查通过，CI验证文件已单独保留，SHA和字节数与Release资产记录一致。
+- 同源检查40338418750、设备构建发布40357240349均成功，标签v3.5.1-build13固定在已验收应用源9cc77ab22b1939b056e41f5498d7be82ee9a52e4；随后交接文档提交不改变IPA或标签。
+- 草稿PR5：https://github.com/3824yyds/PersonalAssistant-iOS/pull/5。Build12交接归档Docs/HANDOFF_BUILD12.md，不能沿用其中旧安装指引。后续应用变更递增Build14。
 
-## 新增与修复
+## 本次功能
 
-- 按既有女性蓝发头像用image_gen逐张独立绘制六张透明PNG：开心、抱抱、疑惑、无语、得意、晚安。原始生成图保留/workspace/generated_images，副本进入Assets.xcassets；Docs/COMPANION_STICKERS.json记录来源文件名和SHA。没有切图或叠加表情替代逐张生成。
-- 每张有固定语义ID、画面与适用场景。DeepSeek通过send_companion_sticker选择，最多一张，限制连发/重复/不适当调侃；完整文字回复成功后才一起保存。关闭自动表情、温柔语气和前台主动场景受相应限制，用户仍能发送本套表情。
-- 输入区笑脸面板点图发送、保留文字草稿；图片ID随加密聊天和历史窗口保存，语义进入上下文、字符预算与精简证据。API只接收语义文本，不为每次聊天实时绘图。
-- emoji组合、肤色、ZWJ和旗帜序列保持原文；提示词结合中文反讽/无奈/夸张语境理解。取名邀请后的emoji或带emoji的简单附和不自动变成名字；明确“以后叫你🐟”仍能取名。
-- 可能带反讽的emoji不自动提取长期偏好；咖啡☕️等装饰emoji不阻止后续偏好更正与撤销。这不是模型权重训练，也不是每段聊天都会自动成为长期记忆。
-- 修复“大肥鱼→名字→是叫我‘大肥鱼’对吧→对的”流程：支持紧邻用户候选的澄清引用、有用户依据的普通确认问句及真正的候选状态；确认后保存并更新标题，不使用模型编造的名字或无关旧话题。
-- 回归发现精简后新窗口已保存，但LazyVStack偶尔沿用旧长窗口滚动位置，隐藏摘要。现按窗口ID重建滚动布局；待回复提示和重试严格限定当前窗口，旧原文保留。原有UI断言和新加的残留提示断言均通过。
-- Build11完整窗口、48,000字符上限/光圈、精简预览、人物和记忆、搜索、语气保留；伙伴语音暂缓、后台主动取消，未新增外部记忆云服务或SDK。
+- 表情包从全屏弹页改为输入框下方展开的底部面板，与系统键盘切换，聊天和草稿留在原页。
+- “我的”表情允许原生PhotosPicker导入照片，填写名称与含义、选择是否允许伙伴发送。最长512像素、每张256KiB内、重新编码去掉元数据，保留透明PNG。最多32张（含为历史聊天归档的图片），存入既有加密资料库，总32MiB上限。AI只收到名称和含义，不收到照片像素；不能声称任意照片视觉识别。
+- 移除用过的自定义表情只归档，聊天图片仍在；未用过的可物理移除。点表情发送保留文字草稿，保存失败保留编辑表单。自定义表情不替代人物头像。
+- 逐张独立绘制四张恶搞表情“绷不住了、吃瓜、我裂开了、就这？”，合计十张内置表情。原图保留/workspace/generated_images；副本与来源SHA在资源目录/Docs/COMPANION_STICKERS.json。沿用频率、重复、温柔与倾诉场景限制。
+- 长按指定消息“回复”，输入区展示可取消引用，发送后保存原发言者和最多800字快照。引用、表情含义计入上下文光圈、历史和精简。失败重试沿用原引用、不重复添加用户消息；引用旧取名/记忆指令不执行旧操作，带引用轮关闭自动取名工具；搜索保护引用中的私人长号码。
+- 顶部头像轻呼吸、摇摆，忙时显示思考点，最近一条回复有内置表情则切换对应静态神态。无额外模型请求。系统减少动态效果、后台及打开面板时暂停，个人资料可关闭。轻量SwiftUI动效，不是Live2D、真实眨眼或口型绑定。
+- 资料库改为恰好4位ASCII数字PIN，保留前导零、PBKDF2-SHA256六十万次/AES-GCM和错误尝试冷却；新加密头版本2。创建、解锁、备份验证统一规则。无资料库的新安装清除遗留钥匙串中的失败次数和生物密钥，不自动删除旧文件或DeepSeek密钥。
 
-## 验证与限制
+## 安装要求（用户已明确授权）
 
-- 最终源181项核心、六张原图SHA/RGBA校验、编译Assets.car完整性全部通过；33项服务+3项IME=36项iOS单元、14项UI全部通过。
-- 已查看最终导出截图：新窗口摘要/草稿、历史原文、表情收发与取名标题。之前失败场景修复后通过，未跳过该测试。
-- 下载最终设备IPA，原CI验证文件单独保留；本地CRC、设备arm64/SDK26/版本12/BundleID、无FairPlay、无DEBUG夹具及无旧伙伴GGUF检查通过。整体SHA与CI及Release发布记录一致。
-- 没有用户真实DeepSeek付费凭据，模拟协议和DEBUG页面不能证明真实情商、emoji/反讽/表情选择和摘要语义全部正确；未做用户iPhone安装或性能验证。见Docs/COMPANION_CHAT_EVAL.md。
-- 仍需原有云端智能和DeepSeek Key，按实际API用量计费。图片随包提供；不上传整份资料库、笔记或账本。
-- 前一b1d源全量检查36单元+13/14UI通过，唯一精简窗口显示失败阻止发布；旧包保留build12-pre-scroll-device，绝不能作为当前交付。其他取消的中间检查也不算最终验收。
+用户明确要求：先卸载原版再安装，不兼容原12位/长密码资料。旧资料库和旧备份不兼容新版，无迁移；不能沿用Build12交接中的“不卸载/覆盖安装”指引。新安装自行设置4位PIN，0426仅为测试夹具，非默认PIN。未签名iPhone arm64，最低iOS17，SDK26.2，Bundle ID cn.local.assistant.ios；沿用既有用户签名安装方式。
 
-用户已授权公共仓库和既有发布流程，不重复要求仅内部研究/私有化。模型原225/200云盘及旧权重备份未更改。Build11交接归档Docs/HANDOFF_BUILD11.md。后续应用更改递增Build13。
+## 验证事实与限制
+
+- 189项核心、十张原图SHA/RGBA及设备编译资源检查已通过。同源40338418750的61项iOS单元和18项UI全部通过；设备构建与发布40357240349成功。
+- UI检查40332552904首轮于模拟器bootstatus超时，尚未运行到应用；失败原始日志存/workspace/companion-build13-checks/boot-failure.log。原设备工作流40332821613正确拒绝发布；同源重跑，应用代码没有为基础设施故障修改。
+- 首次应用UI检查有两处标识被父容器继承覆盖，按钮仍显示但自动化无法独立定位。已为引用与表情面板设置独立可访问容器，原测试未删除或削弱，最终全套通过。
+- 已查看最终截图：底部内置/我的表情面板、自定义表情移除后历史原图、指定旧消息引用、取消引用保留草稿、新窗口摘要和头像表情切换。
+- 原生PhotosPicker的Release入口存在；自动化导入使用DEBUG编辑页夹具，不代表测试了系统相册选取。ImageIO缩放/透明/元数据和加密恢复另有原生单元验证。
+- 无用户真实付费DeepSeek凭据，模拟协议与DEBUG夹具不能证明实际情商、引用理解、表情语义和emoji/反讽生成质量；未完成用户iPhone安装、Face ID和性能验收。
+- 仍需云端智能及DeepSeek Key，按实际API用量计费；未增加外部记忆服务、语音、后台主动、模型训练或更改旧225/200权重备份。
