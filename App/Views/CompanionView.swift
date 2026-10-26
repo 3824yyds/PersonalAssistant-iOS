@@ -37,12 +37,12 @@ struct CompanionView: View {
                 VStack(alignment:.leading,spacing:6) {
                     Text(error).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("companion.error.message")
                     HStack {
-                        if session.data.messages.last?.role=="user" {Button("重试这句话") {session.error=nil;session.retryLast()}}
+                        if CompanionContext.current(session.data).last?.role=="user" {Button("重试这句话") {session.error=nil;session.retryLast()}}
                         Spacer();Button("收起") {session.error=nil}
                     }.font(.footnote)
                 }.padding(12).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14)).padding(.horizontal,14).padding(.bottom,8)
             }
-            if !session.busy,session.error==nil,session.data.messages.last?.role=="user" {
+            if !session.busy,session.error==nil,CompanionContext.current(session.data).last?.role=="user" {
                 HStack {Text("这句话还没有回复").foregroundStyle(.secondary);Spacer();Button("重试这句话") {session.retryLast()}}
                     .font(.footnote).padding(.horizontal,18).padding(.bottom,8)
             }

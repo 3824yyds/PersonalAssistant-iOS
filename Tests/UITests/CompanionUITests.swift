@@ -145,6 +145,7 @@ final class CompanionUITests:XCTestCase {
         app.buttons["companion.context.compress"].tap();XCTAssertTrue(app.navigationBars["精简预览"].waitForExistence(timeout:8))
         app.buttons["companion.compression.confirm"].tap()
         XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.context.summary").firstMatch.waitForExistence(timeout:8));XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        XCTAssertFalse(app.staticTexts["这句话还没有回复"].exists)
         XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
         send("我喜欢什么样的地方，你还记得吗？",app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我记下的是' AND label CONTAINS '安静的地方'")).firstMatch.waitForExistence(timeout:8))
@@ -166,6 +167,7 @@ final class CompanionUITests:XCTestCase {
         XCTAssertTrue(app.textViews["companion.input"].waitForExistence(timeout:8))
         XCTAssertEqual(app.textViews["companion.input"].value as? String,"这段输入留到新窗口")
         XCTAssertTrue(app.buttons["companion.send"].isEnabled);XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        XCTAssertFalse(app.staticTexts["这句话还没有回复"].exists)
         recordScreen(app,"CompanionNewWindowPreservesDraft")
     }
 }

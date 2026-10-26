@@ -67,7 +67,7 @@ import Combine
         touch(); begin(question:question,proactive:false)
     }
     func retryLast() {
-        guard !busy, let message=data.messages.last, message.role == "user" else { return }
+        guard !busy, let message=CompanionContext.current(data).last, message.role == "user" else { return }
         begin(question:message.content,proactive:false,retry:true)
     }
     func sendSticker(_ sticker:CompanionSticker) {
