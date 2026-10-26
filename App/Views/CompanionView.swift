@@ -27,7 +27,9 @@ struct CompanionView: View {
         VStack(spacing:0) {
             header
             contextBar
-            conversation
+            // A new window needs a fresh scroll layout. Reusing the long old window's
+            // LazyVStack can retain an out-of-range offset and hide the new summary.
+            conversation.id(session.data.windows?.last?.id ?? "companion.initial-window")
             if !session.cloudAvailable {
                 Label("伙伴聊天需要开启云端智能并配置 DeepSeek",systemImage:"network").font(.caption).foregroundStyle(.secondary).padding(.horizontal).padding(.bottom,6)
             }
