@@ -112,14 +112,14 @@ final class CompanionConversationTests:XCTestCase {
         XCTAssertTrue((messages[0]["content"] as? String)!.contains("喜欢安静的地方"))
         XCTAssertEqual(messages.last?["content"] as? String,"对，为什么这么晚？")
     }
-    func testLongConversationHasBoundedRecentWindowAndRetrievesOlderRelevantUserQuote() {
-        var history=[CompanionMessage(role:"user",content:"下周六我的面试在杭州，想提前准备。")]
-        history += (0..<120).map {CompanionMessage(role:$0%2==0 ? "user":"assistant",content:String(repeating:"填充甲乙",count:400))}
-        let messages=CompanionConversation.messages(question:"杭州面试准备到哪了？",data:CompanionData(),history:history)
-        XCTAssertLessThanOrEqual(messages.count,26)
-        XCTAssertLessThanOrEqual(messages.dropFirst().dropLast().compactMap {$0["content"] as? String}.reduce(0) {$0+$1.count},12000)
-        XCTAssertTrue((messages[0]["content"] as? String)!.contains("下周六我的面试在杭州"))
-        XCTAssertFalse((messages[0]["content"] as? String)!.contains("填充甲乙"))
+    func testCurrentWindowIncludesEveryTurnWithoutSilentTruncation() {
+        let history=[CompanionMessage(role:"user",content:"下周六我的面试在杭州，想提前准备。")]+(0..<80).map {CompanionMessage(role:$0%2==0 ? "user":"assistant",content:"第\($0)条原文必须完整保留")}
+        var data=CompanionData();data.messages=history
+        let messages=CompanionConversation.messages(question:"杭州面试准备到哪了？",data:data,history:history)
+        XCTAssertEqual(messages.count,history.count+2)
+        XCTAssertEqual(messages[1]["content"] as? String,history[0].content)
+        XCTAssertEqual(messages[messages.count-2]["content"] as? String,history.last!.content)
+        XCTAssertEqual(messages.filter {$0["role"] as? String == "user"}.count,42)
     }
     func testBanterExamplesMatchSelectedToneAndDistressRuleRemainsPresent() {
         for tone in CompanionTone.allCases {
@@ -147,9 +147,9 @@ final class CompanionConversationTests:XCTestCase {
         XCTAssertFalse(CompanionRules.needsWeb("不用联网，陪我聊聊"))
     }
     func testFullHistoryOrMemoryDoesNotSilentlyDiscardUserData() throws {
-        var data=CompanionData();data.messages=(0..<999).map {_ in CompanionMessage(role:"user",content:"原文")}
+        var data=CompanionData();data.messages=(0..<CompanionData.messageLimit-1).map {_ in CompanionMessage(role:"user",content:"原文")}
         XCTAssertThrowsError(try CompanionRules.appendUserTurn("以后叫你大肥鱼吧",to:&data))
-        XCTAssertNil(data.profile.name);XCTAssertEqual(data.messages.count,999)
+        XCTAssertNil(data.profile.name);XCTAssertEqual(data.messages.count,CompanionData.messageLimit-1)
         data=CompanionData();data.memories=(0..<200).map {CompanionMemory(text:"第\($0)条")}
         XCTAssertThrowsError(try CompanionRules.appendUserTurn("记住：第201条",to:&data))
         XCTAssertEqual(data.memories.count,200);XCTAssertTrue(data.messages.isEmpty)

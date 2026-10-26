@@ -35,7 +35,7 @@ final class CompanionUITests:XCTestCase {
     func testMissingCloudCredentialHasRetryAndNoFakeWebAnswer() {
         let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);enter(app)
         send("帮我查杭州周末天气",app)
-        XCTAssertTrue(app.otherElements["companion.error"].waitForExistence(timeout:8) || app.buttons["重试这句话"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["companion.error.message"].waitForExistence(timeout:8))
         XCTAssertTrue(app.buttons["重试这句话"].exists)
         XCTAssertFalse(app.buttons["chat.source.1"].exists)
         recordScreen(app,"CompanionWebFailureHasNoInventedSources")
@@ -82,7 +82,7 @@ final class CompanionUITests:XCTestCase {
     func testOrdinaryCompanionWithMissingKeyShowsErrorWithoutLocalFallback() {
         let app=launchProduct();tapProductTab("助理",in:app);enter(app);send("你好，今天聊点什么？",app)
         XCTAssertTrue(app.buttons["重试这句话"].waitForExistence(timeout:8))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'DeepSeek API Key'")).firstMatch.exists)
+        let error=app.staticTexts["companion.error.message"];XCTAssertTrue(error.waitForExistence(timeout:8));XCTAssertTrue(error.label.contains("DeepSeek API Key"))
         XCTAssertFalse(app.staticTexts["你好！今天想聊点什么？"].exists)
         recordScreen(app,"CompanionCloudFailureRemainsRetryable")
     }
@@ -101,5 +101,39 @@ final class CompanionUITests:XCTestCase {
         XCTAssertTrue(app.staticTexts["名字已更新为「小鱼」"].waitForExistence(timeout:8))
         XCTAssertEqual(app.staticTexts["companion.title"].label,"小鱼");XCTAssertFalse(app.buttons["companion.name.confirm"].exists)
         recordScreen(app,"CompanionConfirmedSemanticNameProposal")
+    }
+    func testContextWarningPreviewCancellationAndNewWindowPreserveHistoryAndMemory() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-long-context-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.staticTexts["companion.context.warning"].waitForExistence(timeout:8))
+        XCTAssertTrue((app.buttons["companion.send"].value as? String ?? "").contains("83%"));recordScreen(app,"CompanionContextRingNearLimit")
+        app.buttons["companion.context.compress"].tap()
+        XCTAssertTrue(app.navigationBars["精简预览"].waitForExistence(timeout:8))
+        let summary=app.textViews["companion.compression.text"];XCTAssertTrue((summary.value as? String ?? "").contains("杭州面试"));recordScreen(app,"CompanionCompressionPreview")
+        app.buttons["取消"].tap();XCTAssertTrue(app.staticTexts["companion.context.warning"].waitForExistence(timeout:8))
+        app.buttons["companion.context.compress"].tap();XCTAssertTrue(app.navigationBars["精简预览"].waitForExistence(timeout:8))
+        app.buttons["companion.compression.confirm"].tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.context.summary").firstMatch.waitForExistence(timeout:8));XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+        send("我喜欢什么样的地方，你还记得吗？",app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我记下的是' AND label CONTAINS '安静的地方'")).firstMatch.waitForExistence(timeout:8))
+        app.buttons["伙伴更多功能"].tap();app.buttons["companion.windows"].tap()
+        XCTAssertTrue(app.navigationBars["历史窗口"].waitForExistence(timeout:5));app.buttons["companion.window.0"].tap()
+        XCTAssertTrue(app.navigationBars["窗口 1"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["窗口开头：面试计划的原话仍然保留。"].waitForExistence(timeout:5));recordScreen(app,"CompanionOriginalWindowRetained")
+    }
+    func testFullContextBlocksSendAndManualCompressionKeepsUnsentDraft() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-full-context-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.staticTexts["companion.context.warning"].waitForExistence(timeout:8))
+        let input=app.textViews["companion.input"];input.tap();input.typeText("这段输入留到新窗口")
+        XCTAssertFalse(app.buttons["companion.send"].isEnabled)
+        XCTAssertTrue((app.buttons["companion.send"].value as? String ?? "").contains("100%"));recordScreen(app,"CompanionContextRingFull")
+        app.buttons["伙伴更多功能"].tap();app.buttons["手动整理新窗口"].tap()
+        XCTAssertTrue(app.navigationBars["精简预览"].waitForExistence(timeout:8))
+        let summary=app.textViews["companion.compression.text"];summary.tap();summary.typeText("用户说：周六去杭州面试，需要提前准备。")
+        app.buttons["companion.compression.confirm"].tap()
+        XCTAssertTrue(app.textViews["companion.input"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.textViews["companion.input"].value as? String,"这段输入留到新窗口")
+        XCTAssertTrue(app.buttons["companion.send"].isEnabled);XCTAssertFalse(app.staticTexts["companion.context.warning"].exists)
+        recordScreen(app,"CompanionNewWindowPreservesDraft")
     }
 }

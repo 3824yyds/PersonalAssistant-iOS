@@ -2,7 +2,10 @@ import Foundation
 
 enum AIService {
     static func credential() throws -> String {
-        guard let data = try Keychain.read("deepseek"), let value = String(data:data,encoding:.utf8), !value.isEmpty else { throw AppError.message("请先在个人详情 → 云端智能中填写 DeepSeek API Key") }; return value
+        let data:Data?
+        do {data=try Keychain.read("deepseek")}
+        catch {throw AppError.message("无法读取 DeepSeek API Key，请在个人详情 → 云端智能中检查或重新保存密钥")}
+        guard let data, let value = String(data:data,encoding:.utf8), !value.isEmpty else { throw AppError.message("请先在个人详情 → 云端智能中填写 DeepSeek API Key") }; return value
     }
     static func cloud(messages: [[String:String]], model: String, onPartial: (@MainActor @Sendable (String)->Void)? = nil) async throws -> String {
         guard !model.isEmpty, model.count <= 100, model.range(of:#"^[A-Za-z0-9._-]+$"#,options:.regularExpression) != nil else { throw AppError.message("模型标识无效，请从模型列表重新选择") }

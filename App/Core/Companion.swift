@@ -41,11 +41,13 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
+    static let messageLimit=5000
     var profile = CompanionProfile()
     var messages: [CompanionMessage] = []
     var memories: [CompanionMemory] = []
     var lastProactive: Date? = nil
     var awaitingProactiveReply = false
+    var windows: [CompanionWindow]? = nil
     static func read(_ document: Document) throws -> Self {
         guard let raw = document.root.raw["companionResearch"] else { return Self() }
         do { return try JSONDecoder().decode(Self.self, from: JSONEncoder().encode(raw)) }
@@ -59,7 +61,8 @@ struct CompanionData: Codable, Equatable, Sendable {
         guard profile.name == nil || CompanionRules.cleanName(profile.name!) == profile.name,
               !profile.appearance.isEmpty, profile.appearance.count <= 400,
               !profile.personality.isEmpty, profile.personality.count <= 200,
-              memories.count <= 200, messages.count <= 1000,
+              memories.count <= 200, messages.count <= Self.messageLimit,
+              CompanionContext.validWindows(windows ?? [],messageCount:messages.count),
               Set(memories.map(\.id)).count == memories.count,
               Set(messages.map(\.id)).count == messages.count,
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),
@@ -147,6 +150,7 @@ enum CompanionRules {
             return data.memories.last(where:{$0.text.hasPrefix("用户称呼：")}).map {"你让我叫你\($0.text.dropFirst(5))。"} ?? "你的称呼我还没记下来，你想让我怎么叫你？"
         }
         if q.range(of:#"^我(?:刚才|刚刚)(?:说|聊|提到).*[？?。！!]*$"#,options:.regularExpression) != nil {
+            if history.isEmpty,!CompanionContext.summary(data).isEmpty {return nil}
             guard let message=history.last(where:{$0.role=="user"}) else {return "这段对话里还没有更早的发言，你愿意再告诉我一次吗？"}
             return "你刚才说：“\(message.content)”"
         }
@@ -171,11 +175,12 @@ enum CompanionRules {
         return Array(values.sorted {left,right in let a=score(left),b=score(right);return a==b ? left.date>right.date:a>b}.prefix(8))
     }
     static func mayInitiate(data: CompanionData, visible: Bool, active: Bool, editing: Bool, draft: String, busy: Bool, now: Date, lastInteraction: Date) -> Bool {
-        if let last=data.messages.last,last.role=="assistant",last.content.contains("？") || last.content.contains("?") {return false}
-        let lastStatement=data.messages.last {message in message.role=="user" && !["嗯","嗯嗯","好","好的","哦"].contains(message.content)}
+        let activeMessages=CompanionContext.current(data)
+        if let last=activeMessages.last,last.role=="assistant",last.content.contains("？") || last.content.contains("?") {return false}
+        let lastStatement=activeMessages.last {message in message.role=="user" && !["嗯","嗯嗯","好","好的","哦"].contains(message.content)}
         if let lastStatement,lastStatement.content.range(of:#"^(?:今天)?(?:晚安|再见|先不聊了|不想聊了|别主动找我|我要休息了|我睡了)[。！!～~]*$"#,options:.regularExpression) != nil {return false}
-        return data.profile.proactive && visible && active && !editing && draft.isEmpty && !busy &&
+        return !CompanionContext.full(data) && data.profile.proactive && visible && active && !editing && draft.isEmpty && !busy &&
         !data.awaitingProactiveReply && now.timeIntervalSince(lastInteraction) >= 30 &&
-        now.timeIntervalSince(data.lastProactive ?? .distantPast) >= 600 && data.messages.count < 999
+        now.timeIntervalSince(data.lastProactive ?? .distantPast) >= 600 && data.messages.count < CompanionData.messageLimit-1
     }
 }

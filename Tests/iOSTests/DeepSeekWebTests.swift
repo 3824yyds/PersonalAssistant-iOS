@@ -17,6 +17,97 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testEmptyMemeSearchKeepsUnverifiedStatusVisible() async throws {
+        var calls=0
+        WebProtocol.handler={request in
+            if request.url!.path=="/v1/tools/search" {return (200,Data(#"{"results":[]}"#.utf8))}
+            calls+=1
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"empty-search","function":["name":"web_search","arguments":"{\"query\":\"不存在的示例新梗\"}"]]]]))}
+            return (200,try self.sse(["content":"没找到能核实的出处，可以把原话发我看看。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"查一下这个不存在的示例梗",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(result.1,"联网查询 · 未找到可核实来源");XCTAssertTrue(result.2.isEmpty)
+    }
+    @MainActor func testInvalidNameProposalCannotBecomeAFakeSuccessfulRename() async throws {
+        var calls=0
+        WebProtocol.handler={_ in
+            calls+=1
+            return (200,try self.sse(["tool_calls":[["index":0,"id":"bad-name","function":["name":"propose_companion_name","arguments":"{\"name\":\"阿肥\",\"quote\":\"不存在的取名指令\"}"]]]]))
+        }
+        do {_=try await CompanionReplyService.answer(question:"我说的是吃饭时间",data:CompanionData(),history:[],client:client());XCTFail("Expected invalid proposal rejection")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("名字尚未更改"))}
+        XCTAssertEqual(calls,1)
+    }
+    @MainActor func testCompressionPreviewUsesQuotesAndDoesNotChangeStoredWindow() async throws {
+        var data=CompanionData();data.profile.name="大肥鱼"
+        let source=CompanionMessage(role:"user",content:"面试改到周日下午两点，不是周六了。")
+        data.messages=[source];var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request)
+            XCTAssertNil(body["tools"]);XCTAssertEqual(body["model"] as? String,"deepseek-flash");XCTAssertEqual(body["max_tokens"] as? Int,8192)
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertTrue((messages.last?["content"] as? String ?? "").contains(source.content))
+            let value=["facts":[["text":"面试改到周日下午两点","messageID":source.id,"quote":"改到周日下午两点"]]]
+            let text=String(decoding:try JSONSerialization.data(withJSONObject:value),as:UTF8.self)
+            return (200,try self.sse(["content":text]))
+        }
+        let preview=try await CompanionCompressionService.preview(data:data,client:client())
+        XCTAssertEqual(calls,1);XCTAssertTrue(preview.text.contains("用户说：面试改到周日下午两点"));XCTAssertEqual(preview.expectedLastID,source.id)
+        XCTAssertNil(data.windows);XCTAssertEqual(data.messages,[source])
+    }
+    @MainActor func testCompressionRejectsInventedQuoteAndCancellationDoesNotContactServer() async throws {
+        var data=CompanionData();let source=CompanionMessage(role:"user",content:"周六面试");data.messages=[source]
+        WebProtocol.handler={_ in
+            let value=["facts":[["text":"周一面试","messageID":source.id,"quote":"周一"]]]
+            return (200,try self.sse(["content":String(decoding:try JSONSerialization.data(withJSONObject:value),as:UTF8.self)]))
+        }
+        do {_=try await CompanionCompressionService.preview(data:data,client:client());XCTFail("Expected quote rejection")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("原文依据"))}
+        XCTAssertNil(data.windows);XCTAssertEqual(data.messages,[source])
+        WebProtocol.handler={_ in XCTFail("Cancelled compression must not run");throw URLError(.cancelled)}
+        let client=client(),snapshot=data
+        let task=Task {try await CompanionCompressionService.preview(data:snapshot,client:client)};task.cancel()
+        do {_=try await task.value;XCTFail("Expected cancellation")}catch{XCTAssertTrue(error is CancellationError)}
+    }
+    @MainActor func testCompressionVisitsEveryBatchAndCarriesPriorEvidence() async throws {
+        var data=CompanionData()
+        data.messages=(0..<90).map {CompanionMessage(role:"user",content:"第\($0)条计划："+String(repeating:"计划内容",count:150))}
+        let expected=Set(data.messages.map(\.id));var seen=Set<String>(),calls=0
+        WebProtocol.handler={request in
+            calls+=1
+            let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let payload=try self.decodeJSON(try XCTUnwrap(messages.last?["content"] as? String))
+            let current=try XCTUnwrap(payload["messages"] as? [[String:String]])
+            seen.formUnion(current.compactMap {$0["id"]})
+            let prior=try XCTUnwrap(payload["previous_facts"] as? [[String:String]])
+            if calls>1 {XCTAssertFalse(prior.isEmpty)}
+            let first=try XCTUnwrap(current.first),id=try XCTUnwrap(first["id"]),quote=String(try XCTUnwrap(first["text"]).prefix(12))
+            let facts=prior.map {["text":$0["text"]!,"messageID":$0["messageID"]!,"quote":$0["quote"]!]}+[["text":"保留这一段的计划","messageID":id,"quote":quote]]
+            return (200,try self.sse(["content":String(decoding:try JSONSerialization.data(withJSONObject:["facts":facts]),as:UTF8.self)]))
+        }
+        let preview=try await CompanionCompressionService.preview(data:data,client:client())
+        XCTAssertGreaterThan(calls,1);XCTAssertEqual(seen,expected);XCTAssertFalse(preview.text.isEmpty);XCTAssertNil(data.windows)
+    }
+    private func decodeJSON(_ text:String)throws->[String:Any] {try XCTUnwrap(JSONSerialization.jsonObject(with:Data(text.utf8)) as? [String:Any])}
+    @MainActor func testNewWindowSendsConfirmedSummaryAndAllCurrentTurnsButNoArchivedRawMessages() async throws {
+        var data=CompanionData()
+        let old=CompanionMessage(role:"user",content:"归档的原始长对话"),current=CompanionMessage(role:"user",content:"当前窗口继续聊面试")
+        data.messages=[old,current];data.windows=[CompanionWindow(startIndex:1,summary:"用户已确认：面试在周日下午两点。")]
+        WebProtocol.handler={request in
+            let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertEqual(messages.count,3);XCTAssertEqual(messages[1]["content"] as? String,current.content)
+            XCTAssertTrue((messages.first?["content"] as? String ?? "").contains("面试在周日下午两点"))
+            XCTAssertFalse(String(describing:messages).contains(old.content))
+            return (200,try self.sse(["content":"记得，我们接着准备周日下午的面试。 "]))
+        }
+        _=try await CompanionReplyService.answer(question:"继续",data:data,history:data.messages,client:client())
+    }
+    @MainActor func testFullWindowPreventsRequestInsteadOfSilentlyTruncatingHistory() async throws {
+        var data=CompanionData();data.messages=(0..<49).map {_ in CompanionMessage(role:"user",content:String(repeating:"甲",count:1000))}
+        WebProtocol.handler={_ in XCTFail("Full window must not contact the API");throw URLError(.cancelled)}
+        do {_=try await CompanionReplyService.answer(question:"继续",data:data,history:data.messages,client:client());XCTFail("Expected context cap")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("上限"))}
+    }
     @MainActor func testSemanticNamingToolReturnsConfirmationWithoutPretendingNameWasSaved() async throws {
         let data=CompanionData();var calls=0
         WebProtocol.handler={request in
@@ -154,6 +245,7 @@ final class DeepSeekWebTests:XCTestCase {
         let key=try VaultCrypto.random(32),salt=try VaultCrypto.random(32)
         var document=Document(),data=CompanionData();data.profile.name="小澜"
         data.memories=[CompanionMemory(text:"喜欢公园")]
+        data.profile.tone = .spicy;data.windows=[CompanionWindow(startIndex:0,summary:"用户说：周六去公园。")]
         try data.write(to:&document)
         let envelope=try VaultCrypto.encrypt(document.encoded(),key:key,salt:salt)
         XCTAssertFalse(String(decoding:envelope,as:UTF8.self).contains("小澜"))

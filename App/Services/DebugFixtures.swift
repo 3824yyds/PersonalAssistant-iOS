@@ -67,6 +67,15 @@ enum DebugFixtures {
             state.messages=[CompanionMessage(role:"user",content:"想好啦，以后你就用小鱼这个名字"),CompanionMessage(role:"assistant",content:"你想叫我小鱼吗？确认后我就用这个名字。",source:"名字待确认",nameProposal:"小鱼")]
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-long-context-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-full-context-fixture") {
+            var state=CompanionData();state.profile.name="大肥鱼";state.profile.proactive=false
+            state.memories=[CompanionMemory(text:"喜欢安静的地方")]
+            state.messages=[CompanionMessage(role:"user",content:"窗口开头：面试计划的原话仍然保留。")]
+            let count=ProcessInfo.processInfo.arguments.contains("--ui-companion-full-context-fixture") ? 49:40
+            state.messages += (0..<count).map {index in CompanionMessage(role:index%2==0 ? "user":"assistant",content:String(repeating:"上下文测试",count:200))}
+            state.messages.append(CompanionMessage(role:"user",content:"周六去杭州面试，需要提前准备。"))
+            try? state.write(to:&d)
+        }
         return d
     }
     @MainActor static func actionReply(_ question:String,tools:[[String:Any]],handler:ChatToolHandler?) async throws -> (String,String)? {

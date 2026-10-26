@@ -8,6 +8,7 @@ import Combine
     @Published private(set) var partial = ""
     @Published private(set) var status = ""
     @Published var error: String?
+    @Published var compression:CompanionCompressionPreview?
     private unowned let store: AppStore
     private var request: Task<Void,Never>?
     private var requestID = UUID()
@@ -62,6 +63,7 @@ import Combine
         let question = draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !busy, !question.isEmpty else { return }
         guard question.count <= 1200 else { error = "这段话较长，请分段发送（每条最多1200字）"; return }
+        guard CompanionContext.canSend(question,data:data) else {error="当前窗口上下文已达上限，请先精简并开启新窗口。输入的文字已保留。";return}
         touch(); begin(question:question,proactive:false)
     }
     func retryLast() {
@@ -129,6 +131,45 @@ import Combine
         }
     }
     func removeMemory(_ id:String) async { _=await update {$0.memories.removeAll {$0.id==id}} }
+    func prepareCompression(manual:Bool=false) {
+        guard !busy,unlocked,!store.busy else {return}
+        if manual {compression=CompanionCompressionPreview(text:CompanionContext.summary(data),expectedLastID:data.messages.last?.id,expectedWindowID:data.windows?.last?.id,expectedMessages:CompanionContext.current(data),expectedSummary:CompanionContext.summary(data));return}
+        let id=UUID();requestID=id;busy=true;error=nil;status="正在精简上下文…"
+        request=Task { [weak self] in
+            guard let self else {return}
+            defer {if self.requestID==id {self.busy=false;self.status="";self.request=nil;self.touch()}}
+            do {
+                let result:CompanionCompressionPreview
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture") {
+                    try await Task.sleep(nanoseconds:300_000_000)
+                    result=CompanionCompressionPreview(text:"用户说：周六准备去杭州面试，想提前准备。",expectedLastID:self.data.messages.last?.id,expectedWindowID:self.data.windows?.last?.id,expectedMessages:CompanionContext.current(self.data),expectedSummary:CompanionContext.summary(self.data))
+                } else {
+                    guard self.store.cloudEnabled else {throw AppError.message("自动精简需要开启云端智能，也可以手动整理")}
+                    result=try await self.compressionPreview(id:id)
+                }
+                #else
+                guard self.store.cloudEnabled else {throw AppError.message("自动精简需要开启云端智能，也可以手动整理")}
+                result=try await self.compressionPreview(id:id)
+                #endif
+                guard self.unlocked,self.requestID==id,!Task.isCancelled else {return}
+                self.compression=result
+            } catch {guard self.unlocked,self.requestID==id,!(error is CancellationError),!Task.isCancelled else {return};self.error=error.localizedDescription}
+        }
+    }
+    private func compressionPreview(id:UUID) async throws -> CompanionCompressionPreview {
+        try await CompanionCompressionService.preview(data:data,client:DeepSeekWebClient(apiKey:try AIService.credential()),onStatus:{[weak self] value in
+            guard let self,self.requestID==id,self.unlocked else {return};self.status=value
+        })
+    }
+    func applyCompression(_ preview:CompanionCompressionPreview) async -> Bool {
+        guard !busy else {return false}
+        let saved=await update {state in
+            guard CompanionContext.apply(preview,to:&state) else {throw AppError.message("摘要为空、过长或聊天已经变化，请重新整理；原聊天没有删除")}
+        }
+        if saved {compression=nil;error=nil;touch()}
+        return saved
+    }
     func confirmName(_ message:CompanionMessage) async {
         guard !busy else {return}
         _=await update {_=try CompanionRules.confirmNameProposal(message,in:&$0)}

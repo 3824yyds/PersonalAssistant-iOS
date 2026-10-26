@@ -60,7 +60,7 @@ final class DeepSeekWebClient {
                 onPartial:(@MainActor @Sendable (String)->Void)?) async throws -> DeepSeekStreamMessage {
         try Task.checkCancellation()
         guard !model.isEmpty,model.count<=100,model.range(of:#"^[A-Za-z0-9._-]+$"#,options:.regularExpression) != nil else {throw AppError.message("模型标识无效，请重新选择")}
-        var body:[String:Any] = ["model":model,"messages":messages,"stream":true,"max_tokens":max(128,min(4096,maxTokens)),"thinking":["type":"disabled"]]
+        var body:[String:Any] = ["model":model,"messages":messages,"stream":true,"max_tokens":max(128,min(8192,maxTokens)),"thinking":["type":"disabled"]]
         let schemas=(tools ? [Self.tool]:[])+localTools
         if !schemas.isEmpty {body["tools"]=schemas;body["tool_choice"]="auto"}
         let (bytes,response)=try await session.bytes(for:request("/chat/completions",body));try check(response)
