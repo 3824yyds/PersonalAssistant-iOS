@@ -121,17 +121,18 @@ struct UnlockView: View {
                         Color.clear.frame(height:passwordFocused ? 24:proxy.size.height*0.36).accessibilityHidden(true)
                     VStack(spacing:12) {
                         if !store.hasVault {Text("创建你的私人资料库").font(.headline).foregroundStyle(.black.opacity(0.8)).padding(.bottom,8)}
-                        passwordField(store.hasVault ? "资料库密码":"设置密码（至少12个字符）",text:$password,confirmation:false)
-                        if !store.hasVault {passwordField("再次输入密码",text:$confirmation,confirmation:true)}
+                        passwordField(store.hasVault ? "输入4位PIN":"设置4位数字PIN",text:$password,confirmation:false)
+                        if !store.hasVault {passwordField("再次输入4位PIN",text:$confirmation,confirmation:true)}
+                        if !password.isEmpty && !VaultPIN.valid(password) {Text("PIN须为4位数字").font(.caption).foregroundStyle(.black.opacity(0.7))}
                         Button {
-                            if !store.hasVault && password != confirmation { store.error="两次密码不一致"; return }
+                            if !store.hasVault && password != confirmation { store.error="两次PIN不一致"; return }
                             Task { await store.unlock(password:password,creating:!store.hasVault); password="";confirmation="" }
-                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity,minHeight:48).foregroundStyle(password.isEmpty ? Color.black.opacity(0.48):.white).background(password.isEmpty ? Color.white.opacity(0.72):Theme.accent,in:RoundedRectangle(cornerRadius:16)) }.buttonStyle(.plain).disabled(store.busy || password.isEmpty)
+                        } label: { HStack { if store.busy {ProgressView().tint(.white)};Text(store.hasVault ? "解锁":"创建资料库").fontWeight(.semibold) }.frame(maxWidth:.infinity,minHeight:48).foregroundStyle(VaultPIN.valid(password) ? .white:Color.black.opacity(0.48)).background(VaultPIN.valid(password) ? Theme.accent:Color.white.opacity(0.72),in:RoundedRectangle(cornerRadius:16)) }.buttonStyle(.plain).disabled(store.busy || !VaultPIN.valid(password) || (!store.hasVault && !VaultPIN.valid(confirmation)))
                         if store.hasVault {Button {
                             if store.biometricEnabled {Task {await store.unlockBiometric()}}
-                            else {store.error="请先使用密码解锁，再到个人详情启用 Face ID / 系统解锁"}
+                            else {store.error="请先使用PIN解锁，再到个人详情启用 Face ID / 系统解锁"}
                         } label:{Image(systemName:"faceid").font(.system(size:26,weight:.regular)).frame(width:54,height:54).appGlass(Circle(),interactive:true)}.buttonStyle(.plain).foregroundStyle(.black.opacity(0.78)).accessibilityLabel("Face ID 解锁").disabled(store.busy).padding(.top,12)}
-                        if !store.hasVault { Text("密码用于加密备份，请妥善保存。请定期在个人详情导出加密备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
+                        if !store.hasVault { Text("PIN用于解锁和加密备份，请妥善保存。请定期在个人详情导出加密备份。").font(.caption).foregroundStyle(.black.opacity(0.6)).multilineTextAlignment(.center) }
                     }.frame(maxWidth:340).frame(maxWidth:.infinity).accessibilityIdentifier("unlock.controls")
                         Spacer(minLength:24)
                     }.padding(.horizontal,28).padding(.bottom,24).frame(minHeight:proxy.size.height,alignment:.top)
@@ -142,7 +143,7 @@ struct UnlockView: View {
     func passwordField(_ title:String,text:Binding<String>,confirmation:Bool)->some View {
         HStack(spacing:10) {
             Image(systemName:confirmation ? "checkmark.shield":"lock").font(.system(size:16,weight:.regular)).foregroundStyle(.black.opacity(0.46)).accessibilityHidden(true)
-            SecureField(title,text:text).textContentType(store.hasVault ? .password:.newPassword).focused($passwordFocused).font(.system(size:16)).foregroundStyle(.black).tint(Theme.accent)
+            SecureField(title,text:text).textContentType(.password).keyboardType(.numberPad).focused($passwordFocused).font(.system(size:16)).foregroundStyle(.black).tint(Theme.accent)
         }.padding(.horizontal,16).frame(height:52)
             .background(.white.opacity(0.9),in:RoundedRectangle(cornerRadius:16))
             .overlay {RoundedRectangle(cornerRadius:16).strokeBorder(.white.opacity(0.65),lineWidth:0.5)}

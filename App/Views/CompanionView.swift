@@ -1,13 +1,35 @@
 import SwiftUI
 import UIKit
 
-private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history, stickers; var id:String {rawValue} }
+private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history; var id:String {rawValue} }
 
 struct CompanionAvatar: View {
     var size:CGFloat = 36
+    var expression:String?=nil
+    var animated=false
+    var busy=false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var phase
     var body:some View {
-        Image("CompanionAvatar").resizable().scaledToFill().frame(width:size,height:size).clipShape(Circle())
-            .overlay {Circle().strokeBorder(.white.opacity(0.85),lineWidth:1)}.accessibilityLabel("伙伴头像")
+        Group {
+            if animated && !reduceMotion && phase == .active {
+                TimelineView(.animation(minimumInterval:1.0/15)) {context in
+                    let t=context.date.timeIntervalSinceReferenceDate*(busy ? 3.2:1.8)
+                    portrait.scaleEffect(1+0.025*sin(t)).rotationEffect(.degrees(1.8*sin(t*0.7))).offset(y:sin(t)*0.8)
+                }
+            } else {portrait}
+        }.frame(width:size,height:size).accessibilityLabel("伙伴头像").accessibilityValue(busy ? "正在思考":"微笑")
+    }
+    private var portrait:some View {
+        ZStack(alignment:.bottomTrailing) {
+            Group {
+                if let expression,CompanionSticker.find(expression) != nil {
+                    Image("CompanionSticker_"+expression).resizable().scaledToFill().scaleEffect(1.6).offset(y:size*0.18)
+                } else {Image("CompanionAvatar").resizable().scaledToFill()}
+            }.frame(width:size,height:size).background(Theme.accent.opacity(0.08)).clipShape(Circle())
+                .overlay {Circle().strokeBorder(.white.opacity(0.85),lineWidth:1)}
+            if busy {Text("···").font(.system(size:size*0.27,weight:.bold)).foregroundStyle(Theme.accent).padding(.horizontal,3).background(.white,in:Capsule()).offset(x:2,y:2).accessibilityHidden(true)}
+        }
     }
 }
 
@@ -22,6 +44,12 @@ struct CompanionView: View {
     @State private var focused=false
     @State private var clearHistory=false
     @State private var follow=true
+    @State private var stickersExpanded=false
+    private var avatarExpression:String? {
+        guard let id=CompanionContext.current(session.data).last(where:{$0.role=="assistant"})?.stickerID else {return nil}
+        if ["happy","hug","confused","speechless","smug","goodnight"].contains(id) {return id}
+        return ["meme_laugh":"happy","meme_melon":"smug","meme_cracked":"confused","meme_justthis":"smug"][id]
+    }
     init(store:AppStore) {_store=ObservedObject(wrappedValue:store);_session=StateObject(wrappedValue:CompanionSession(store:store))}
     var body:some View {
         VStack(spacing:0) {
@@ -47,6 +75,7 @@ struct CompanionView: View {
                     .font(.footnote).padding(.horizontal,18).padding(.bottom,8)
             }
             composer
+            if stickersExpanded {CompanionStickerDock(session:session) {showKeyboard()}.transition(.move(edge:.bottom).combined(with:.opacity))}
         }.background {ConversationBackground()}.appClearChrome().toolbar(.hidden,for:.navigationBar).appErrorScope()
             .task {
                 session.active=phase == .active
@@ -58,10 +87,11 @@ struct CompanionView: View {
             }
             .onDisappear {dismissKeyboard();session.close()}
             .onChange(of:phase) {_,value in session.active=value == .active;if value != .active {session.cancel()}else{session.touch()}}
-            .onChange(of:focused) {_,value in session.editing=value;session.touch()}
+            .onChange(of:focused) {_,value in session.editing=value;if value {stickersExpanded=false};session.touch()}
             .onChange(of:session.draft) {_,_ in session.touch()}
-            .onChange(of:panel) {_,value in session.panelOpen=value != nil || clearHistory;session.touch()}
-            .onChange(of:clearHistory) {_,value in session.panelOpen=value || panel != nil;session.touch()}
+            .onChange(of:panel) {_,value in session.panelOpen=value != nil || clearHistory || stickersExpanded;session.touch()}
+            .onChange(of:clearHistory) {_,value in session.panelOpen=value || panel != nil || stickersExpanded;session.touch()}
+            .onChange(of:stickersExpanded) {_,value in session.panelOpen=value || panel != nil || clearHistory;session.touch()}
             .onChange(of:session.compression?.id) {_,value in if value != nil {open(.compression)}}
             .onChange(of:session.data.windows?.last?.id) {_,_ in follow=true}
             .sheet(item:$panel,onDismiss:{session.compression=nil}) {value in
@@ -71,7 +101,6 @@ struct CompanionView: View {
                     case .memory:CompanionMemoryView(session:session)
                     case .compression:CompanionCompressionView(session:session)
                     case .history:CompanionWindowHistoryView(data:session.data)
-                    case .stickers:CompanionStickerPicker(session:session)
                     }
                 }.environmentObject(store)
             }
@@ -84,8 +113,8 @@ struct CompanionView: View {
             Button {dismissKeyboard();session.close();dismiss()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}
                 .buttonStyle(.plain).accessibilityLabel("返回普通聊天").accessibilityIdentifier("companion.back")
             Spacer(minLength:4)
-            Button {open(.profile)} label:{HStack(spacing:8) {CompanionAvatar(size:32);VStack(alignment:.leading,spacing:2) {Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title");Text("Flash · 文字伙伴").font(.caption2).foregroundStyle(.secondary)}}}
-                .buttonStyle(.plain).accessibilityIdentifier("companion.profile").disabled(session.busy || store.busy)
+            Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {CompanionAvatar(size:32,expression:avatarExpression,animated:session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy).accessibilityIdentifier("companion.avatar.live");VStack(alignment:.leading,spacing:2) {Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title");Text("Flash · 文字伙伴").font(.caption2).foregroundStyle(.secondary)}}}
+                .buttonStyle(.plain).accessibilityIdentifier("companion.profile").accessibilityHint(session.busy ? "正在回复，请稍后查看资料":"查看她的资料")
             Spacer(minLength:4)
             HStack(spacing:0) {
                 Button {open(.memory)} label:{Image(systemName:"bookmark").frame(width:40,height:44)}.accessibilityLabel("你们的记忆").accessibilityIdentifier("companion.memory")
@@ -103,7 +132,8 @@ struct CompanionView: View {
         }.padding(.horizontal,12).padding(.top,4).padding(.bottom,10)
     }
     private func dismissKeyboard() {focused=false;UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)}
-    private func open(_ value:CompanionPanel) {dismissKeyboard();session.touch();panel=value}
+    private func open(_ value:CompanionPanel) {stickersExpanded=false;dismissKeyboard();session.touch();panel=value}
+    private func showKeyboard() {stickersExpanded=false;focused=true;session.touch()}
     private var contextBar:some View {
         let count=CompanionContext.count(session.data),warn=count>=CompanionContext.warning
         return Group {
@@ -173,11 +203,12 @@ struct CompanionView: View {
         HStack(alignment:.top,spacing:10) {
             if message.role=="user" {Spacer(minLength:38)}else{CompanionAvatar()}
             VStack(alignment:.leading,spacing:8) {
-                if let sticker=CompanionSticker.find(message.stickerID) {
-                    CompanionStickerImage(sticker:sticker)
+                if let sticker=session.data.descriptor(message.stickerID) {
+                    CompanionStickerImage(sticker:sticker,data:session.data)
                 }
+                if let quote=message.replyTo {quotePreview(quote,cancellable:false).accessibilityIdentifier("companion.quote."+message.id)}
                 if message.role != "user" || message.stickerID == nil {
-                Text(.init(WebEvidence.cited(message.content,sources:message.sources))).textSelection(.enabled)
+                Text(.init(WebEvidence.cited(message.content,sources:message.sources)))
                     .padding(.horizontal,15).padding(.vertical,12)
                     .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
                     .accessibilityIdentifier("companion.message.\(message.id)")
@@ -198,15 +229,31 @@ struct CompanionView: View {
             }
             if message.role != "user" {Spacer(minLength:24)}
         }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
+            .contextMenu {
+                Button("回复",systemImage:"arrowshape.turn.up.left") {session.selectReply(message);showKeyboard()}.disabled(session.busy)
+                Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content}
+            }
+            .accessibilityAction(named:"回复这条消息") {session.selectReply(message);showKeyboard()}
+            .id(message.id)
     }
     private var composer:some View {
+        VStack(spacing:5) {
+        if let quote=session.replyTo {quotePreview(quote,cancellable:true).padding(.horizontal,12).accessibilityIdentifier("companion.reply.preview")}
         HStack(alignment:.bottom,spacing:10) {
-            Button {open(.stickers)} label:{Image(systemName:"face.smiling").font(.system(size:22)).frame(width:36,height:52)}
+            Button {if stickersExpanded {showKeyboard()}else{dismissKeyboard();stickersExpanded=true;session.touch()}} label:{Image(systemName:stickersExpanded ? "keyboard":"face.smiling").font(.system(size:22)).frame(width:36,height:52)}
                 .buttonStyle(.plain).accessibilityLabel("伙伴表情包").accessibilityIdentifier("companion.stickers").disabled(session.busy || store.busy)
             ComposingTextInput(text:$session.draft,isFocused:$focused,placeholder:session.data.profile.name.map {"和\($0)说点什么…"} ?? "说点什么…",accessibilityID:"companion.input")
             sendWithContextRing
         }.padding(.horizontal,12).padding(.vertical,7).appGlass(RoundedRectangle(cornerRadius:26))
             .padding(.horizontal,14).padding(.bottom,8)
+        }
+    }
+    private func quotePreview(_ quote:CompanionQuote,cancellable:Bool)->some View {
+        HStack(alignment:.top,spacing:8) {
+            RoundedRectangle(cornerRadius:1).fill(Theme.accent.opacity(0.5)).frame(width:3)
+            Text((quote.role=="assistant" ? session.title:"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
+            if cancellable {Button {session.replyTo=nil;session.touch()} label:{Image(systemName:"xmark.circle.fill")}.accessibilityLabel("取消引用回复").accessibilityIdentifier("companion.reply.cancel")}
+        }.fixedSize(horizontal:false,vertical:true).padding(8).background(Theme.panel(scheme).opacity(0.8),in:RoundedRectangle(cornerRadius:10)).accessibilityElement(children:.contain)
     }
     private var sendWithContextRing:some View {
         let count=CompanionContext.count(session.data)
@@ -249,6 +296,7 @@ struct CompanionProfileView:View {
                 Toggle("主动接话",isOn:Binding(get:{session.data.profile.proactive},set:{value in Task {_=await session.update {$0.profile.proactive=value}}})).accessibilityIdentifier("companion.proactive")
                 Toggle("需要时联网查询",isOn:Binding(get:{session.data.profile.web},set:{value in Task {_=await session.update {$0.profile.web=value}}})).accessibilityIdentifier("companion.web")
                 Toggle("适时发表情包",isOn:Binding(get:{session.data.profile.stickers != false},set:{value in Task {_=await session.update {$0.profile.stickers=value}}})).accessibilityIdentifier("companion.stickers.enabled")
+                Toggle("头像聊天动效",isOn:Binding(get:{session.data.profile.avatarMotion != false},set:{value in Task {_=await session.update {$0.profile.avatarMotion=value}}})).accessibilityIdentifier("companion.avatar.motion")
             } footer:{Text("聊天和自动精简使用 DeepSeek Flash，需要联网并产生 API 费用。会发送当前窗口的完整对话、交接摘要和相关记忆，不发送整份笔记或账本。按需搜索另有费用，搜索词仅使用必要公开关键词。主动接话只在此页打开时发生。")}
             Section {Button {memory=true} label:{Label("查看你们的记忆",systemImage:"bookmark")}}
             if let error=session.error {Section {Text(error).font(.footnote).foregroundStyle(.red)}}

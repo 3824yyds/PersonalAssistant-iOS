@@ -58,8 +58,9 @@ struct CompanionWindowHistoryView:View {
                         ForEach(messages(index)) {message in
                             VStack(alignment:.leading,spacing:5) {
                                 Text(message.role=="user" ? "你":"伙伴").font(.caption).foregroundStyle(.secondary)
-                                if let sticker=CompanionSticker.find(message.stickerID) {CompanionStickerImage(sticker:sticker,size:110)}
+                                if let sticker=data.descriptor(message.stickerID) {CompanionStickerImage(sticker:sticker,data:data,size:110)}
                                 Text(message.content).textSelection(.enabled)
+                                if let quote=message.replyTo {Text("引用"+(quote.role=="assistant" ? "伙伴":"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)}
                             }.padding(.vertical,5)
                         }
                     }.navigationTitle("窗口 \(index+1)").navigationBarTitleDisplayMode(.inline)

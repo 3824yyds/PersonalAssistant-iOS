@@ -6,9 +6,9 @@ final class AppSmokeTests:XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-motion-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
-            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
-            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
-        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("0426")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("0426");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));tapProductTab("助理",in:app)
         XCTAssertTrue(app.buttons["停止回复"].waitForExistence(timeout:5));attach(app,"AIFlowChat");app.buttons["停止回复"].tap()
         app.buttons["返回"].firstMatch.tap();app.buttons["展开快捷操作"].tap();app.buttons["新建笔记"].tap()
@@ -28,11 +28,11 @@ final class AppSmokeTests:XCTestCase {
         if app.buttons["创建资料库"].waitForExistence(timeout:10) {
             let fields=app.secureTextFields
             XCTAssertGreaterThanOrEqual(fields.count,2)
-            fields.element(boundBy:0).tap();fields.element(boundBy:0).typeText("test-password-351")
-            fields.element(boundBy:1).tap();fields.element(boundBy:1).typeText("test-password-351")
+            fields.element(boundBy:0).tap();fields.element(boundBy:0).typeText("0426")
+            fields.element(boundBy:1).tap();fields.element(boundBy:1).typeText("0426")
             app.buttons["创建资料库"].tap()
         } else if app.buttons["解锁"].exists {
-            app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()
+            app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()
         }
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20))
         attach(app,"Notes")
@@ -104,9 +104,9 @@ final class AppSmokeTests:XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-scroll-fixture","--ui-proposal-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
-            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
-            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
-        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("0426")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("0426");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20))
         for page in ["笔记","提醒","账本"] {
             tapProductTab(page,in:app)
@@ -159,9 +159,9 @@ final class AppSmokeTests:XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture","--ui-search-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
-            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
-            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
-        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("0426")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("0426");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["助理"].firstMatch.waitForExistence(timeout:20));tapProductTab("助理",in:app)
         XCTAssertTrue(app.staticTexts["联网搜索 · 2 个来源"].waitForExistence(timeout:5));attach(app,"WebAnswerCompact")
         app.buttons.containing(.staticText,identifier:"来源 · 2").firstMatch.tap()

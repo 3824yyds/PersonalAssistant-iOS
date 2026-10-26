@@ -12,16 +12,68 @@ final class CompanionUITests:XCTestCase {
     func testStickerPickerSendingAndReplyKeepDraftAndSurviveReopening() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-sticker-fixture"]);tapProductTab("助理",in:app);enter(app)
         let input=app.textViews["companion.input"];input.tap();input.typeText("这段草稿保留🙂")
-        app.buttons["companion.stickers"].tap();XCTAssertTrue(app.navigationBars["表情包"].waitForExistence(timeout:5))
+        app.buttons["companion.stickers"].tap();XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.sticker.dock").firstMatch.waitForExistence(timeout:5))
+        XCTAssertFalse(app.navigationBars["表情包"].exists);XCTAssertTrue(app.textViews["companion.input"].isHittable)
         recordScreen(app,"CompanionStickerPicker")
         app.buttons["companion.sticker.send.happy"].tap()
         XCTAssertTrue(app.images["companion.sticker.image.hug"].waitForExistence(timeout:8))
         XCTAssertTrue(app.images["companion.sticker.image.happy"].exists)
         XCTAssertEqual(app.textViews["companion.input"].value as? String,"这段草稿保留🙂")
+        app.buttons["companion.stickers"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        XCTAssertFalse(app.descendants(matching:.any).matching(identifier:"companion.sticker.dock").firstMatch.exists)
         recordScreen(app,"CompanionStickerConversation")
         app.buttons["companion.back"].tap();enter(app)
         XCTAssertTrue(app.images["companion.sticker.image.hug"].waitForExistence(timeout:5))
         XCTAssertTrue(app.images["companion.sticker.image.happy"].exists)
+    }
+    func testCustomStickerEditorSaveSendRemoveAndHistoricalImagePersist() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-custom-sticker-fixture"]);tapProductTab("助理",in:app);enter(app)
+        app.buttons["companion.stickers"].tap();app.buttons["companion.sticker.add"].tap()
+        XCTAssertTrue(app.navigationBars["添加表情"].waitForExistence(timeout:8))
+        app.textFields["companion.sticker.title"].tap();app.textFields["companion.sticker.title"].typeText("我的吃瓜")
+        let meaning=app.descendants(matching:.any).matching(identifier:"companion.sticker.meaning").firstMatch
+        meaning.tap();meaning.typeText("围观趣事，表示好奇")
+        app.buttons["companion.sticker.save"].tap()
+        let tile=app.buttons["发送我的吃瓜表情包"];XCTAssertTrue(tile.waitForExistence(timeout:8));recordScreen(app,"CompanionCustomStickerSaved")
+        tile.tap();XCTAssertTrue(app.staticTexts["我在呢，接着聊。"].waitForExistence(timeout:8))
+        tile.press(forDuration:1);app.buttons["移除表情"].tap()
+        let gone=expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:tile);wait(for:[gone],timeout:8)
+        app.buttons["companion.stickers"].tap()
+        XCTAssertTrue(app.images.containing(NSPredicate(format:"label CONTAINS '我的吃瓜'")).firstMatch.waitForExistence(timeout:5))
+        recordScreen(app,"CompanionCustomStickerHistoryPreserved")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertTrue(app.images.containing(NSPredicate(format:"label CONTAINS '我的吃瓜'")).firstMatch.waitForExistence(timeout:5))
+    }
+    func testReplyToSelectedOlderMessagePersistsInConversation() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-quote-fixture"]);tapProductTab("助理",in:app);enter(app)
+        app.staticTexts["先聊长沙计划，还是西安？"].press(forDuration:1);app.buttons["回复"].tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.reply.preview").firstMatch.waitForExistence(timeout:5))
+        send("这条先展开",app)
+        XCTAssertTrue(app.staticTexts["收到，你是在回复这条消息，我接着这句聊。"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["companion.reply.cancel"].exists)
+        XCTAssertTrue(app.descendants(matching:.any).matching(NSPredicate(format:"identifier BEGINSWITH 'companion.quote.'")).firstMatch.exists)
+        recordScreen(app,"CompanionQuotedReply")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertTrue(app.descendants(matching:.any).matching(NSPredicate(format:"identifier BEGINSWITH 'companion.quote.'")).firstMatch.waitForExistence(timeout:5))
+    }
+    func testCancelQuotedReplyKeepsTypedDraft() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-quote-fixture"]);tapProductTab("助理",in:app);enter(app)
+        app.staticTexts["先聊长沙计划，还是西安？"].press(forDuration:1);app.buttons["回复"].tap()
+        let input=app.textViews["companion.input"];input.tap();input.typeText("保留这段输入")
+        app.buttons["companion.reply.cancel"].tap()
+        XCTAssertEqual(input.value as? String,"保留这段输入");XCTAssertFalse(app.buttons["companion.reply.cancel"].exists)
+        recordScreen(app,"CompanionCancelQuoteKeepsDraft")
+    }
+    func testFourDigitPINUnlockAfterWrongPINAndManualLock() {
+        let app=launchProduct();tapProductTab("助理",in:app);app.buttons["个人详情"].tap()
+        let lock=app.buttons["锁定资料库"]
+        for _ in 0..<4 {if lock.isHittable {break};app.swipeUp()}
+        lock.tap();XCTAssertTrue(app.buttons["解锁"].waitForExistence(timeout:8))
+        let field=app.secureTextFields.firstMatch;field.tap();field.typeText("9999");app.buttons["解锁"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout:8));app.buttons["知道了"].tap()
+        field.tap();field.typeText("0426");app.buttons["解锁"].tap()
+        XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20));recordScreen(app,"FourDigitPINUnlocked")
     }
     func testEmojiRoundTripAndTextCommandDisableAutomaticStickers() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-sticker-fixture"]);tapProductTab("助理",in:app);enter(app)

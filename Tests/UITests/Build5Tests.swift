@@ -5,9 +5,9 @@ final class Build5Tests:XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","--ui-layout-fixture","--ui-debt-fixture"];app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
-            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
-            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
-        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("0426")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("0426");app.buttons["创建资料库"].tap()
+        } else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20));return app
     }
     private func replace(_ field:XCUIElement,_ value:String) {

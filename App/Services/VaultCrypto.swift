@@ -9,18 +9,19 @@ enum VaultCrypto {
     static let overhead = 72
     static var maximumPlaintext:Int {maximum-overhead}
     static func capacityLabel(_ bytes:Int)->String {ByteCountFormatter.string(fromByteCount:Int64(max(0,bytes)),countStyle:.binary)}
-    static let magic = Data([0x50,0x41,0x56,0x41,0x55,0x4c,0x54,0x01])
+    static let magic = Data([0x50,0x41,0x56,0x41,0x55,0x4c,0x54,0x02])
     static func random(_ count: Int) throws -> Data {
         var bytes = Data(count:count)
         let status = bytes.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault,count,$0.baseAddress!) }
         guard status == errSecSuccess else { throw AppError.message("无法生成安全随机数，请重新启动应用") }; return bytes
     }
     static func salt(_ envelope: Data) throws -> Data {
-        guard (72...maximum).contains(envelope.count), envelope.prefix(8) == magic, Array(envelope[8..<12]) == [0,9,39,192] else { throw AppError.message("备份格式不支持，请选择原生 .pavault 完整备份") }
+        guard (72...maximum).contains(envelope.count), envelope.prefix(8) == magic, Array(envelope[8..<12]) == [0,9,39,192] else { throw AppError.message("当前版本只支持4位PIN资料库及其备份，不支持旧密码格式") }
         return envelope.subdata(in:12..<44)
     }
     static func derive(password: String, salt: Data) throws -> Data {
-        guard password.utf16.count >= 12, password.utf8.count <= 1024, salt.count == 32 else { throw AppError.message("备份密码至少 12 个字符，最多 1024 字节") }
+        guard VaultPIN.valid(password) else {throw AppError.message("请输入4位数字PIN")}
+        guard salt.count==32 else {throw AppError.message("备份结构无效")}
         var output = Data(count:32)
         let pass = Array(password.utf8)
         let status = output.withUnsafeMutableBytes { out in
@@ -45,7 +46,7 @@ enum VaultCrypto {
         do {
             let box = try AES.GCM.SealedBox(nonce:AES.GCM.Nonce(data:envelope.subdata(in:44..<56)),ciphertext:envelope.subdata(in:56..<(envelope.count-16)),tag:envelope.suffix(16))
             return try AES.GCM.open(box,using:SymmetricKey(data:key),authenticating:envelope.prefix(56))
-        } catch { throw AppError.message("密码不正确或备份已损坏，请核对后重试") }
+        } catch { throw AppError.message("PIN不正确或备份已损坏，请核对后重试") }
     }
 }
 
@@ -67,7 +68,7 @@ enum Keychain {
         if let prompt {let context=LAContext();context.localizedReason=prompt;query[kSecUseAuthenticationContext as String]=context}
         var result: CFTypeRef?; let status = SecItemCopyMatching(query as CFDictionary,&result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw AppError.message("系统认证未完成，请使用资料库密码解锁") }; return result as? Data
+        guard status == errSecSuccess else { throw AppError.message("系统认证未完成，请使用资料库PIN解锁") }; return result as? Data
     }
     static func delete(_ name: String) { SecItemDelete([kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:name] as CFDictionary) }
 }

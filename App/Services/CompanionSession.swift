@@ -9,6 +9,7 @@ import Combine
     @Published private(set) var status = ""
     @Published var error: String?
     @Published var compression:CompanionCompressionPreview?
+    @Published var replyTo:CompanionQuote?
     private unowned let store: AppStore
     private var request: Task<Void,Never>?
     private var requestID = UUID()
@@ -40,7 +41,10 @@ import Combine
             try edit(&next); try next.write(to:&document)
         }
         guard unlocked else { return false }
-        if saved { data = (try? CompanionData.read(store.current)) ?? data }
+        if saved {
+            data = (try? CompanionData.read(store.current)) ?? data
+            if let replyTo,!data.messages.contains(where:{$0.id==replyTo.messageID}) {self.replyTo=nil}
+        }
         else { error = store.error ?? "伙伴资料未能保存，请稍后重试" }
         return saved
     }
@@ -63,20 +67,30 @@ import Combine
         let question = draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !busy, !question.isEmpty else { return }
         guard question.count <= 1200 else { error = "这段话较长，请分段发送（每条最多1200字）"; return }
-        guard CompanionContext.canSend(question,data:data) else {error="当前窗口上下文已达上限，请先精简并开启新窗口。输入的文字已保留。";return}
-        touch(); begin(question:question,proactive:false)
+        guard CompanionContext.canSend(CompanionMessage(role:"user",content:question,replyTo:replyTo).contextText,data:data) else {error="当前窗口上下文已达上限，请先精简并开启新窗口。输入的文字已保留。";return}
+        touch(); begin(question:question,proactive:false,quote:replyTo)
     }
     func retryLast() {
         guard !busy, let message=CompanionContext.current(data).last, message.role == "user" else { return }
-        begin(question:message.content,proactive:false,retry:true)
+        begin(question:message.content,proactive:false,retry:true,quote:message.replyTo)
     }
     func sendSticker(_ sticker:CompanionSticker) {
         let question="[表情包："+sticker.title+"，"+sticker.meaning+"]"
         guard !busy else {return}
-        guard CompanionContext.canSend(CompanionMessage(role:"user",content:question,stickerID:sticker.id).contextText,data:data) else {error="当前窗口上下文已满，请先精简并新开窗口";return}
-        touch();begin(question:question,proactive:false,stickerID:sticker.id)
+        guard data.availableStickers.contains(where:{$0.id==sticker.id}) else {error="这个表情已移除，请重新选择";return}
+        guard CompanionContext.canSend(CompanionMessage(role:"user",content:question,stickerID:sticker.id,stickerMeaning:sticker.description,replyTo:replyTo).contextText,data:data) else {error="当前窗口上下文已满，请先精简并新开窗口";return}
+        touch();begin(question:question,proactive:false,stickerID:sticker.id,quote:replyTo)
     }
-    private func begin(question:String, proactive:Bool, retry:Bool=false,stickerID:String?=nil) {
+    func selectReply(_ message:CompanionMessage) {
+        guard !busy,data.messages.contains(where:{$0.id==message.id}) else {return}
+        replyTo=CompanionQuote.snapshot(message,data:data);touch()
+    }
+    func addSticker(_ sticker:CompanionCustomSticker) async -> Bool {guard !busy else {return false};return await update {try $0.addSticker(sticker)}}
+    func removeSticker(_ id:String) async {guard !busy else {return};_=await update {$0.removeSticker(id)}}
+    func setStickerAllowed(_ id:String,_ allowed:Bool) async {
+        guard !busy else {return};_=await update {state in if let index=state.customStickers?.firstIndex(where:{$0.id==id}) {state.customStickers?[index].allowAssistant=allowed}}
+    }
+    private func begin(question:String, proactive:Bool, retry:Bool=false,stickerID:String?=nil,quote:CompanionQuote?=nil) {
         guard unlocked, !busy else { return }
         let id=UUID(); requestID=id; busy=true; error=nil; partial=""; status=proactive ? "正在接着话题想…":"正在想…"
         request=Task { [weak self] in
@@ -88,11 +102,12 @@ import Combine
                 guard await self.update({ state in
                     if proactive { state.lastProactive=Date(); state.awaitingProactiveReply=true }
                     else {
-                        repliedLocally=try CompanionRules.appendUserTurn(question,to:&state)
-                        if let stickerID,let index=state.messages.lastIndex(where:{$0.role=="user"}) {state.messages[index].stickerID=stickerID}
+                        repliedLocally=try CompanionRules.appendUserTurn(question,to:&state,replyTo:quote)
+                        if let stickerID,let index=state.messages.lastIndex(where:{$0.role=="user"}) {let meaning=state.descriptor(stickerID)?.description;state.messages[index].stickerID=stickerID;state.messages[index].stickerMeaning=meaning}
                     }
                 }) else { return }
                 if !proactive, stickerID==nil,self.draft.trimmingCharacters(in:.whitespacesAndNewlines) == question { self.draft="" }
+                if !proactive,self.replyTo==quote {self.replyTo=nil}
             }
             if repliedLocally {return}
             guard self.requestID==id, self.unlocked, !Task.isCancelled else { return }
@@ -101,19 +116,19 @@ import Combine
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture"),!CompanionRules.needsWeb(question) {
                     try await Task.sleep(nanoseconds:ProcessInfo.processInfo.arguments.contains("--ui-companion-slow-fixture") ? 3_000_000_000:300_000_000)
-                    text="我在呢，接着聊。";source="界面测试夹具";sources=[];proposal=nil
+                    text=quote == nil ? "我在呢，接着聊。":"收到，你是在回复这条消息，我接着这句聊。";source="界面测试夹具";sources=[];proposal=nil
                     sticker=ProcessInfo.processInfo.arguments.contains("--ui-companion-sticker-fixture") && self.data.profile.stickers != false ? "hug":nil
                 } else {
                     guard self.store.cloudEnabled else {throw AppError.message("伙伴聊天需要云端智能，请在个人详情开启后重试")}
-                    (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
+                    (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id,quote:quote)
                 }
                 #else
                 guard self.store.cloudEnabled else {throw AppError.message("伙伴聊天需要云端智能，请在个人详情开启后重试")}
-                (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
+                (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id,quote:quote)
                 #endif
                 try Task.checkCancellation()
                 guard self.requestID==id, self.unlocked else { return }
-                let message=CompanionMessage(role:"assistant",content:text,source:source,sources:sources,nameProposal:proposal,stickerID:sticker)
+                let message=CompanionMessage(role:"assistant",content:text,source:source,sources:sources,nameProposal:proposal,stickerID:sticker,stickerMeaning:self.data.descriptor(sticker)?.description)
                 _=await self.update { $0.messages.append(message) }
             } catch {
                 guard self.requestID==id,self.unlocked,!(error is CancellationError),!Task.isCancelled else{return}
@@ -121,14 +136,14 @@ import Combine
             }
         }
     }
-    private func cloudReply(question:String,previous:[CompanionMessage],proactive:Bool,id:UUID) async throws -> (String,String,[WebSource],String?,String?) {
+    private func cloudReply(question:String,previous:[CompanionMessage],proactive:Bool,id:UUID,quote:CompanionQuote?) async throws -> (String,String,[WebSource],String?,String?) {
         try await CompanionReplyService.answer(question:question,data:data,history:previous,proactive:proactive,
-            client:DeepSeekWebClient(apiKey:try AIService.credential()),onStatus:{ [weak self] value in
+            client:DeepSeekWebClient(apiKey:try AIService.credential()),replyTo:quote,onStatus:{ [weak self] value in
                 guard let self,self.requestID==id,self.unlocked else{return};self.status=value
             })
     }
     func tick() {
-        guard CompanionRules.mayInitiate(data:data,visible:visible && !panelOpen,active:active,editing:editing,draft:draft,busy:busy || store.busy,now:Date(),lastInteraction:interaction),cloudAvailable else {return}
+        guard replyTo==nil,CompanionRules.mayInitiate(data:data,visible:visible && !panelOpen,active:active,editing:editing,draft:draft,busy:busy || store.busy,now:Date(),lastInteraction:interaction),cloudAvailable else {return}
         begin(question:"用户仍停留在聊天页。请根据前文或记忆主动说一句简短、自然的话，可以接着未完话题；没有依据就问候，不虚构经历，不催促回复。",proactive:true)
     }
     func undoName(_ message:CompanionMessage) async {

@@ -5,16 +5,16 @@ enum CompanionReplyService {
         "name":"propose_companion_name","description":"用户希望给伙伴取名或改名时提出候选名字，仅显示确认卡，不直接保存。介绍用户或第三方名字时不使用。",
         "parameters":["type":"object","properties":["name":["type":"string"],"quote":["type":"string","description":"连续复制含名字的用户原话；通常当前句，仅在用户紧接着澄清‘名字’时允许引用紧邻上一轮候选"]],"required":["name","quote"],"additionalProperties":false]
     ]]
-    static let stickerTool:[String:Any] = ["type":"function","function":[
+    static func stickerTool(_ data:CompanionData)->[String:Any] { ["type":"function","function":[
         "name":"send_companion_sticker","description":"可选：随本轮文字回复附一张角色表情包。仅在合适时用，不连续发；不能代替回答。",
-        "parameters":["type":"object","properties":["id":["type":"string","enum":CompanionSticker.all.map(\.id)]],"required":["id"],"additionalProperties":false]
-    ]]
+        "parameters":["type":"object","properties":["id":["type":"string","enum":data.assistantStickers.map(\.id)]],"required":["id"],"additionalProperties":false]
+    ]] }
     /// No local-model or canned-reply fallback: a failed cloud turn stays retryable.
     @MainActor static func answer(question:String,data:CompanionData,history:[CompanionMessage],proactive:Bool=false,client:DeepSeekWebClient,
-        onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
+        replyTo:CompanionQuote?=nil,onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
         let current=CompanionContext.messagesForRequest(data,history:history)
-        guard CompanionContext.summary(data).count+current.reduce(0,{$0+$1.contextText.count})+question.count<CompanionContext.limit else {throw AppError.message("当前窗口上下文已达上限，请先精简并开启新窗口")}
-        var messages=CompanionConversation.messages(question:question,data:data,history:history,proactive:proactive)
+        guard CompanionContext.summary(data).count+current.reduce(0,{$0+$1.contextText.count})+CompanionMessage(role:"user",content:question,replyTo:replyTo).contextText.count<CompanionContext.limit else {throw AppError.message("当前窗口上下文已达上限，请先精简并开启新窗口")}
+        var messages=CompanionConversation.messages(question:question,data:data,history:history,proactive:proactive,replyTo:replyTo)
         let web=data.profile.web && !proactive && question.range(of:"不要联网|不用联网|别联网|不要搜索|不用搜索",options:.regularExpression)==nil
         let maxTokens=question.range(of:"详细|展开|完整|逐步|长文",options:.regularExpression)==nil ? 768:3072
         for attempt in 0...1 {
@@ -24,8 +24,8 @@ enum CompanionReplyService {
             var sticker:String?
             var stickerRequested=false
             let result=try await client.answer(messages:messages,model:CompanionConversation.model,webSearch:web && attempt==0,
-                responseStyle:CompanionConversation.responseStyle,maxTokens:maxTokens,validateSearch:{query in try publicQuery(query,data:data)},
-                localTools:proactive ? []:[nameTool]+(data.profile.stickers == false ? []:[stickerTool]),onTool:{tool,arguments in
+                responseStyle:CompanionConversation.responseStyle,maxTokens:maxTokens,validateSearch:{query in try publicQuery(query,data:data,quotedText:replyTo?.text)},
+                localTools:proactive ? []:(replyTo==nil ? [nameTool]:[])+(data.profile.stickers == false ? []:[stickerTool(data)]),onTool:{tool,arguments in
                     if tool == "send_companion_sticker" {
                         guard !stickerRequested else {return Item(["attached":.bool(false),"message":.string("每轮最多选择一次表情包，请直接用文字回答。")])}
                         stickerRequested=true
@@ -34,7 +34,7 @@ enum CompanionReplyService {
                             return Item(["attached":.bool(false),"message":.string("本轮表情包不适用或需要降低频率，请正常用文字回答，不宣称发图。")])
                         }
                         sticker=id
-                        return Item(["attached":.bool(true),"id":.string(id),"meaning":.string(CompanionSticker.find(id)!.meaning),"message":.string("文字回复成功保存后，界面会附上这一张表情包。不要再输出图片链接。")])
+                        return Item(["attached":.bool(true),"id":.string(id),"meaning":.string(data.descriptor(id)!.meaning),"message":.string("文字回复成功保存后，界面会附上这一张表情包。不要再输出图片链接。")])
                     }
                     guard let bytes=arguments.data(using:.utf8),let args=try? JSONSerialization.jsonObject(with:bytes) as? [String:Any],
                           let name=args["name"] as? String,let quote=args["quote"] as? String,
@@ -49,7 +49,7 @@ enum CompanionReplyService {
             if let proposal {return ("你是想把我的名字改成“\(proposal)”吗？确认后我就用这个名字。","名字待确认",sources,proposal,nil)}
             let text=result.0.trimmingCharacters(in:.whitespacesAndNewlines)
             guard text.count<=12000 else {throw AppError.message("这次回复太长，请缩小话题后重试")}
-            if !proactive,let candidate=CompanionNaming.pending(current+[CompanionMessage(role:"user",content:question),CompanionMessage(role:"assistant",content:text)]) {
+            if !proactive,replyTo==nil,let candidate=CompanionNaming.pending(current+[CompanionMessage(role:"user",content:question),CompanionMessage(role:"assistant",content:text)]) {
                 return ("你是想把我的名字改成“\(candidate)”吗？确认后我就用这个名字。","名字待确认",sources,candidate,nil)
             }
             let source=result.1.contains("未找到可核实来源") ? "联网查询 · 未找到可核实来源":(result.1.hasPrefix("联网") ? result.1:"DeepSeek Flash")
@@ -61,10 +61,10 @@ enum CompanionReplyService {
         }
         throw AppError.message("伙伴回复未完成，请重试")
     }
-    static func publicQuery(_ query:String,data:CompanionData) throws -> String {
+    static func publicQuery(_ query:String,data:CompanionData,quotedText:String?=nil) throws -> String {
         let clean=WebEvidence.query(query)
         // Never forward verbatim long memories or numbers copied from private memory to search.
-        for text in data.memories.map(\.text)+[CompanionContext.summary(data)] {
+        for text in data.memories.map(\.text)+[CompanionContext.summary(data)]+(data.customStickers ?? []).map(\.meaning)+(quotedText.map {[$0]} ?? []) {
             if text.count>=6 && clean.contains(text) {throw AppError.message("搜索词包含私人记忆，已停止查询。请直接提供要查的公开关键词。")}
             if let regex=try? NSRegularExpression(pattern:#"[0-9]{8,}"#) {
                 for match in regex.matches(in:text,range:NSRange(text.startIndex...,in:text)) {

@@ -5,9 +5,9 @@ extension XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-AppleLanguages","(zh-Hans)","-AppleLocale","zh_CN","-appAppearance","light","--ui-layout-fixture"]+flags;app.launch()
         if app.buttons["创建资料库"].waitForExistence(timeout:5) {
-            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("test-password-351")
-            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("test-password-351");app.buttons["创建资料库"].tap()
-        }else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("test-password-351");app.buttons["解锁"].tap()}
+            app.secureTextFields.element(boundBy:0).tap();app.secureTextFields.element(boundBy:0).typeText("0426")
+            app.secureTextFields.element(boundBy:1).tap();app.secureTextFields.element(boundBy:1).typeText("0426");app.buttons["创建资料库"].tap()
+        }else {app.secureTextFields.firstMatch.tap();app.secureTextFields.firstMatch.typeText("0426");app.buttons["解锁"].tap()}
         XCTAssertTrue(app.buttons["展开快捷操作"].waitForExistence(timeout:20));return app
     }
     func recordScreen(_ app:XCUIApplication,_ name:String) {let a=XCTAttachment(screenshot:app.screenshot());a.name=name;a.lifetime = .keepAlways;add(a)}

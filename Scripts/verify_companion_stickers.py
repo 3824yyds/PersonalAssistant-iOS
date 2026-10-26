@@ -5,10 +5,10 @@ from pathlib import Path
 
 root=Path(__file__).resolve().parents[1]
 manifest=json.loads((root/'Docs/COMPANION_STICKERS.json').read_text())
-expected={'happy','hug','confused','speechless','smug','goodnight'}
+expected={'happy','hug','confused','speechless','smug','goodnight','meme_laugh','meme_melon','meme_cracked','meme_justthis'}
 assert {p['id'] for p in manifest['stickers']}==expected
 catalog=(root/'App/Core/CompanionStickers.swift').read_text()
-assert set(re.findall(r'\.init\(id:"([a-z]+)"',catalog))==expected
+assert set(re.findall(r'\.init\(id:"([a-z_]+)"',catalog))==expected
 for entry in manifest['stickers']:
     folder=root/'App/Resources/Assets.xcassets'/('CompanionSticker_'+entry['id']+'.imageset')
     contents=json.loads((folder/'Contents.json').read_text())
@@ -22,4 +22,4 @@ if len(sys.argv)>1:
     records=json.loads(subprocess.check_output(['xcrun','assetutil','--info',sys.argv[1]]))
     names={p.get('Name') for p in records}
     assert {'CompanionSticker_'+key for key in expected}<=names, 'A sticker is missing from Assets.car'
-print('Verified all six individually generated RGBA stickers'+(' and compiled assets' if len(sys.argv)>1 else ''))
+print('Verified all ten individually generated RGBA stickers'+(' and compiled assets' if len(sys.argv)>1 else ''))
