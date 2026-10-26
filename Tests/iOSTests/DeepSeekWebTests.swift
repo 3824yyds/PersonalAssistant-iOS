@@ -17,6 +17,74 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testStickerToolAttachesOneKnownImageAndPreservesTextAnswer() async throws {
+        var calls=0
+        WebProtocol.handler={request in
+            calls+=1
+            if calls==1 {
+                let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+                XCTAssertTrue((messages[0]["content"] as? String ?? "").contains("双手握拳欢呼"))
+                return (200,try self.sse(["tool_calls":[["index":0,"id":"sticker","function":["name":"send_companion_sticker","arguments":"{\"id\":\"happy\"}"]],["index":1,"id":"second","function":["name":"send_companion_sticker","arguments":"{\"id\":\"smug\"}"]]]]))
+            }
+            return (200,try self.sse(["content":"面试过了！这下可以松口气啦。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"我的面试过了！",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(result.4,"happy");XCTAssertTrue(result.0.contains("面试"));XCTAssertNil(result.3);XCTAssertEqual(calls,2)
+    }
+    @MainActor func testInvalidOrUnsuitableStickerDoesNotBreakUsefulTextReply() async throws {
+        for (id,question) in [("https://example.com/x.png","你好"),("smug","今天真的很难过😭")] {
+            var calls=0
+            WebProtocol.handler={_ in
+                calls+=1
+                if calls==1 {
+                    let args=String(decoding:try JSONSerialization.data(withJSONObject:["id":id]),as:UTF8.self)
+                    return (200,try self.sse(["tool_calls":[["index":0,"id":"sticker","function":["name":"send_companion_sticker","arguments":args]]]]))
+                }
+                return (200,try self.sse(["content":"我在，你想说的话我听着。 "]))
+            }
+            let result=try await CompanionReplyService.answer(question:question,data:CompanionData(),history:[],client:client())
+            XCTAssertNil(result.4);XCTAssertTrue(result.0.contains("我在"))
+        }
+    }
+    @MainActor func testDisabledStickerToolIsNotExposedButUserEmojiAndStickerMeaningRemainReadable() async throws {
+        var data=CompanionData();data.profile.stickers=false
+        let original=CompanionMessage(role:"user",content:"抱抱",stickerID:"hug");data.messages=[original]
+        let emoji="又加班🙂 👩🏽‍💻 👍🏽"
+        WebProtocol.handler={request in
+            let body=try self.body(request),tools=body["tools"] as? [[String:Any]] ?? [],messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="send_companion_sticker"})
+            XCTAssertEqual(messages.last?["content"] as? String,emoji)
+            XCTAssertTrue((messages[1]["content"] as? String ?? "").contains("安慰、关心和支持"))
+            return (200,try self.sse(["content":"这笑脸后面，听着都是加班的无奈。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:emoji,data:data,history:data.messages,client:client())
+        XCTAssertNil(result.4)
+    }
+    @MainActor func testStickerIsNotReturnedWhenFinalTextStreamFails() async throws {
+        var calls=0
+        WebProtocol.handler={_ in
+            calls+=1
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"sticker","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]]))}
+            throw URLError(.networkConnectionLost)
+        }
+        do {_=try await CompanionReplyService.answer(question:"陪我聊聊",data:CompanionData(),history:[],client:client());XCTFail("An uncompleted reply must not commit a sticker")}
+        catch {XCTAssertEqual((error as? URLError)?.code,.networkConnectionLost)}
+    }
+    @MainActor func testNamingClarificationCanUsePreviousUserEvidenceAndProseConfirmationBecomesRealProposal() async throws {
+        let history=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这是给我的名字吗？")]
+        for usesTool in [true,false] {
+            var calls=0
+            WebProtocol.handler={_ in
+                calls+=1
+                if usesTool && calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"name","function":["name":"propose_companion_name","arguments":"{\"name\":\"大肥鱼\",\"quote\":\"大肥鱼\"}"]]]]))}
+                return (200,try self.sse(["content":"确认一下，是叫我“大肥鱼”对吧？"]))
+            }
+            let result=try await CompanionReplyService.answer(question:"名字",data:CompanionData(),history:history,client:client())
+            XCTAssertEqual(result.3,"大肥鱼");XCTAssertNil(result.4)
+            var data=CompanionData();data.messages=history+[CompanionMessage(role:"user",content:"名字"),CompanionMessage(role:"assistant",content:result.0,nameProposal:result.3)]
+            XCTAssertTrue(try CompanionRules.appendUserTurn("对的",to:&data));XCTAssertEqual(data.profile.name,"大肥鱼")
+        }
+    }
     @MainActor func testEmptyMemeSearchKeepsUnverifiedStatusVisible() async throws {
         var calls=0
         WebProtocol.handler={request in
@@ -132,7 +200,7 @@ final class DeepSeekWebTests:XCTestCase {
             XCTAssertTrue(system.contains("大肥鱼"));XCTAssertTrue(system.contains("贴吧老哥"));XCTAssertTrue(system.contains("喜欢安静的地方"))
             XCTAssertFalse(system.contains("再给必要的2–4个要点"))
             let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
-            XCTAssertEqual(tools.count,2);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"web_search")
+            XCTAssertEqual(tools.count,3);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"web_search")
             return (200,try self.sse(["content":"哦，你问的是时间，我刚才听岔了。 "]))
         }
         let result=try await CompanionReplyService.answer(question:"我问为什么这么晚",data:data,history:history,client:client())
@@ -246,6 +314,7 @@ final class DeepSeekWebTests:XCTestCase {
         var document=Document(),data=CompanionData();data.profile.name="小澜"
         data.memories=[CompanionMemory(text:"喜欢公园")]
         data.profile.tone = .spicy;data.windows=[CompanionWindow(startIndex:0,summary:"用户说：周六去公园。")]
+        data.profile.stickers=false;data.messages=[CompanionMessage(role:"user",content:"🙂👩🏽‍💻"),CompanionMessage(role:"assistant",content:"抱抱",stickerID:"hug")]
         try data.write(to:&document)
         let envelope=try VaultCrypto.encrypt(document.encoded(),key:key,salt:salt)
         XCTAssertFalse(String(decoding:envelope,as:UTF8.self).contains("小澜"))

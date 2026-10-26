@@ -70,7 +70,13 @@ import Combine
         guard !busy, let message=data.messages.last, message.role == "user" else { return }
         begin(question:message.content,proactive:false,retry:true)
     }
-    private func begin(question:String, proactive:Bool, retry:Bool=false) {
+    func sendSticker(_ sticker:CompanionSticker) {
+        let question="[表情包："+sticker.title+"，"+sticker.meaning+"]"
+        guard !busy else {return}
+        guard CompanionContext.canSend(CompanionMessage(role:"user",content:question,stickerID:sticker.id).contextText,data:data) else {error="当前窗口上下文已满，请先精简并新开窗口";return}
+        touch();begin(question:question,proactive:false,stickerID:sticker.id)
+    }
+    private func begin(question:String, proactive:Bool, retry:Bool=false,stickerID:String?=nil) {
         guard unlocked, !busy else { return }
         let id=UUID(); requestID=id; busy=true; error=nil; partial=""; status=proactive ? "正在接着话题想…":"正在想…"
         request=Task { [weak self] in
@@ -83,29 +89,31 @@ import Combine
                     if proactive { state.lastProactive=Date(); state.awaitingProactiveReply=true }
                     else {
                         repliedLocally=try CompanionRules.appendUserTurn(question,to:&state)
+                        if let stickerID,let index=state.messages.lastIndex(where:{$0.role=="user"}) {state.messages[index].stickerID=stickerID}
                     }
                 }) else { return }
-                if !proactive, self.draft.trimmingCharacters(in:.whitespacesAndNewlines) == question { self.draft="" }
+                if !proactive, stickerID==nil,self.draft.trimmingCharacters(in:.whitespacesAndNewlines) == question { self.draft="" }
             }
             if repliedLocally {return}
             guard self.requestID==id, self.unlocked, !Task.isCancelled else { return }
             do {
-                let text:String,source:String,sources:[WebSource],proposal:String?
+                let text:String,source:String,sources:[WebSource],proposal:String?,sticker:String?
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture"),!CompanionRules.needsWeb(question) {
                     try await Task.sleep(nanoseconds:ProcessInfo.processInfo.arguments.contains("--ui-companion-slow-fixture") ? 3_000_000_000:300_000_000)
                     text="我在呢，接着聊。";source="界面测试夹具";sources=[];proposal=nil
+                    sticker=ProcessInfo.processInfo.arguments.contains("--ui-companion-sticker-fixture") && self.data.profile.stickers != false ? "hug":nil
                 } else {
                     guard self.store.cloudEnabled else {throw AppError.message("伙伴聊天需要云端智能，请在个人详情开启后重试")}
-                    (text,source,sources,proposal)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
+                    (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
                 }
                 #else
                 guard self.store.cloudEnabled else {throw AppError.message("伙伴聊天需要云端智能，请在个人详情开启后重试")}
-                (text,source,sources,proposal)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
+                (text,source,sources,proposal,sticker)=try await self.cloudReply(question:question,previous:previous,proactive:proactive,id:id)
                 #endif
                 try Task.checkCancellation()
                 guard self.requestID==id, self.unlocked else { return }
-                let message=CompanionMessage(role:"assistant",content:text,source:source,sources:sources,nameProposal:proposal)
+                let message=CompanionMessage(role:"assistant",content:text,source:source,sources:sources,nameProposal:proposal,stickerID:sticker)
                 _=await self.update { $0.messages.append(message) }
             } catch {
                 guard self.requestID==id,self.unlocked,!(error is CancellationError),!Task.isCancelled else{return}
@@ -113,7 +121,7 @@ import Combine
             }
         }
     }
-    private func cloudReply(question:String,previous:[CompanionMessage],proactive:Bool,id:UUID) async throws -> (String,String,[WebSource],String?) {
+    private func cloudReply(question:String,previous:[CompanionMessage],proactive:Bool,id:UUID) async throws -> (String,String,[WebSource],String?,String?) {
         try await CompanionReplyService.answer(question:question,data:data,history:previous,proactive:proactive,
             client:DeepSeekWebClient(apiKey:try AIService.credential()),onStatus:{ [weak self] value in
                 guard let self,self.requestID==id,self.unlocked else{return};self.status=value

@@ -10,6 +10,7 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     var tone: CompanionTone? = nil
     var gentleUntil: Date? = nil
     var nameRecoveryChecked: Bool? = nil
+    var stickers: Bool? = nil
     var title: String { name ?? "伙伴" }
     func effectiveTone(at now:Date = Date()) -> CompanionTone {
         if let gentleUntil, gentleUntil > now {return .gentle}
@@ -38,6 +39,7 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
     var renamedFrom: String? = nil
     var renamedTo: String? = nil
     var nameProposal: String? = nil
+    var stickerID: String? = nil
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
@@ -66,7 +68,7 @@ struct CompanionData: Codable, Equatable, Sendable {
               Set(memories.map(\.id)).count == memories.count,
               Set(messages.map(\.id)).count == messages.count,
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),
-              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
+              messages.allSatisfy({ ["user", "assistant"].contains($0.role) && !$0.content.isEmpty && $0.content.count <= 12000 && $0.sources.count <= 10 && ($0.stickerID == nil || CompanionSticker.find($0.stickerID) != nil) && ($0.nameProposal == nil || ($0.role=="assistant" && CompanionRules.cleanName($0.nameProposal!)==$0.nameProposal)) && ($0.rememberedText?.count ?? 0)<=300 && ($0.replacedMemories?.count ?? 0)<=8 && ($0.replacedMemories ?? []).allSatisfy({ !$0.text.isEmpty && $0.text.count<=300 && $0.quote.count<=1200 && ["preference","topic"].contains($0.kind) }) })
         else { throw AppError.message("伙伴资料内容无效或容量已满，请先导出备份并清理不需要的聊天或记忆") }
     }
 }
