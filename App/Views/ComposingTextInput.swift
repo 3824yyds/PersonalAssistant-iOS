@@ -7,16 +7,18 @@ struct ComposingTextInput:UIViewRepresentable {
     @Binding var isFocused:Bool
     var placeholder:String
     var concealed=false
+    var accessibilityID="chat.input"
     func makeCoordinator()->Coordinator {Coordinator(self)}
     func makeUIView(context:Context)->ComposerTextView {
         let view=ComposerTextView(frame:.zero,textContainer:nil);view.delegate=context.coordinator;view.backgroundColor = .clear
         view.font = .systemFont(ofSize:15);view.textColor = .label;view.tintColor=UIColor(Theme.accent)
         view.textContainerInset=UIEdgeInsets(top:11,left:0,bottom:11,right:0);view.textContainer.lineFragmentPadding=0
-        view.setContentCompressionResistancePriority(.defaultLow,for:.horizontal);view.accessibilityIdentifier="chat.input"
+        view.setContentCompressionResistancePriority(.defaultLow,for:.horizontal);view.accessibilityIdentifier=accessibilityID
         return view
     }
     func updateUIView(_ view:ComposerTextView,context:Context) {
         context.coordinator.parent=self;synchronize(view)
+        view.accessibilityIdentifier=accessibilityID
         view.accessibilityLabel=placeholder
         view.textColor=concealed ? .clear:.label;view.tintColor=concealed ? .clear:UIColor(Theme.accent)
         view.placeholder.text=placeholder;view.placeholder.isHidden = concealed || !view.text.isEmpty

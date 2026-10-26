@@ -108,6 +108,7 @@ public struct Document: Codable, Equatable, Sendable {
             guard let expense = expenses[id], refunds.allSatisfy({ $0.text("currency") == expense.text("currency") }), refunds.reduce(Int64(0), { $0 + $1.int("cents") }) <= expense.int("cents") else { throw AppError.message("退款缺少原支出或累计退款超过原金额") }
         }
         try Validation.extra(self)
+        if root.raw["companionResearch"] != nil {try CompanionData.read(self).validate()}
         return self
     }
 }

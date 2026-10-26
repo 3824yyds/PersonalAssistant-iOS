@@ -1,49 +1,42 @@
-# PersonalAssistant-iOS · Build 9 交接
+# PersonalAssistant-iOS · Build 10 交接
 
-2026-10-25 UTC。最新交付为 **3.5.1（Build 9）**。历史交接保存在 Docs/HANDOFF_BUILD8.md 和 Docs/HANDOFF_BUILD6.md。
+2026-10-26。最新交付为 **3.5.1（Build 10）**，从助理输入区＋进入独立纯文字伙伴页。
 
-## 当前交付事实
+## 交付事实
 
-- 分支 codex/fullscreen-notes-model-slider；PR #1：https://github.com/3824yyds/PersonalAssistant-iOS/pull/1 。应用修改仍在该分支，main 尚未合并。
-- 最终应用构建提交：2fb3ff5221a180cebb277cfba060aad3c5a8dcad。之后的文档/测试流程提交不更新 IPA。
-- 最终设备打包：https://github.com/3824yyds/PersonalAssistant-iOS/actions/runs/40184774721
-- artifact：https://github.com/3824yyds/PersonalAssistant-iOS/actions/runs/40184774721/artifacts/12596290415
-- IPA：/workspace/deliverables/build9-device/PersonalAssistant-iOS-3.5.1-build9-unsigned.ipa；80,601,885 字节。
-- SHA-256：296ee0068cea873b0ee4f896a59ac8d792cce264ab8f0dcc94128d02ab7a4979
-- 安装 ZIP：/workspace/deliverables/PersonalAssistant-iOS-3.5.1-build9-Install.zip
-- 当前清单：/workspace/deliverables/build9-delivery-manifest.json
-- 最低 iOS 17，SDK iphoneos26.2，未签名 iPhone arm64，Bundle ID cn.local.assistant.ios。沿用原签名方式覆盖安装；没有证明新版本在用户手机已安装成功。
-- 40182602239 是缺少后续口语提示的中间 Build 9，不作为最终交付。
+- 应用构建提交：305c01a30f43c0e14b7ce4ba21d59825b8370dbb；分支codex/companion-build10。后续文档提交不改变安装包。
+- Release：https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build10
+- IPA：https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build10/PersonalAssistant-iOS-3.5.1-build10-unsigned.ipa
+- 本地：/workspace/deliverables/build10-device/PersonalAssistant-iOS-3.5.1-build10-unsigned.ipa
+- 大小：1045859475字节；SHA256：3077868ca0a4e29e3d79a0375c9b83282726be2584e65520ea5a30a0c109d1e5。
+- 设备构建与发布：https://github.com/3824yyds/PersonalAssistant-iOS/actions/runs/40282236178
+- 核心及iOS检查：https://github.com/3824yyds/PersonalAssistant-iOS/actions/runs/40281913473
+- 交付清单：/workspace/deliverables/build10-delivery-manifest.json。
+- 未签名iPhone arm64，最低iOS17，SDK iphoneos26.2；Bundle ID仍cn.local.assistant.ios。沿用原签名身份覆盖安装，不卸载、不清库、不改Keychain服务。
+- PR2草稿：https://github.com/3824yyds/PersonalAssistant-iOS/pull/2，基于原Build9分支供单独审阅；main尚未合并。
 
-## 本轮用户问题、决定与完成内容
+## 已交付功能
 
-用户在 Build 8 说话后，识别文字“你好呀”已出现，但一直停留“正在听”。用户随后确认手动点球能进入思考并听到回复，说明这次主要卡点在自动结束/发送。旧逻辑每次环境音量超过0.16都会刷新活动时间，底噪可使自动发送持续推迟；旧模拟整句夹具绕过这一步，没有覆盖到它。
+- 指定蓝发女性角色头像；热情、简短口语表达的人物指令；可查看和编辑外貌服装、名字与性格资料。
+- 明确聊天取名先保存，再即时更新标题及输入提示，支持撤销，退出后重进仍保留。
+- 偏好和明确“记住：…”保存到既有加密Document，支持查看、编辑、删除。明确记忆回问读实际事实和对话，防止225小模型混淆主体或编造回忆。
+- 普通聊天使用冻结225步模型；前台主动接话尊重可见性、编辑、草稿、弹窗、忙碌状态和冷却，忽略后不连发。
+- 需要当前公开信息时复用DeepSeek Flash搜索，保留伙伴身份、短句表达、实际来源，提供取消和失败重试；不上传全部记忆、历史、账本或笔记。
+- 伙伴语音暂缓、后台主动取消；普通助理既有语音与Flash/Pro选择器保留。
+- 统一native串行队列和全局取消ID，原本机模型不覆盖。IPA内置完整225步GGUF，无需导入。
 
-Build 9 新增 VoiceTurnDetector：实质识别文字变化刷新文本时钟，重复文字/空白/标点不延长；安静停顿可提前结束，文本稳定2.2秒后不受持续底噪阻止。界面增加识别确认、语音准备状态及“发送这句话”；识别收尾有兜底，合成8秒没启动回调显示错误。现有手动点球发送/打断保留。
+## 验证及限制
 
-用户另要求像正常口语交流，简洁、直接、少输出大段。AIService.reply 增加仅全屏语音 spoken 请求启用的 voiceConversation 提示：默认1至3短句、通常20至80字，先回答、一次一个澄清问题；用户明确要求详解时展开，金额/币种/日期/实际保存回执完整保留。普通文字聊天和笔记 AI 不受该语音提示影响。没有通过硬截断回答来实现简短，也没有声称真实模型每次都满足字数。
+- 134项核心测试通过；iOS26的14项单元/输入法/加密/模拟联网工具检查及3项伙伴页面操作通过。
+- 设备Release编译与IPA检查通过：arm64设备平台、版本/构建号、SDK、CRC、无FairPlay、无模拟回复开关、完整模型大小与SHA256。本地下载IPA的整体SHA再核对一致。
+- 未以用户真实API Key执行付费联网请求；未做用户iPhone真机安装、性能或全部聊天质量验证。不要把定向检查称作完整UI验收。
+- 225权重未续训；CPU实际自由生成的记忆回问曾不可靠，故明确回问由事实层处理。开放式聊天质量仍受当前模型能力限制。
+- 初次UI检查40279833414因容器标识覆盖子控件而失败，修正后以上最终检查通过；初次设备包40280384380不作为交付。
 
-原有全屏笔记、输入区 Flash/Pro 滑动选择器、展开名称无 >、文字键盘保留和语音长按层条件移除均保留。不要把语音 Text 改回只设透明；modelMenu 展开时直接移除该 Text/背景/手势，以42pt透明占位。UIKit 文字输入仍常驻，通过 concealed 隐藏文字/光标，保护中文输入法焦点。
+## 模型与发布范围
 
-## 音色服务尚待用户选择
+用户已明确取消仅内部研究/必须私有仓库限制，授权沿用原公共仓库流程。不要再次要求私有仓库；原始语料、私有Drive备份和API密钥仍不上传。
 
-用户想要更像人声、可选男声/女声与调语速，最新决定是“先比较试听效果和费用再决定”。已整理官方试听和费用，见 Docs/VOICE_OPTIONS.md；未接入新的付费 TTS，没有创建付费资源或调用付费语音 API。男女声选择和扩展调速待方案选定后实现；现有系统朗读及三档语速仍可用。不要声称新音色已实现，也不要未经用户决定擅自接入付费服务。
+模型986048064字节，SHA256 07fcb0fdd9a9e116f3ddb0926a5f9059fc8f9e3369f6455b80397cab562c4f4f。12卷位于独立companion-model-225分支，固定提交4fa8c13439839c8a5b158626486f6ce1d2942f39；下载脚本逐卷及整体核验组装。原始云盘225/200未改。GitHub Release上传域认证受限已通过正常Git传输分卷解决；最终IPA由GitHub Actions原生token发布，公共Release下载成功。
 
-比较建议：保留 DeepSeek Flash/Pro 负责回答，另接专门TTS负责发声。Azure 标准神经音色 East US 约$15/百万字符；HD约$22，但HD官方不支持SSML prosody，语速需客户端处理。ElevenLabs当前v4约$0.08/千字符，Turbo约$0.04/千字符。OpenAI mini TTS输入文本$0.60/百万token、音频输出$12/百万token，不能直接按字数混算。官方试听链接与定价来源都在报告里，价格按2026-10-25核对。
-
-## 验证记录（不能混同）
-
-- 40182519825：应用源码 d1b8cd5；8项 VoiceTurnDetector 核心测试通过，包括持续高底噪、正常讲话进展、标点/重复、空文本、金额修订等。
-- 同次 iOS：识别最终结果兜底及取消两项通过，三个界面场景通过。新的模拟发言只注入中间识别文字和持续0.95噪声，必须经过生产的停顿计时再发送和获取本地回复，不再直接跳过自动结束。
-- 该次整体 failure：PCM 检查错误地把每个零帧回调当结束，多次 fulfill 导致测试工具崩溃。不能把该运行标成整体success。
-- 40184169700：b23c863 仅改测试和工作流；PCM 检查按实际非静音数据只报告一次，通过。实际2700帧，峰值0.4562378。核心8项也再次通过，不重复计数。
-- 合计14个不同相关检查分别通过：核心8、识别收尾2、界面3、PCM1。不是完整UI验证，complete_UI_validation_verified=false。
-- 最终2fb3ff5在此前功能代码上增加语音专用口语提示，并设备Release编译通过；没有用用户真实DeepSeek Key做付费模型风格测试。模型表达风格需在实际使用中观察。
-- 新Build9尚未做用户设备真实麦克风/扬声器/蓝牙测试；用户确认的是旧Build8的手动发送能听到回复。模拟器产出PCM不等于真机音质验证。
-- 发布IPA已检查CRC、版本/构建号、arm64设备平台、无FairPlay、隐私说明/manifest与许可，并确认不包含模拟发言按钮和测试开关。
-
-## 工作方式与后续
-
-Linux本机没有Xcode；设备编译与实际模拟器测试经GitHub Actions。模拟器启动曾慢，启动失败与产品测试失败要分开记录。焦点持续iOS26，不擅自恢复用户取消的旧长测试或iOS18任务。
-
-后续先git status/log和交付清单。新应用改动再次交付递增构建号（当前9）。保留用户资料，不能擅自卸载、清空、变更Bundle ID、Keychain服务名、加密格式或迁移数据。没有后台跨窗口自动监控承诺；在当前工作期间跟进必要构建并交付产物。
+当前Build10已经交付，下一轮应用修改需递增Build11。Linux无Xcode，继续用已注册GitHub Actions；不恢复旧的已取消全面UI审计。历史Build9交接在Docs/HANDOFF_BUILD9.md。

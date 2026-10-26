@@ -24,6 +24,7 @@ struct ConversationView:View {
     @State var history=false
     @State var modelMenu=false
     @State private var voiceCall=false
+    @State private var companion=false
     @State var follow=true
     @State var viewport:CGFloat=0
     @State private var photoPicker=false
@@ -37,7 +38,7 @@ struct ConversationView:View {
     @AppStorage("chat.lastFinanceGreeting") private var lastFinanceGreeting=""
     @State var focused=false
     @State private var composerVisible=false
-    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !voiceCall}
+    private var composerAvailable:Bool {composerVisible && sheet == nil && !history && !preferences && openedItem == nil && !photoPicker && !voiceCall && !companion}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -88,6 +89,7 @@ struct ConversationView:View {
             .onChange(of:scenePhase) {_,phase in if phase != .active {cancelVoice()}}
             .onChange(of:store.financeMode) {_,_ in refreshGreeting()}
             .fullScreenCover(isPresented:$voiceCall) {VoiceCallView(onSend:{send(spoken:$0)}).environmentObject(store)}
+            .fullScreenCover(isPresented:$companion) {NavigationStack {CompanionView(store:store)}.environmentObject(store)}
             .sheet(isPresented:$preferences) {NavigationStack {ChatPreferencesView()}.environmentObject(store)}
             .fullScreenCover(item:Binding(get:{openedItem?.kind == .note ? openedItem:nil},set:{openedItem=$0})) {receipt in
                 NavigationStack {createdDestination(receipt)}.appErrorScope().environmentObject(store)
@@ -148,6 +150,7 @@ struct ConversationView:View {
                     Toggle(isOn:$webSearch) {Label("联网搜索",systemImage:"globe")}.accessibilityIdentifier("chat.webSearch")
                 } footer:{Text("按需查询最新信息，搜索与抓取分别为 5 元／千次成功请求。")}
                 Section("对话") {
+                    Button("伙伴模式",systemImage:"person.crop.circle") {dismissComposer();cancelVoice();modelMenu=false;companion=true}.accessibilityIdentifier("chat.menu.companion")
                     Button("语音通话",systemImage:"waveform") {openVoiceCall()}.accessibilityIdentifier("chat.menu.voiceCall")
                     Button("回复风格",systemImage:"slider.horizontal.3") {dismissComposer();preferences=true}.accessibilityIdentifier("chat.menu.preferences")
                     Button("新对话",systemImage:"square.and.pencil") {dismissComposer();Task {await store.newChat()}}.accessibilityIdentifier("chat.menu.new")
