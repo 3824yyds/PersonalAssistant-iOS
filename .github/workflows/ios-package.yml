@@ -14,6 +14,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select iOS 26 toolchain
         run: python3 Scripts/select-xcode.py
+      - name: Download frozen companion model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download companion-model-225 --repo "$GITHUB_REPOSITORY" --pattern CompanionModel.gguf --dir App/Resources
+          python3 Scripts/verify_companion_model.py
       - id: toolchain
         run: echo "sdk=$(xcrun --sdk iphoneos --show-sdk-build-version)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
@@ -28,10 +34,17 @@ jobs:
         run: bash Scripts/build-ipa.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: PersonalAssistant-iOS-3.5.1-build9-unsigned
+          name: PersonalAssistant-iOS-3.5.1-build10-unsigned
+          compression-level: 0
           path: |
             build/*.ipa
             build/*.verification.json
             build/SHA256SUMS.txt
             build/device-build.log
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: companion-device-build-log
+          path: build/device-build.log
+          retention-days: 7
