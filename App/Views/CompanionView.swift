@@ -253,7 +253,7 @@ struct CompanionView: View {
             RoundedRectangle(cornerRadius:1).fill(Theme.accent.opacity(0.5)).frame(width:3)
             Text((quote.role=="assistant" ? session.title:"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
             if cancellable {Button {session.replyTo=nil;session.touch()} label:{Image(systemName:"xmark.circle.fill")}.accessibilityLabel("取消引用回复").accessibilityIdentifier("companion.reply.cancel")}
-        }.fixedSize(horizontal:false,vertical:true).padding(8).background(Theme.panel(scheme).opacity(0.8),in:RoundedRectangle(cornerRadius:10))
+        }.fixedSize(horizontal:false,vertical:true).padding(8).background(Theme.panel(scheme).opacity(0.8),in:RoundedRectangle(cornerRadius:10)).accessibilityElement(children:.contain)
     }
     private var sendWithContextRing:some View {
         let count=CompanionContext.count(session.data)

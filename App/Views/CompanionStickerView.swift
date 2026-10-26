@@ -58,7 +58,7 @@ struct CompanionStickerDock:View {
                 }.padding(.horizontal,14).padding(.vertical,12)
                 if mine && items.isEmpty {Text("点击右上角＋，把照片添加为表情包。").font(.footnote).foregroundStyle(.secondary).padding(20)}
             }.frame(height:242)
-        }.background(Theme.panel(scheme).opacity(0.85)).accessibilityIdentifier("companion.sticker.dock")
+        }.background(Theme.panel(scheme).opacity(0.85)).accessibilityElement(children:.contain).accessibilityIdentifier("companion.sticker.dock")
             .sheet(item:$imported) {item in NavigationStack {CompanionStickerEditor(session:session,image:item.image) {mine=true}}}
             .onChange(of:photo) {_,value in load(value)}
             .onDisappear {photoTask?.cancel();loading=false}
