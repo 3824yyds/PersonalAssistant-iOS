@@ -45,8 +45,9 @@ import Combine
     }
     func open() async {
         visible = true; touch()
-        guard data.messages.isEmpty else { return }
+        guard data.messages.isEmpty || data.profile.nameRecoveryChecked != true else { return }
         await update {
+            CompanionRules.recoverLegacyName(in:&$0)
             guard $0.messages.isEmpty else { return }
             $0.messages.append(CompanionMessage(role:"assistant",content:$0.profile.name == nil ? "你来啦，今天过得怎么样？也可以先给我取个名字呀。":"我在呢，今天想聊点什么？",source:"伙伴问候"))
             $0.awaitingProactiveReply = true; $0.lastProactive = Date()

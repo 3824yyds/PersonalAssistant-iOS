@@ -20,6 +20,23 @@ enum CompanionToneChange:Equatable {
 }
 
 extension CompanionRules {
+    /// One-time repair of missed Build 10 naming instructions, never of model-invented names.
+    @discardableResult static func recoverLegacyName(in state:inout CompanionData)->Bool {
+        guard state.profile.nameRecoveryChecked != true else {return false}
+        state.profile.nameRecoveryChecked=true
+        guard state.profile.name==nil,
+              !state.messages.contains(where:{$0.renamedTo != nil || $0.renamedFrom != nil || ($0.source=="伙伴资料" && $0.content.hasPrefix("好呀，那我就叫"))}) else {return false}
+        for message in state.messages.reversed() where message.role=="user" {
+            if message.content.range(of:"别叫|不叫|不要这个名字|名字不要|名字不是|取消取名|撤销名字",options:.regularExpression) != nil {return false}
+            guard let name=proposedName(message.content) else {continue}
+            state.profile.name=name
+            if state.messages.count<1000 {
+                state.messages.append(CompanionMessage(role:"assistant",content:"你之前给我取的名字是\(name)，已经补存到资料里啦。",source:"伙伴资料",renamedFrom:"",renamedTo:name))
+            }
+            return true
+        }
+        return false
+    }
     static func proposedTone(_ input:String)->CompanionToneChange? {
         let q=input.trimmingCharacters(in:.whitespacesAndNewlines).trimmingCharacters(in:CharacterSet(charactersIn:"。！!"))
         switch q {

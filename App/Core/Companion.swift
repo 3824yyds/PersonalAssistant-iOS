@@ -9,6 +9,7 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     // Optional fields keep Build 10 encrypted backups readable without rewriting them.
     var tone: CompanionTone? = nil
     var gentleUntil: Date? = nil
+    var nameRecoveryChecked: Bool? = nil
     var title: String { name ?? "伙伴" }
     func effectiveTone(at now:Date = Date()) -> CompanionTone {
         if let gentleUntil, gentleUntil > now {return .gentle}

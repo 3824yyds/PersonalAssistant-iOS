@@ -57,6 +57,16 @@ enum DebugFixtures {
                  Item(["id":.string(String(format:"00000000-0000-0000-0000-%012d",3000+index)),"kind":.string("expense"),"title":.string("账目 \(index+1)"),"cents":.int(100),"currency":.string("CNY"),"account":.string(account),"category":.string("其他"),"date":.int(now-Int64(index)*3600000)])]
             }
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-legacy-name-fixture") {
+            var state=CompanionData()
+            state.messages=[CompanionMessage(role:"user",content:"你的名字是大肥鱼"),CompanionMessage(role:"assistant",content:"那我叫阿肥。",source:"本机伙伴")]
+            try? state.write(to:&d)
+        }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-name-proposal-fixture") {
+            var state=CompanionData()
+            state.messages=[CompanionMessage(role:"user",content:"想好啦，以后你就用小鱼这个名字"),CompanionMessage(role:"assistant",content:"你想叫我小鱼吗？确认后我就用这个名字。",source:"名字待确认",nameProposal:"小鱼")]
+            try? state.write(to:&d)
+        }
         return d
     }
     @MainActor static func actionReply(_ question:String,tools:[[String:Any]],handler:ChatToolHandler?) async throws -> (String,String)? {

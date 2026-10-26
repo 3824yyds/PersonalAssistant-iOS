@@ -214,4 +214,22 @@ final class CompanionConversationTests:XCTestCase {
         _=try CompanionRules.appendUserTurn("记住：我喜欢咖啡",to:&data)
         XCTAssertTrue(CompanionRules.recallReply("我喜欢什么？",data:data,history:[])!.contains("喜欢咖啡"))
     }
+    func testUpgradeRecoversMissedExplicitUserNameButNeverTheModelsInventedName() throws {
+        var data=CompanionData()
+        data.messages=[CompanionMessage(role:"user",content:"我说给你取名大肥鱼"),CompanionMessage(role:"assistant",content:"哈哈，那我叫阿肥。",source:"本机伙伴"),CompanionMessage(role:"user",content:"你的名字是大肥鱼"),CompanionMessage(role:"assistant",content:"我叫阿七。",source:"本机伙伴")]
+        XCTAssertTrue(CompanionRules.recoverLegacyName(in:&data));XCTAssertEqual(data.profile.name,"大肥鱼")
+        XCTAssertTrue(data.messages.last!.content.contains("补存"))
+        data.profile.name=nil
+        XCTAssertFalse(CompanionRules.recoverLegacyName(in:&data));XCTAssertNil(data.profile.name)
+        data=CompanionData();data.messages=[CompanionMessage(role:"assistant",content:"我叫阿肥。",source:"本机伙伴")]
+        XCTAssertFalse(CompanionRules.recoverLegacyName(in:&data));XCTAssertNil(data.profile.name)
+    }
+    func testUpgradeDoesNotOverrideSavedNamesOrUndoAndCancellationEvidence() {
+        var data=CompanionData();data.profile.name="现有名字";data.messages=[CompanionMessage(role:"user",content:"以后叫你旧名字吧")]
+        XCTAssertFalse(CompanionRules.recoverLegacyName(in:&data));XCTAssertEqual(data.profile.name,"现有名字")
+        for last in [CompanionMessage(role:"assistant",content:"好呀，那我就叫旧名字啦！",source:"伙伴资料"),CompanionMessage(role:"user",content:"不要这个名字了")] {
+            data=CompanionData();data.messages=[CompanionMessage(role:"user",content:"以后叫你旧名字吧"),last]
+            XCTAssertFalse(CompanionRules.recoverLegacyName(in:&data));XCTAssertNil(data.profile.name)
+        }
+    }
 }

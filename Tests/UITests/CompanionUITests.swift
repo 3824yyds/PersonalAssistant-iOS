@@ -86,4 +86,20 @@ final class CompanionUITests:XCTestCase {
         XCTAssertFalse(app.staticTexts["你好！今天想聊点什么？"].exists)
         recordScreen(app,"CompanionCloudFailureRemainsRetryable")
     }
+    func testUpgradeRepairsMissedNameFromOldUserMessagesAndPreservesItAfterReopening() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-legacy-name-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.staticTexts["名字已更新为「大肥鱼」"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼");recordScreen(app,"CompanionRecoveredLegacyName")
+    }
+    func testNameProposalOnlyChangesHeaderAfterExplicitConfirmation() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-name-proposal-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.buttons["companion.name.confirm"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"伙伴")
+        app.buttons["companion.name.confirm"].tap()
+        XCTAssertTrue(app.staticTexts["名字已更新为「小鱼」"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"小鱼");XCTAssertFalse(app.buttons["companion.name.confirm"].exists)
+        recordScreen(app,"CompanionConfirmedSemanticNameProposal")
+    }
 }
