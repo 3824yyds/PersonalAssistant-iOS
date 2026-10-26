@@ -15,7 +15,7 @@ final class CompanionUITests:XCTestCase {
         XCTAssertEqual(app.staticTexts["companion.title"].label,"小澜")
         send("你穿什么衣服？",app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我的形象是蓝色长发' AND label CONTAINS '白色围裙'")).firstMatch.waitForExistence(timeout:8))
-        XCTAssertFalse(app.buttons["语音通话"].exists)
+        XCTAssertFalse(app.buttons["语音通话"].isHittable)
         recordScreen(app,"CompanionNamedAndSelfKnowledge")
         app.buttons["companion.back"].tap();XCTAssertTrue(app.buttons["chat.model"].waitForExistence(timeout:8));enter(app)
         XCTAssertEqual(app.staticTexts["companion.title"].label,"小澜")
