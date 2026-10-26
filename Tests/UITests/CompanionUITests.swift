@@ -1,6 +1,69 @@
 import XCTest
 
 final class CompanionUITests:XCTestCase {
+    func testRealDeliveryPipelineRendersImagesInsteadOfMetadataAndAllowsExplicitRepeat() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-delivery-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertFalse(app.staticTexts["Flash · 文字伙伴"].exists)
+        app.buttons["companion.stickers"].tap();app.buttons["companion.sticker.send.hug"].tap()
+        XCTAssertTrue(app.staticTexts["来，抱一下。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.images.matching(identifier:"companion.sticker.image.hug").count,2)
+        app.buttons["companion.stickers"].tap();send("用表情包呀",app)
+        XCTAssertTrue(app.staticTexts["好，这次也用抱抱图。"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '[表情包：'")).firstMatch.exists)
+        recordScreen(app,"CompanionActualStickerDeliveryWithoutMetadata")
+        app.buttons["companion.back"].tap();enter(app)
+        XCTAssertTrue(app.staticTexts["好，这次也用抱抱图。"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.images.matching(identifier:"companion.sticker.image.hug").firstMatch.exists)
+    }
+    func testMalePrivateIdentityAndNameAreIndependentFromFemale() {
+        let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);openHub(app)
+        app.buttons["companion.hub.male"].tap();XCTAssertTrue(app.buttons["companion.back"].waitForExistence(timeout:8))
+        send("你的名字是阿川",app);XCTAssertTrue(app.staticTexts["名字已更新为「阿川」"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts["companion.title"].label,"阿川")
+        send("你是女生吗",app);XCTAssertTrue(app.staticTexts["我是男生。"].waitForExistence(timeout:5))
+        app.buttons["companion.profile"].tap();XCTAssertTrue(app.navigationBars["他的资料"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["男性"].exists);recordScreen(app,"CompanionMaleProfile")
+        app.buttons["完成"].tap();app.buttons["companion.back"].tap();enter(app)
+        XCTAssertEqual(app.staticTexts["companion.title"].label,"伙伴")
+        app.buttons["companion.back"].tap();app.buttons["companion.hub.male"].tap();XCTAssertEqual(app.staticTexts["companion.title"].label,"阿川")
+    }
+    func testGroupCreationBothSpeakersAndMentionedOnlyReplyPersist() {
+        let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);createGroup(app)
+        send("大家一起聊聊",app)
+        XCTAssertTrue(app.staticTexts["我也在，今天想一起聊点什么？"].waitForExistence(timeout:8));XCTAssertTrue(app.staticTexts["先挑一件最想聊的，我听着。"].waitForExistence(timeout:8))
+        app.buttons["companion.group.target"].tap();app.buttons["@男生伙伴"].tap();send("只让你回答",app)
+        XCTAssertTrue(app.staticTexts["这轮我单独接话。"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1)
+        recordScreen(app,"CompanionGroupWithDistinctSpeakersAndMention")
+        app.buttons["companion.back"].tap();app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.hub.group.'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["这轮我单独接话。"].waitForExistence(timeout:5))
+    }
+    func testGroupCancellationRetriesOnlyMissingMember() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-group-slow-fixture"]);tapProductTab("助理",in:app);createGroup(app)
+        send("一起讨论周末",app);XCTAssertTrue(app.staticTexts["我也在，今天想一起聊点什么？"].waitForExistence(timeout:8))
+        app.buttons["companion.send"].tap();XCTAssertTrue(app.buttons["重试这句话"].waitForExistence(timeout:5));app.buttons["重试这句话"].tap()
+        XCTAssertTrue(app.staticTexts["先挑一件最想聊的，我听着。"].waitForExistence(timeout:12))
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1);XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == %@","一起讨论周末")).count,1)
+        recordScreen(app,"CompanionGroupRetryOnlyMissingMember")
+    }
+    func testDeviceClockReplyWorksWithoutCloudAndDoesNotGuessACity() {
+        let app=launchProduct();tapProductTab("助理",in:app);enter(app);send("现在几点了",app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label BEGINSWITH '现在是'")).firstMatch.waitForExistence(timeout:8))
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS 'UTC是' OR label CONTAINS '长沙那边'")).firstMatch.exists)
+        recordScreen(app,"CompanionLocalDeviceClock")
+    }
+    func testLearnedHabitCanBeReviewedAndRemovedInItsOwnPrivateChat() {
+        let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);enter(app);send("以后和我聊天少用反问",app)
+        XCTAssertTrue(app.staticTexts["我在呢，接着聊。"].waitForExistence(timeout:8));app.buttons["companion.profile"].tap();app.buttons["相处习惯"].tap()
+        let habit=app.staticTexts["少用反问收尾，有内容再提问。"]
+        XCTAssertTrue(habit.waitForExistence(timeout:5));recordScreen(app,"CompanionLearnedHabitWithUserEvidence")
+        app.buttons["删除"].firstMatch.tap();let removed=expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:habit);wait(for:[removed],timeout:8)
+    }
+    private func openHub(_ app:XCUIApplication) {
+        if app.buttons["companion.hub.female"].isHittable {return}
+        app.buttons["聊天功能"].tap();app.buttons["chat.menu.companion"].tap();XCTAssertTrue(app.buttons["companion.hub.female"].waitForExistence(timeout:8))
+    }
+    private func createGroup(_ app:XCUIApplication) {
+        openHub(app);app.buttons["companion.group.create"].tap();XCTAssertTrue(app.buttons["companion.group.confirm"].waitForExistence(timeout:5));app.buttons["companion.group.confirm"].tap()
+        XCTAssertTrue(app.buttons["companion.back"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts["companion.title"].label,"伙伴群聊")
+    }
     func testPlainTextNameConfirmationFromScreenshotUpdatesHeaderAndPersists() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-plain-name-fixture"]);tapProductTab("助理",in:app);enter(app)
         send("对的",app)
@@ -86,7 +149,7 @@ final class CompanionUITests:XCTestCase {
         recordScreen(app,"CompanionEmojiAndStickerPreference")
     }
     private func enter(_ app:XCUIApplication) {
-        app.buttons["聊天功能"].tap();app.buttons["chat.menu.companion"].tap()
+        openHub(app);app.buttons["companion.hub.female"].tap()
         XCTAssertTrue(app.buttons["companion.back"].waitForExistence(timeout:8))
     }
     private func send(_ text:String,_ app:XCUIApplication) {
@@ -101,7 +164,7 @@ final class CompanionUITests:XCTestCase {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '我的形象是蓝色长发' AND label CONTAINS '白色围裙'")).firstMatch.waitForExistence(timeout:8))
         XCTAssertFalse(app.buttons["语音通话"].isHittable)
         recordScreen(app,"CompanionNamedAndSelfKnowledge")
-        app.buttons["companion.back"].tap();XCTAssertTrue(app.buttons["chat.model"].waitForExistence(timeout:8));enter(app)
+        app.buttons["companion.back"].tap();app.buttons["companion.hub.back"].tap();XCTAssertTrue(app.buttons["chat.model"].waitForExistence(timeout:8));enter(app)
         XCTAssertEqual(app.staticTexts["companion.title"].label,"小澜")
         app.buttons["companion.profile"].tap();XCTAssertTrue(app.navigationBars["她的资料"].waitForExistence(timeout:5));XCTAssertTrue(app.staticTexts["女性"].exists)
         recordScreen(app,"CompanionProfileFemaleAndAppearance")

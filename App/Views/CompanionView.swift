@@ -8,6 +8,7 @@ struct CompanionAvatar: View {
     var expression:String?=nil
     var animated=false
     var busy=false
+    var persona:CompanionPersona = .female
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var phase
     var body:some View {
@@ -25,7 +26,7 @@ struct CompanionAvatar: View {
             Group {
                 if let expression,CompanionSticker.find(expression) != nil {
                     Image("CompanionSticker_"+expression).resizable().scaledToFill().scaleEffect(1.6).offset(y:size*0.18)
-                } else {Image("CompanionAvatar").resizable().scaledToFill()}
+                } else {Image(persona.avatar).resizable().scaledToFill()}
             }.frame(width:size,height:size).background(Theme.accent.opacity(0.08)).clipShape(Circle())
                 .overlay {Circle().strokeBorder(.white.opacity(0.85),lineWidth:1)}
             if busy {Text("···").font(.system(size:size*0.27,weight:.bold)).foregroundStyle(Theme.accent).padding(.horizontal,3).background(.white,in:Capsule()).offset(x:2,y:2).accessibilityHidden(true)}
@@ -47,10 +48,10 @@ struct CompanionView: View {
     @State private var stickersExpanded=false
     private var avatarExpression:String? {
         guard let id=CompanionContext.current(session.data).last(where:{$0.role=="assistant"})?.stickerID else {return nil}
-        if ["happy","hug","confused","speechless","smug","goodnight"].contains(id) {return id}
+        if ["happy","hug","confused","speechless","smug","goodnight"].contains(id) || id.hasPrefix("male_") {return id}
         return ["meme_laugh":"happy","meme_melon":"smug","meme_cracked":"confused","meme_justthis":"smug"][id]
     }
-    init(store:AppStore) {_store=ObservedObject(wrappedValue:store);_session=StateObject(wrappedValue:CompanionSession(store:store))}
+    init(store:AppStore,space:CompanionSpace = .direct(.female)) {_store=ObservedObject(wrappedValue:store);_session=StateObject(wrappedValue:CompanionSession(store:store,space:space))}
     var body:some View {
         VStack(spacing:0) {
             header
@@ -65,12 +66,12 @@ struct CompanionView: View {
                 VStack(alignment:.leading,spacing:6) {
                     Text(error).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("companion.error.message")
                     HStack {
-                        if CompanionContext.current(session.data).last?.role=="user" {Button("重试这句话") {session.error=nil;session.retryLast()}}
+                        if session.canRetry {Button("重试这句话") {session.error=nil;session.retryLast()}}
                         Spacer();Button("收起") {session.error=nil}
                     }.font(.footnote)
                 }.padding(12).background(Theme.panel(scheme),in:RoundedRectangle(cornerRadius:14)).padding(.horizontal,14).padding(.bottom,8)
             }
-            if !session.busy,session.error==nil,CompanionContext.current(session.data).last?.role=="user" {
+            if !session.busy,session.error==nil,session.canRetry {
                 HStack {Text("这句话还没有回复").foregroundStyle(.secondary);Spacer();Button("重试这句话") {session.retryLast()}}
                     .font(.footnote).padding(.horizontal,18).padding(.bottom,8)
             }
@@ -97,10 +98,10 @@ struct CompanionView: View {
             .sheet(item:$panel,onDismiss:{session.compression=nil}) {value in
                 NavigationStack {
                     switch value {
-                    case .profile:CompanionProfileView(session:session)
+                    case .profile:if session.isGroup {CompanionGroupInfoView(session:session)} else {CompanionProfileView(session:session)}
                     case .memory:CompanionMemoryView(session:session)
                     case .compression:CompanionCompressionView(session:session)
-                    case .history:CompanionWindowHistoryView(data:session.data)
+                    case .history:CompanionWindowHistoryView(data:session.data,names:Dictionary(uniqueKeysWithValues:session.members.map {($0.rawValue,session.profile($0).title)}))
                     }
                 }.environmentObject(store)
             }
@@ -113,14 +114,17 @@ struct CompanionView: View {
             Button {dismissKeyboard();session.close();dismiss()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}
                 .buttonStyle(.plain).accessibilityLabel("返回普通聊天").accessibilityIdentifier("companion.back")
             Spacer(minLength:4)
-            Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {CompanionAvatar(size:32,expression:avatarExpression,animated:session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy).accessibilityIdentifier("companion.avatar.live");VStack(alignment:.leading,spacing:2) {Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title");Text("Flash · 文字伙伴").font(.caption2).foregroundStyle(.secondary)}}}
-                .buttonStyle(.plain).accessibilityIdentifier("companion.profile").accessibilityHint(session.busy ? "正在回复，请稍后查看资料":"查看她的资料")
+            Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {
+                if session.isGroup {HStack(spacing:-10) {ForEach(session.members) {member in CompanionAvatar(size:28,persona:member)}}}
+                else {CompanionAvatar(size:32,expression:avatarExpression,animated:session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy,persona:session.persona).accessibilityIdentifier("companion.avatar.live")}
+                Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title")}}
+                .buttonStyle(.plain).accessibilityIdentifier("companion.profile").accessibilityHint(session.busy ? "正在回复，请稍后查看资料":"查看伙伴资料")
             Spacer(minLength:4)
             HStack(spacing:0) {
                 Button {open(.memory)} label:{Image(systemName:"bookmark").frame(width:40,height:44)}.accessibilityLabel("你们的记忆").accessibilityIdentifier("companion.memory")
                 Menu {
                     Section("当前窗口：\(CompanionContext.count(session.data).formatted()) / 48,000字符") {
-                    Button("她的资料",systemImage:"person.crop.circle") {open(.profile)}
+                    Button(session.isGroup ? "群聊信息":session.persona.pronoun+"的资料",systemImage:"person.crop.circle") {open(.profile)}
                     Button("你们的记忆",systemImage:"bookmark") {open(.memory)}
                     Button("精简并新开窗口",systemImage:"text.badge.checkmark") {dismissKeyboard();session.prepareCompression()}.accessibilityIdentifier("companion.compress").disabled(CompanionContext.current(session.data).isEmpty)
                     Button("手动整理新窗口",systemImage:"square.and.pencil") {dismissKeyboard();session.prepareCompression(manual:true)}.disabled(CompanionContext.current(session.data).isEmpty)
@@ -162,7 +166,7 @@ struct CompanionView: View {
                     }
                     if session.busy {
                         HStack(alignment:.top,spacing:10) {
-                            CompanionAvatar()
+                            CompanionAvatar(persona:session.speaking ?? session.persona)
                             VStack(alignment:.leading,spacing:10) {
                                 if !session.partial.isEmpty {Text(session.partial).textSelection(.enabled)}
                                 HStack(spacing:8) {ProgressView().controlSize(.small);Text(session.status).font(.caption).foregroundStyle(.secondary)}
@@ -201,13 +205,14 @@ struct CompanionView: View {
     }
     private func bubble(_ message:CompanionMessage)->some View {
         HStack(alignment:.top,spacing:10) {
-            if message.role=="user" {Spacer(minLength:38)}else{CompanionAvatar()}
+            if message.role=="user" {Spacer(minLength:38)}else{CompanionAvatar(persona:CompanionPersona(rawValue:message.speakerID ?? "") ?? session.persona)}
             VStack(alignment:.leading,spacing:8) {
+                if session.isGroup,message.role=="assistant",let raw=message.speakerID,let author=CompanionPersona(rawValue:raw) {Text(session.profile(author).title).font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("companion.speaker."+raw)}
                 if let sticker=session.data.descriptor(message.stickerID) {
                     CompanionStickerImage(sticker:sticker,data:session.data)
                 }
                 if let quote=message.replyTo {quotePreview(quote,cancellable:false).accessibilityIdentifier("companion.quote."+message.id)}
-                if message.role != "user" || message.stickerID == nil {
+                if !message.content.isEmpty && (message.role != "user" || message.stickerID == nil) {
                 Text(.init(WebEvidence.cited(message.content,sources:message.sources)))
                     .padding(.horizontal,15).padding(.vertical,12)
                     .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
@@ -231,13 +236,19 @@ struct CompanionView: View {
         }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             .contextMenu {
                 Button("回复",systemImage:"arrowshape.turn.up.left") {session.selectReply(message);showKeyboard()}.disabled(session.busy)
-                Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content}
+                Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content.isEmpty ? session.data.descriptor(message.stickerID)?.description:message.content}
             }
             .accessibilityAction(named:"回复这条消息") {session.selectReply(message);showKeyboard()}
             .id(message.id)
     }
     private var composer:some View {
         VStack(spacing:5) {
+        if session.isGroup {
+            HStack {Menu {
+                Button("所有成员") {session.target=nil}
+                ForEach(session.members) {member in Button("@"+session.profile(member).title) {session.target=member}}
+            } label:{Label(session.target.map {"@"+session.profile($0).title} ?? "所有成员",systemImage:"at").font(.caption).padding(.horizontal,12).padding(.vertical,5)}.accessibilityIdentifier("companion.group.target").disabled(session.busy);Spacer()}.padding(.horizontal,16)
+        }
         if let quote=session.replyTo {quotePreview(quote,cancellable:true).padding(.horizontal,12).accessibilityIdentifier("companion.reply.preview")}
         HStack(alignment:.bottom,spacing:10) {
             Button {if stickersExpanded {showKeyboard()}else{dismissKeyboard();stickersExpanded=true;session.touch()}} label:{Image(systemName:stickersExpanded ? "keyboard":"face.smiling").font(.system(size:22)).frame(width:36,height:52)}
@@ -251,7 +262,7 @@ struct CompanionView: View {
     private func quotePreview(_ quote:CompanionQuote,cancellable:Bool)->some View {
         HStack(alignment:.top,spacing:8) {
             RoundedRectangle(cornerRadius:1).fill(Theme.accent.opacity(0.5)).frame(width:3)
-            Text((quote.role=="assistant" ? session.title:"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
+            Text((quote.role=="assistant" ? (quote.authorID.flatMap(CompanionPersona.init(rawValue:)).map {session.profile($0).title} ?? session.title):"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
             if cancellable {Button {session.replyTo=nil;session.touch()} label:{Image(systemName:"xmark.circle.fill")}.accessibilityLabel("取消引用回复").accessibilityIdentifier("companion.reply.cancel")}
         }.fixedSize(horizontal:false,vertical:true).padding(8).background(Theme.panel(scheme).opacity(0.8),in:RoundedRectangle(cornerRadius:10)).accessibilityElement(children:.contain)
     }
@@ -283,9 +294,10 @@ struct CompanionProfileView:View {
     var body:some View {
         Form {
             Section {
-                VStack(spacing:12) {CompanionAvatar(size:100);Text(session.title).font(.title2.bold());Text("女性").font(.caption).foregroundStyle(.secondary)}.frame(maxWidth:.infinity).padding(.vertical,12).listRowBackground(Color.clear)
+                VStack(spacing:12) {CompanionAvatar(size:100,persona:session.persona);Text(session.title).font(.title2.bold());Text(session.persona.gender).font(.caption).foregroundStyle(.secondary)}.frame(maxWidth:.infinity).padding(.vertical,12).listRowBackground(Color.clear)
             }
             Section("性格") {Text(session.data.profile.personality)}
+            Section {NavigationLink("相处习惯") {CompanionGrowthView(session:session)}}
             Section {
                 Picker("聊天语气",selection:Binding(get:{session.data.profile.effectiveTone()},set:{tone in Task {_=await session.update {$0.profile.tone=tone;$0.profile.gentleUntil=nil}}})) {
                     ForEach(CompanionTone.allCases) {tone in Text(tone.title).tag(tone)}
@@ -300,7 +312,7 @@ struct CompanionProfileView:View {
             } footer:{Text("聊天和自动精简使用 DeepSeek Flash，需要联网并产生 API 费用。会发送当前窗口的完整对话、交接摘要和相关记忆，不发送整份笔记或账本。按需搜索另有费用，搜索词仅使用必要公开关键词。主动接话只在此页打开时发生。")}
             Section {Button {memory=true} label:{Label("查看你们的记忆",systemImage:"bookmark")}}
             if let error=session.error {Section {Text(error).font(.footnote).foregroundStyle(.red)}}
-        }.scrollContentBackground(.hidden).background {ConversationBackground()}.navigationTitle("她的资料").navigationBarTitleDisplayMode(.inline)
+        }.scrollContentBackground(.hidden).background {ConversationBackground()}.navigationTitle(session.persona.pronoun+"的资料").navigationBarTitleDisplayMode(.inline)
             .toolbar {ToolbarItem(placement:.topBarLeading) {Button("完成") {dismiss()}};ToolbarItem(placement:.topBarTrailing) {Button("编辑") {edit=true}.accessibilityIdentifier("companion.profile.edit")}}
             .sheet(isPresented:$edit) {NavigationStack {CompanionProfileEditor(session:session)}}
             .navigationDestination(isPresented:$memory) {CompanionMemoryView(session:session)}
@@ -320,9 +332,9 @@ private struct CompanionProfileEditor:View {
             Section("名字") {TextField("尚未取名",text:$name).accessibilityIdentifier("companion.name.editor")}
             Section("外貌与服装") {TextEditor(text:$appearance).frame(minHeight:130)}
             Section("性格") {TextEditor(text:$personality).frame(minHeight:85)}
-            Section {Text("这些资料会用于她的自我描述。更换穿搭时可以在此修改。").font(.footnote).foregroundStyle(.secondary)}
+            Section {Text("这些资料会用于伙伴的自我描述。更换穿搭时可以在此修改。").font(.footnote).foregroundStyle(.secondary)}
             if let error {Text(error).foregroundStyle(.red)}
-        }.navigationTitle("编辑她的资料").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle("编辑"+session.persona.pronoun+"的资料").navigationBarTitleDisplayMode(.inline)
             .onAppear {name=session.data.profile.name ?? "";appearance=session.data.profile.appearance;personality=session.data.profile.personality}
             .toolbar {
                 ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}.disabled(saving)}

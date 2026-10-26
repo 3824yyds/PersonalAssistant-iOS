@@ -17,6 +17,79 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testLegacyAnnotationWithoutToolCreatesActualAttachmentAndCleanSavedText() async throws {
+        WebProtocol.handler={_ in (200,try self.sse(["content":"来，抱一下。\n[表情包：抱抱：张开双臂，温柔地表示安慰、关心和支持]"]))}
+        let result=try await CompanionReplyService.answer(question:"用表情包呀",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(result.4,"hug");XCTAssertEqual(result.0,"来，抱一下。")
+        var data=CompanionData();data.messages=[CompanionMessage(role:"assistant",content:result.0,stickerID:result.4)]
+        var document=Document();try data.write(to:&document);XCTAssertEqual(try CompanionData.read(document).messages.first?.stickerID,"hug")
+    }
+    @MainActor func testSameWayFollowupResendsRealImageAndSendsInputAttachmentMetadata() async throws {
+        var data=CompanionData();let history=[CompanionMessage(role:"user",content:"抱抱",stickerID:"hug"),CompanionMessage(role:"assistant",content:"抱抱收下了。",stickerID:"hug")]
+        data.messages=history+[CompanionMessage(role:"user",content:"抱抱",stickerID:"hug")]
+        WebProtocol.handler={request in
+            let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let input=messages.last?["content"] as? String ?? "";XCTAssertTrue(input.contains("attached_sticker"));XCTAssertFalse(input.contains("[表情包"))
+            return (200,try self.sse(["content":"[表情包：抱抱：张开双臂，温柔地表示安慰、关心和支持]"]))
+        }
+        // An incoming user image is not itself an explicit resend request: automatic cooldown holds.
+        let request=CompanionConversation.messages(question:"抱抱",data:data,history:history)
+        XCTAssertTrue((request.last?["content"] as? String ?? "").contains("attached_sticker"))
+        var fresh=CompanionData();fresh.messages=[CompanionMessage(role:"user",content:"抱抱",stickerID:"hug")]
+        let received=try await CompanionReplyService.answer(question:"抱抱",data:fresh,history:[],client:client());XCTAssertEqual(received.4,"hug")
+        WebProtocol.handler={_ in (200,try self.sse(["content":"好，还是用抱抱图。 "]))}
+        let result=try await CompanionReplyService.answer(question:"你就不能同样的方式抱抱我？",data:data,history:history,client:client())
+        XCTAssertEqual(result.4,"hug");XCTAssertFalse(result.0.contains("[表情包"))
+    }
+    @MainActor func testFakeLoadingExcuseGetsOneRepairAndThenAcceptedImageIsAtomic() async throws {
+        var calls=0
+        WebProtocol.handler={request in
+            calls+=1
+            if calls==1 {return (200,try self.sse(["content":"图应该已经跟着消息过去了，刷新一下。 "]))}
+            if calls==2 {return (200,try self.sse(["tool_calls":[["index":0,"id":"real-hug","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]]))}
+            let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]]),tool=try XCTUnwrap(messages.last?["content"] as? String)
+            XCTAssertTrue(tool.contains("will_attach_to_this_reply"));XCTAssertFalse(tool.contains("\"attached\":true"))
+            return (200,try self.sse(["content":"来，抱一下。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"图在哪里",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(calls,3);XCTAssertEqual(result.4,"hug");XCTAssertEqual(result.0,"来，抱一下。")
+    }
+    @MainActor func testPersistentFakeImageReceiptStopsAfterOneRepairWithoutCannedSuccess() async throws {
+        var calls=0;WebProtocol.handler={_ in calls+=1;return (200,try self.sse(["content":"图已经发过去了。 "]))}
+        do {_=try await CompanionReplyService.answer(question:"嗯",data:CompanionData(),history:[],client:client());XCTFail("No actual attachment may be reported as sent")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("停止回复"))};XCTAssertEqual(calls,2)
+    }
+    @MainActor func testDisabledPackCannotBeReenabledByMetadataFallback() async throws {
+        var data=CompanionData();data.profile.stickers=false;var calls=0
+        WebProtocol.handler={_ in calls+=1;return (200,try self.sse(["content":calls==1 ? "[表情包：抱抱]":"你关了自动表情，我先用文字陪你。 "]))}
+        let result=try await CompanionReplyService.answer(question:"用表情包呀",data:data,history:[],client:client())
+        XCTAssertNil(result.4);XCTAssertEqual(calls,2);XCTAssertFalse(result.0.contains("[表情包"))
+    }
+    @MainActor func testImageOnlyReplyIsValidAndSurvivesEncryptedSave() async throws {
+        WebProtocol.handler={_ in (200,try self.sse(["content":"[表情包：抱抱]"]))}
+        let result=try await CompanionReplyService.answer(question:"给我个抱抱表情包",data:CompanionData(),history:[],client:client())
+        XCTAssertTrue(result.0.isEmpty);XCTAssertEqual(result.4,"hug")
+        var data=CompanionData();data.messages=[CompanionMessage(role:"assistant",content:result.0,stickerID:result.4)]
+        var document=Document();try data.write(to:&document)
+        let salt=try VaultCrypto.random(32),key=try VaultCrypto.derive(password:"0426",salt:salt)
+        let restored=try JSONDecoder().decode(Document.self,from:VaultCrypto.decrypt(VaultCrypto.encrypt(document.encoded(),key:key,salt:salt),key:key))
+        XCTAssertEqual(try CompanionData.read(restored),data)
+    }
+    @MainActor func testMaleGroupRequestHasOwnIdentityPackAndNoPrivateMemoryOrRenameTool() async throws {
+        var document=Document(),male=CompanionPersona.male.initial;male.profile.name="阿川";male.memories=[CompanionMemory(text:"男生私聊密码线索")]
+        try CompanionDirectory.write(male,space:.direct(.male),to:&document)
+        let room=try CompanionDirectory.create(name:"群聊",members:[.female,.male],in:&document)
+        let context=CompanionDirectory.groupContext(room.data,as:.male,document:document);var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request),tools=body["tools"] as? [[String:Any]] ?? []
+            XCTAssertFalse(String(describing:body).contains("男生私聊密码线索"));XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="propose_companion_name"})
+            XCTAssertTrue(String(describing:body).contains("男性AI伙伴"))
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"male","function":["name":"send_companion_sticker","arguments":"{\"id\":\"male_hug\"}"]]]]))}
+            return (200,try self.sse(["content":"我在，先缓一缓。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"用抱抱表情包",data:context,history:[],client:client(),allowNaming:false,scene:"这是共享群聊，只用自己的身份接话。")
+        XCTAssertEqual(result.4,"male_hug");XCTAssertNil(result.3)
+    }
     @MainActor func testQuotedReplyCarriesSelectedSpeakerAndNeverExposesRenameTool() async throws {
         let original=CompanionMessage(role:"assistant",content:"旧消息：先聊长沙计划")
         var data=CompanionData();data.messages=[original];let quote=CompanionQuote.snapshot(original,data:data)

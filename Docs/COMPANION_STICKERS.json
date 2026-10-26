@@ -1,6 +1,6 @@
 {
   "reference": "App/Resources/Assets.xcassets/CompanionAvatar.imageset/avatar.png",
-  "creation": "Build12: six individually painted avatar-reference stickers. Build13: four individually generated exaggerated comic meme stickers, varied styles as requested. Original generated PNG files retained; no sheet slicing.",
+  "creation": "Build12: six individually painted avatar-reference stickers. Build13: four individually generated exaggerated comic meme stickers, varied styles as requested. Original generated PNG files retained; no sheet slicing. Build14: original male avatar and six male reference stickers drawn in separate image_gen calls; originals retained unchanged.",
   "stickers": [
     {
       "id": "happy",
@@ -51,6 +51,41 @@
       "id": "meme_justthis",
       "sha256": "f4d10b0cf5f67964e88bbc2047317b40501766ec13269398b55edd7eaa7d39f1",
       "original_generated_file": "exec-2f1a98b8-1dd0-4844-9d2f-3bf318af48ac.png"
+    },
+    {
+      "id": "male_happy",
+      "sha256": "aa9e452dd8fdb37217bfc51ca1617d4852473bbf1354a24599177987300ae51d",
+      "original_generated_file": "exec-6179b21a-e6ad-42c2-85b7-b7dda2e0b0dd.png"
+    },
+    {
+      "id": "male_hug",
+      "sha256": "3d31c60bbb491b75682a348246a16377f604e3c31e3c021d403c62182dd2374d",
+      "original_generated_file": "exec-745c4e0e-a591-4a02-829b-205ba8fd8d1c.png"
+    },
+    {
+      "id": "male_confused",
+      "sha256": "f82ca45e2360c318694f5208a8072bc8ef8c6d90eed55587bcb19c6649e81900",
+      "original_generated_file": "exec-573d875d-2d98-4b4b-8ad3-dcba55494504.png"
+    },
+    {
+      "id": "male_speechless",
+      "sha256": "b81537d88fd3628ce497f46e745c5be5267c6f4d087d9cc3746986392f993c63",
+      "original_generated_file": "exec-d4166f92-d3b5-4bb3-be0e-b0ce61901513.png"
+    },
+    {
+      "id": "male_smug",
+      "sha256": "d1e79280b68b0d62b594c612cf56fbe12ff8bca8dbaa847794b60a53c6b13ff3",
+      "original_generated_file": "exec-1aba1fa9-1f34-464b-8cb4-23237656a6b9.png"
+    },
+    {
+      "id": "male_goodnight",
+      "sha256": "7abdd51133d37f19584ac982859c11fe9f407fab08dad3706eeba3479af8e936",
+      "original_generated_file": "exec-4d5a61c6-2c9b-46d2-bc09-91921cc3d37a.png"
     }
-  ]
+  ],
+  "male_avatar": {
+    "asset": "CompanionMaleAvatar",
+    "sha256": "8e7c95507fbbb1d493290562244fae8a0c3a508e7e74000284421799412936b4",
+    "original_generated_file": "exec-c2333403-6e1b-4c3d-a307-253eab2a7abd.png"
+  }
 }

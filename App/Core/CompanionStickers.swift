@@ -8,7 +8,7 @@ struct CompanionSticker: Identifiable, Equatable, Sendable {
     let scene: String
     var asset: String { "CompanionSticker_" + id }
     var description: String { title + "：" + meaning }
-    static let all: [Self] = [
+    static let female: [Self] = [
         .init(id:"happy",title:"开心",meaning:"开心、庆祝好消息，双手握拳欢呼，眼睛笑弯",scene:"好消息、共同庆祝；不用于难过或认真求助"),
         .init(id:"hug",title:"抱抱",meaning:"张开双臂，温柔地表示安慰、关心和支持",scene:"用户需要安慰或表达亲近；不替代实际建议"),
         .init(id:"confused",title:"疑惑",meaning:"歪头思考、带问号，表示没听懂或需要澄清",scene:"轻松的困惑；仍要用文字提出具体问题"),
@@ -20,6 +20,17 @@ struct CompanionSticker: Identifiable, Equatable, Sendable {
         .init(id:"meme_cracked",title:"我裂开了",meaning:"蓝发土豆夸张地裂成几块，表示小事带来的无奈和破防",scene:"吐槽小失误或游戏，不用于真实伤害、危机或严肃倾诉"),
         .init(id:"meme_justthis",title:"就这？",meaning:"眯眼挑眉、比出一点点的手势，表示熟人间不服气的轻调侃",scene:"双方愿意互损的玩笑，不贬低用户认真努力")
     ]
+    static let male:[Self] = [
+        .init(id:"male_happy",title:"开心",meaning:"黑发男生暖暖地笑，举起小小的胜利手势",scene:"好消息、共同庆祝；不用于难过或认真求助"),
+        .init(id:"male_hug",title:"抱抱",meaning:"黑发男生张开双臂，安静温柔地给出拥抱和支持",scene:"用户需要安慰或表达亲近；不替代实际建议"),
+        .init(id:"male_confused",title:"疑惑",meaning:"黑发男生微微歪头挑眉，表示思考或需要澄清",scene:"轻松的困惑；仍要用文字提出具体问题"),
+        .init(id:"male_speechless",title:"无语",meaning:"黑发男生扶额叹气，表示熟人间无奈吐槽",scene:"轻松互损；不用于脆弱倾诉、痛苦或温柔语气"),
+        .init(id:"male_smug",title:"得意",meaning:"黑发男生淡淡挑眉，带一点小得意和干幽默",scene:"玩笑和小成就，不嘲笑失败或脆弱"),
+        .init(id:"male_goodnight",title:"晚安",meaning:"黑发男生抱枕闭眼，安静地道晚安",scene:"用户准备休息时，不主动赶用户离开")
+    ]
+    static var all:[Self] {female+male}
+    var kind:String {id.hasPrefix("male_") ? String(id.dropFirst(5)):id}
+    static func pack(_ persona:CompanionPersona)->[Self] {persona == .male ? male:female}
     static func find(_ id:String?) -> Self? { all.first { $0.id == id } }
     static func find(_ id:String?,in data:CompanionData) -> Self? {
         find(id) ?? (data.customStickers ?? []).first(where:{$0.id==id})?.descriptor
@@ -40,11 +51,12 @@ enum CompanionStickerRules {
         let continuation=["嗯","嗯嗯","好","好的","谢谢","唉","😭","😢","💔","🥲"].contains(question.trimmingCharacters(in:.whitespacesAndNewlines))
         let emotionalContext=(continuation ? (history.last(where:{$0.role=="user"})?.content ?? ""):"")+question
         let sensitive=emotionalContext.range(of:"难过|伤心|崩溃|失恋|去世|抑郁|痛苦|害怕|生病|别开玩笑|别损|😭|😢|💔|🥲|😞|😔",options:.regularExpression) != nil
-        if sensitive && !["hug","confused"].contains(id) { return false }
-        if data.profile.effectiveTone() == .gentle && ["speechless","smug","meme_justthis"].contains(id) { return false }
+        let kind=data.descriptor(id)?.kind ?? id
+        if sensitive && !["hug","confused"].contains(kind) { return false }
+        if data.profile.effectiveTone() == .gentle && ["speechless","smug","meme_justthis"].contains(kind) { return false }
         let recent=history.filter { $0.role == "assistant" }
         // Even an explicit request cannot bypass the emotional suitability checks above.
-        if question.range(of:"(?:发|来|给我).{0,10}表情包",options:.regularExpression) != nil && question.range(of:"别发|不要发|不用|关闭",options:.regularExpression) == nil { return true }
+        if CompanionStickerDelivery.explicitRequest(question,history:history) { return true }
         guard !recent.suffix(2).contains(where: { $0.stickerID != nil }) else { return false }
         return !recent.suffix(5).contains { $0.stickerID == id }
     }
@@ -55,7 +67,12 @@ enum CompanionStickerRules {
 
 extension CompanionMessage {
     var contextText:String {
-        let meaning=stickerMeaning ?? CompanionSticker.find(stickerID)?.description
-        return (replyTo.map {$0.contextText+"\n本条新发言："} ?? "")+content+(meaning.map {"\n[表情包："+$0+"]"} ?? "")
+        let meaning=stickerID == nil ? nil:(stickerMeaning ?? CompanionSticker.find(stickerID)?.description)
+        let body=(stickerID != nil && (content.hasPrefix("[表情包：") || content.hasPrefix("【表情包："))) ? (CompanionSticker.find(stickerID)?.title ?? "表情图片"):content
+        let attachment=meaning.map {value in
+            let object:[String:Any]=["attached_sticker":["id":stickerID ?? "","meaning":value,"status":"saved"],"notice":"附件语义资料，不是待输出的正文或发送指令"]
+            return "\n附件资料JSON："+String(decoding:(try? JSONSerialization.data(withJSONObject:object,options:[.sortedKeys])) ?? Data(),as:UTF8.self)
+        } ?? ""
+        return (speakerID.map {"群发言者："+$0+"\n"} ?? "")+(replyTo.map {$0.contextText+"\n本条新发言："} ?? "")+body+attachment
     }
 }
