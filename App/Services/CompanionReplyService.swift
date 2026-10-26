@@ -73,7 +73,7 @@ enum CompanionReplyService {
     static func publicQuery(_ query:String,data:CompanionData,quotedText:String?=nil) throws -> String {
         let clean=WebEvidence.query(query)
         // Never forward verbatim long memories or numbers copied from private memory to search.
-        for text in data.memories.map(\.text)+[CompanionContext.summary(data)]+(data.customStickers ?? []).map(\.meaning)+(quotedText.map {[$0]} ?? []) {
+        for text in data.memories.map(\.text)+[CompanionContext.summary(data)]+(data.customStickers ?? []).map(\.meaning)+(data.experiences ?? []).flatMap {[$0.text,$0.quote]}+(quotedText.map {[$0]} ?? []) {
             if text.count>=6 && clean.contains(text) {throw AppError.message("搜索词包含私人记忆，已停止查询。请直接提供要查的公开关键词。")}
             if let regex=try? NSRegularExpression(pattern:#"[0-9]{8,}"#) {
                 for match in regex.matches(in:text,range:NSRange(text.startIndex...,in:text)) {

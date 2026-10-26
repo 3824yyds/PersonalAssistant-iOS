@@ -17,6 +17,16 @@ private final class WebProtocol:URLProtocol {
     override func stopLoading() {}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testPrivateGrowthFeedbackCannotBeCopiedIntoPublicSearch() async throws {
+        var data=CompanionData();_=try CompanionRules.appendUserTurn("以后和我聊天少用反问，我的私人号码9876543210",to:&data)
+        XCTAssertFalse((data.experiences ?? []).isEmpty)
+        WebProtocol.handler={request in
+            XCTAssertEqual(request.url!.path,"/chat/completions")
+            return (200,try self.sse(["tool_calls":[["index":0,"id":"private-growth","function":["name":"web_search","arguments":"{\"query\":\"9876543210\"}"]]]]))
+        }
+        do {_=try await CompanionReplyService.answer(question:"帮我查一下",data:data,history:data.messages,client:client());XCTFail("Private feedback must never reach search")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("私人"))}
+    }
     @MainActor func testLegacyAnnotationWithoutToolCreatesActualAttachmentAndCleanSavedText() async throws {
         WebProtocol.handler={_ in (200,try self.sse(["content":"来，抱一下。\n[表情包：抱抱：张开双臂，温柔地表示安慰、关心和支持]"]))}
         let result=try await CompanionReplyService.answer(question:"用表情包呀",data:CompanionData(),history:[],client:client())
