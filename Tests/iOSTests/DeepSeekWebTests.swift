@@ -92,8 +92,10 @@ final class DeepSeekWebTests:XCTestCase {
         let context=CompanionDirectory.groupContext(room.data,as:.male,document:document);var calls=0
         WebProtocol.handler={request in
             calls+=1;let body=try self.body(request),tools=body["tools"] as? [[String:Any]] ?? []
-            XCTAssertFalse(String(describing:body).contains("男生私聊密码线索"));XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="propose_companion_name"})
-            XCTAssertTrue(String(describing:body).contains("男性AI伙伴"))
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let contents=messages.compactMap {$0["content"] as? String}.joined(separator:"\n")
+            XCTAssertFalse(contents.contains("男生私聊密码线索"));XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="propose_companion_name"})
+            XCTAssertTrue(contents.contains("男性AI伙伴"));XCTAssertTrue(contents.contains("阿川"))
             if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"male","function":["name":"send_companion_sticker","arguments":"{\"id\":\"male_hug\"}"]]]]))}
             return (200,try self.sse(["content":"我在，先缓一缓。 "]))
         }
