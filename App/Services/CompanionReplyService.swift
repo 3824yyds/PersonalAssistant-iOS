@@ -49,7 +49,7 @@ enum CompanionReplyService {
                     return Item(["saved":.bool(false),"requires_confirmation":.bool(true),"message":.string("候选已提交，用户确认前名字未更改。")])
                 },completeLocalTools:!CompanionRules.needsWeb(question),maxToolRounds:2,
                 onPartial:{value in
-                    await onPartial?(naming ? "":CompanionStickerDelivery.preview(value,question:question,data:data))
+                    onPartial?(naming ? "":CompanionStickerDelivery.preview(value,question:question,data:data))
                 },onSources:{sources=$0},onStatus:onStatus)
             if let proposal {return ("你是想把我的名字改成“\(proposal)”吗？确认后我就用这个名字。","名字待确认",sources,proposal,nil)}
             guard result.0.count<=12000 else {throw AppError.message("这次回复太长，请缩小话题后重试")}
