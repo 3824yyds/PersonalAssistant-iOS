@@ -10,3 +10,7 @@
 从Build14或Build13更新，请使用相同Bundle ID与原签名身份覆盖安装，保留4位PIN、两位伙伴、群聊、记忆和自定义表情。旧Build12及更早长密码资料仍不兼容。未签名iPhone arm64，最低iOS17，iOS26 SDK，Bundle ID cn.local.assistant.ios。
 
 发布须同一应用源的核心、资源、iOS单元和页面检查通过。URLProtocol模拟验证真实服务链路，DEBUG夹具验证页面和加密保存；真实模型质量、用户iPhone性能、Face ID和系统PhotosPicker仍需真机体验。
+
+最终验证：同源检查40425520573的205项核心、16张表情原图/编译资源、75项iOS单元和26项页面流程全部通过；设备构建与发布40425549640成功。标签固定在应用源82646cc9255d767613aaf22d74674f995ab6f129。
+
+安装包108,166,831字节，SHA-256：c45cbe9fad812013113806063cf4bbb62bf65b725015b90f2697849a1bb74d9c
