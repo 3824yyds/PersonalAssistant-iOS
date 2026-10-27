@@ -116,7 +116,7 @@ struct CompanionView: View {
             Spacer(minLength:4)
             Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {
                 if session.isGroup {HStack(spacing:-10) {ForEach(session.members) {member in CompanionAvatar(size:28,persona:member)}}}
-                else {CompanionAvatar(size:32,expression:avatarExpression,animated:session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy,persona:session.persona).accessibilityIdentifier("companion.avatar.live")}
+                else {CompanionAvatar(size:32,expression:avatarExpression,animated:session.visible && session.active && session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy,persona:session.persona).accessibilityIdentifier("companion.avatar.live")}
                 Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title")}}
                 .buttonStyle(.plain).accessibilityIdentifier("companion.profile").accessibilityHint(session.busy ? "正在回复，请稍后查看资料":"查看伙伴资料")
             Spacer(minLength:4)

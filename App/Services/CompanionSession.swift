@@ -20,8 +20,8 @@ import Combine
     private var peerProfiles:[CompanionPersona:CompanionProfile]=[:]
     private var storedMembers:[CompanionPersona]=[]
     private var lastPreview=Date.distantPast
-    var visible = false
-    var active = true
+    @Published var visible = false
+    @Published var active = true
     var editing = false
     var panelOpen = false
     var title: String { data.profile.title }
