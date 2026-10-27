@@ -78,6 +78,17 @@ enum DebugFixtures {
             if ProcessInfo.processInfo.arguments.contains("--ui-companion-recover-confirmed-fixture") {state.messages += [CompanionMessage(role:"user",content:"是的"),CompanionMessage(role:"user",content:"今天的天气怎么样")]}
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-group-delivery-fixture") {
+            var female=CompanionData(),male=CompanionPersona.male.initial
+            female.profile.name="大肥鱼";female.profile.proactive=false;male.profile.name="阿力"
+            try? female.write(to:&d);try? CompanionDirectory.write(male,space:.direct(.male),to:&d)
+            if ProcessInfo.processInfo.arguments.contains("--ui-companion-group-legacy-fixture"),let room=try? CompanionDirectory.create(name:"工作室",members:[.female,.male],in:&d) {
+                var state=room.data
+                let turn=CompanionMessage(role:"user",content:"你们彼此互相认识一下",recipients:["female","male"])
+                state.messages=[turn,CompanionMessage(role:"assistant",content:"群发言者：female\n群成员「大肥鱼」（female）说：群发言者：female\n阿力你好，我是大肥鱼。",speakerID:"female",turnID:turn.id),CompanionMessage(role:"assistant",content:"群发言者：male\n群成员「阿力」（male）说：你好，大肥鱼。",speakerID:"male",turnID:turn.id)]
+                try? CompanionDirectory.write(state,space:.group(room.id),to:&d)
+            }
+        }
         if ProcessInfo.processInfo.arguments.contains("--ui-companion-quote-fixture") {
             var state=CompanionData();state.profile.name="小鱼";state.profile.proactive=false;state.profile.nameRecoveryChecked=true
             state.messages=[CompanionMessage(id:"quoted-first",role:"assistant",content:"先聊长沙计划，还是西安？"),CompanionMessage(id:"quoted-user",role:"user",content:"西安先排五天"),CompanionMessage(id:"quoted-last",role:"assistant",content:"好，西安可以先留五天。")]

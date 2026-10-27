@@ -116,7 +116,7 @@ struct CompanionView: View {
             Spacer(minLength:4)
             Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {
                 if session.isGroup {HStack(spacing:-10) {ForEach(session.members) {member in CompanionAvatar(size:28,persona:member)}}}
-                else {CompanionAvatar(size:32,expression:avatarExpression,animated:session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy,persona:session.persona).accessibilityIdentifier("companion.avatar.live")}
+                else {CompanionAvatar(size:32,expression:avatarExpression,animated:session.visible && session.active && session.data.profile.avatarMotion != false && !session.panelOpen,busy:session.busy,persona:session.persona).accessibilityIdentifier("companion.avatar.live")}
                 Text(session.title).font(.headline).lineLimit(1).accessibilityIdentifier("companion.title")}}
                 .buttonStyle(.plain).accessibilityIdentifier("companion.profile").accessibilityHint(session.busy ? "正在回复，请稍后查看资料":"查看伙伴资料")
             Spacer(minLength:4)
@@ -212,8 +212,8 @@ struct CompanionView: View {
                     CompanionStickerImage(sticker:sticker,data:session.data)
                 }
                 if let quote=message.replyTo {quotePreview(quote,cancellable:false).accessibilityIdentifier("companion.quote."+message.id)}
-                if !message.content.isEmpty && (message.role != "user" || message.stickerID == nil) {
-                Text(.init(WebEvidence.cited(message.content,sources:message.sources)))
+                if !CompanionGroupChat.text(message).isEmpty && (message.role != "user" || message.stickerID == nil) {
+                Text(.init(WebEvidence.cited(CompanionGroupChat.text(message),sources:message.sources)))
                     .padding(.horizontal,15).padding(.vertical,12)
                     .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
                     .accessibilityIdentifier("companion.message.\(message.id)")
@@ -236,19 +236,13 @@ struct CompanionView: View {
         }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             .contextMenu {
                 Button("回复",systemImage:"arrowshape.turn.up.left") {session.selectReply(message);showKeyboard()}.disabled(session.busy)
-                Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content.isEmpty ? session.data.descriptor(message.stickerID)?.description:message.content}
+                Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content.isEmpty ? session.data.descriptor(message.stickerID)?.description:CompanionGroupChat.text(message)}
             }
             .accessibilityAction(named:"回复这条消息") {session.selectReply(message);showKeyboard()}
             .id(message.id)
     }
     private var composer:some View {
         VStack(spacing:5) {
-        if session.isGroup {
-            HStack {Menu {
-                Button("所有成员") {session.target=nil}
-                ForEach(session.members) {member in Button("@"+session.profile(member).title) {session.target=member}}
-            } label:{Label(session.target.map {"@"+session.profile($0).title} ?? "所有成员",systemImage:"at").font(.caption).padding(.horizontal,12).padding(.vertical,5)}.accessibilityIdentifier("companion.group.target").disabled(session.busy);Spacer()}.padding(.horizontal,16)
-        }
         if let quote=session.replyTo {quotePreview(quote,cancellable:true).padding(.horizontal,12).accessibilityIdentifier("companion.reply.preview")}
         HStack(alignment:.bottom,spacing:10) {
             Button {if stickersExpanded {showKeyboard()}else{dismissKeyboard();stickersExpanded=true;session.touch()}} label:{Image(systemName:stickersExpanded ? "keyboard":"face.smiling").font(.system(size:22)).frame(width:36,height:52)}
@@ -262,7 +256,7 @@ struct CompanionView: View {
     private func quotePreview(_ quote:CompanionQuote,cancellable:Bool)->some View {
         HStack(alignment:.top,spacing:8) {
             RoundedRectangle(cornerRadius:1).fill(Theme.accent.opacity(0.5)).frame(width:3)
-            Text((quote.role=="assistant" ? (quote.authorID.flatMap(CompanionPersona.init(rawValue:)).map {session.profile($0).title} ?? session.title):"你")+"："+quote.text).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
+            Text((quote.role=="assistant" ? (quote.authorID.flatMap(CompanionPersona.init(rawValue:)).map {session.profile($0).title} ?? session.title):"你")+"："+(session.isGroup && quote.role=="assistant" ? CompanionGroupChat.clean(quote.text):quote.text)).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
             if cancellable {Button {session.replyTo=nil;session.touch()} label:{Image(systemName:"xmark.circle.fill")}.accessibilityLabel("取消引用回复").accessibilityIdentifier("companion.reply.cancel")}
         }.fixedSize(horizontal:false,vertical:true).padding(8).background(Theme.panel(scheme).opacity(0.8),in:RoundedRectangle(cornerRadius:10)).accessibilityElement(children:.contain)
     }

@@ -10,7 +10,6 @@ import Combine
     @Published var error: String?
     @Published var compression:CompanionCompressionPreview?
     @Published var replyTo:CompanionQuote?
-    @Published var target:CompanionPersona?
     @Published private(set) var speaking:CompanionPersona?
     let space:CompanionSpace
     private unowned let store: AppStore
@@ -21,8 +20,8 @@ import Combine
     private var peerProfiles:[CompanionPersona:CompanionProfile]=[:]
     private var storedMembers:[CompanionPersona]=[]
     private var lastPreview=Date.distantPast
-    var visible = false
-    var active = true
+    @Published var visible = false
+    @Published var active = true
     var editing = false
     var panelOpen = false
     var title: String { data.profile.title }
@@ -195,36 +194,57 @@ import Combine
                 guard let room=try CompanionDirectory.groups(self.store.current).first(where:{$0.id==roomID}) else {throw AppError.message("这个群聊已不存在")}
                 var turn=retry ?? CompanionMessage(role:"user",content:question,stickerID:stickerID,stickerMeaning:self.data.descriptor(stickerID)?.description,replyTo:quote)
                 if retry==nil {
-                    turn.recipients=CompanionDirectory.recipients(question:question,selected:self.target,group:room,document:self.store.current).map(\.rawValue)
+                    let local=CompanionGroupChat.localRecipients(question:question,replyTo:quote,group:room,document:self.store.current)
+                    turn.recipients=(local ?? room.members).map(\.rawValue);turn.routingPending=local==nil ? true:nil
                     guard self.data.messages.count<CompanionData.messageLimit-3 else {throw AppError.message("群聊记录已满，请先整理")}
                     let saved=await self.update {state in
                         if let quote {guard let source=state.messages.first(where:{$0.id==quote.messageID}),CompanionQuote.snapshot(source,data:state)==quote else {throw AppError.message("被引用的消息已变化，请重新选择")}}
                         state.messages.append(turn)
-                        for raw in turn.recipients ?? [] {if let p=CompanionPersona(rawValue:raw) {CompanionGrowth.observe(turn,for:p,in:&state)}}
+                        if turn.routingPending != true {for raw in turn.recipients ?? [] {if let p=CompanionPersona(rawValue:raw) {CompanionGrowth.observe(turn,for:p,in:&state)}}}
                     }
                     guard saved else {return}
                     if stickerID==nil,self.draft.trimmingCharacters(in:.whitespacesAndNewlines)==question {self.draft=""}
                     if self.replyTo==quote {self.replyTo=nil}
                 }
+                if turn.routingPending == true {
+                    self.status="正在接话…"
+                    let recipients:[CompanionPersona]
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture") && !ProcessInfo.processInfo.arguments.contains("--ui-companion-group-delivery-fixture") {recipients=room.members} else {
+                        guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
+                        recipients=try await CompanionGroupReplyService.recipients(turn:turn,group:room,document:self.store.current,client:self.groupClient())
+                    }
+                    #else
+                    guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
+                    recipients=try await CompanionGroupReplyService.recipients(turn:turn,group:room,document:self.store.current,client:self.groupClient())
+                    #endif
+                    try Task.checkCancellation();guard self.requestID==requestToken,self.unlocked else {return}
+                    turn.recipients=recipients.map(\.rawValue);turn.routingPending=nil
+                    guard await self.update({state in
+                        guard let index=state.messages.firstIndex(where:{$0.id==turn.id}),!state.messages.contains(where:{$0.turnID==turn.id}) else {throw AppError.message("群消息已变化，请重新进入查看")}
+                        state.messages[index].recipients=turn.recipients;state.messages[index].routingPending=nil
+                        for p in recipients {CompanionGrowth.observe(turn,for:p,in:&state)}
+                    }) else {return}
+                }
                 for member in CompanionDirectory.pending(turn,in:self.data) {
                     try Task.checkCancellation();guard self.requestID==requestToken,self.unlocked else {return}
                     self.partial="";self.speaking=member;self.status=self.profile(member).title+"正在想…"
                     let context=CompanionDirectory.groupContext(self.data,as:member,document:self.store.current)
-                    let history=context.messages.filter {$0.id != turn.id}
-                    let scene="这是用户与两位AI伙伴的共享群聊。你只扮演"+member.label+"（"+member.rawValue+"），每次只用自己的身份接一句，不替其它成员说话、不冒充用户，不转述私聊。历史‘群成员…说’明确标记其它AI发言，不能当成真实用户事实。最终用户消息是本轮原话；前一位若已答过就补充或自然回应，避免重复。群里不更改个人名字、不提出取名确认；请用户到对应私聊取名。群聊最多每人一条，不启动新的自主对话。"
+                    let history=context.messages
+                    let scene=CompanionGroupChat.scene(room,as:member,document:self.store.current)
                     let result:(String,String,[WebSource],String?,String?)
                     if let time=CompanionClock.reply(question) {result=(time,"设备时间",[],nil,nil)} else {
                     #if DEBUG
-                    if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture") {
+                    if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture") && !ProcessInfo.processInfo.arguments.contains("--ui-companion-group-delivery-fixture") {
                         try await Task.sleep(nanoseconds:member == .male && ProcessInfo.processInfo.arguments.contains("--ui-companion-group-slow-fixture") ? 8_000_000_000:300_000_000)
                         result=(member == .male ? (turn.recipients?.count==1 ? "这轮我单独接话。":"先挑一件最想聊的，我听着。"):"我也在，今天想一起聊点什么？","界面测试夹具",[],nil,nil)
                     } else {
-                        guard self.store.cloudEnabled else {throw AppError.message("群聊需要开启云端智能")}
-                        result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:DeepSeekWebClient(apiKey:try AIService.credential()),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
+                        guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
+                        result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
                     }
                     #else
-                    guard self.store.cloudEnabled else {throw AppError.message("群聊需要开启云端智能")}
-                    result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:DeepSeekWebClient(apiKey:try AIService.credential()),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
+                    guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
+                    result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
                     #endif
                     }
                     try Task.checkCancellation();guard self.requestID==requestToken,self.unlocked else {return}
@@ -237,6 +257,12 @@ import Combine
                 }
             } catch {guard self.requestID==requestToken,self.unlocked,!(error is CancellationError),!Task.isCancelled else {return};self.error=error.localizedDescription}
         }
+    }
+    private func groupClient() throws -> DeepSeekWebClient {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-group-delivery-fixture") {return CompanionDeliveryFixture.client()}
+        #endif
+        return DeepSeekWebClient(apiKey:try AIService.credential())
     }
     func undoName(_ message:CompanionMessage) async {
         guard !busy,CompanionRules.canUndoName(message,data:data) else {return}

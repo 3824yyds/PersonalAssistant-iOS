@@ -207,6 +207,16 @@ enum CompanionConversation {
         system+="\n聊天示例用于理解节奏，不照抄：\n"+examples(tone:profile.effectiveTone(at:now))
         var messages:[[String:Any]]=[["role":"system","content":system]]
         if let scene {messages[0]["content"]=system+"\n"+scene}
+        if scene != nil {
+            let incoming=incomingMessage ?? incoming(question:question,data:data,replyTo:replyTo)
+            var turns=recent
+            if !turns.contains(where:{$0.id==incoming.id}) {turns.append(incoming)}
+            let transcript=CompanionGroupChat.transcript(turns,data:data)
+            let records=(try? JSONSerialization.jsonObject(with:Data(transcript.utf8))) ?? []
+            let payload=String(decoding:(try? JSONSerialization.data(withJSONObject:["latest_user_message_id":incoming.id,"conversation":records],options:[.sortedKeys])) ?? Data(),as:UTF8.self)
+            messages.append(["role":"user","content":payload])
+            return messages
+        }
         messages += recent.map {["role":$0.role,"content":CompanionStickerDelivery.historyText($0,data:data)]}
         messages.append(["role":"user","content":(incomingMessage ?? incoming(question:question,data:data,replyTo:replyTo)).contextText])
         return messages

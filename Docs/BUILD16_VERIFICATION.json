@@ -1,0 +1,80 @@
+{
+  "version": "3.5.1",
+  "build": 16,
+  "source_commit": "5ad8000088b309eb7941e811c3a98c48ffad4699",
+  "ui_run": {
+    "id": 40451122704,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "5ad8000088b309eb7941e811c3a98c48ffad4699"
+  },
+  "device_run": {
+    "id": 40451307886,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "5ad8000088b309eb7941e811c3a98c48ffad4699"
+  },
+  "release_id": 425077274,
+  "release_url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build16",
+  "tag": "refs/tags/v3.5.1-build16",
+  "tag_source": "5ad8000088b309eb7941e811c3a98c48ffad4699",
+  "ipa": {
+    "name": "PersonalAssistant-iOS-3.5.1-build16-unsigned.ipa",
+    "size": 108177329,
+    "digest": "sha256:10174dc2b20371951c6006942219f0a59591e939b91da46464aac6d09c228591",
+    "url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build16/PersonalAssistant-iOS-3.5.1-build16-unsigned.ipa"
+  },
+  "device_artifact": 12712295828,
+  "ui_artifact": 12713516152,
+  "all_checks_match_source": true,
+  "checks": {
+    "core": {
+      "tests": 213,
+      "failures": 0,
+      "job": 122025325713
+    },
+    "stickers": {
+      "images": 16,
+      "result": "success",
+      "job": 122025289222
+    },
+    "ios_native": {
+      "tests": 80,
+      "failures": 0,
+      "seconds": 2.423,
+      "job": 122025287088
+    },
+    "ios_ui": {
+      "tests": 29,
+      "failures": 0,
+      "seconds": 1206.983,
+      "job": 122025287088,
+      "execution_timeouts": 0,
+      "result": "TEST SUCCEEDED"
+    }
+  },
+  "package_verification": {
+    "version": "3.5.1",
+    "build": "16",
+    "sdk": "iphoneos26.2",
+    "platform": "iOS device",
+    "architecture": "arm64",
+    "unsigned": true,
+    "fairplay_encrypted": false,
+    "minimum_ios": "17.0",
+    "bundle_id": "cn.local.assistant.ios",
+    "bytes": 108177329,
+    "sha256": "10174dc2b20371951c6006942219f0a59591e939b91da46464aac6d09c228591",
+    "device_installation_verified": false,
+    "companion_engine": "deepseek-flash",
+    "companion_model_bundled": false,
+    "live_conversation_evaluation_performed": false
+  },
+  "screenshots_viewed": [
+    "7F05D06E-9C09-4AC4-9567-BB47B5312B3A.png",
+    "147A9313-FDD9-4D68-99CD-35F3CB0CDDB8.png",
+    "99363B0D-EC45-457B-892C-8A904017BEE5.png"
+  ],
+  "real_paid_provider_quality_evaluation": false,
+  "physical_iphone_acceptance": false
+}

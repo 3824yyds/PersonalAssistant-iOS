@@ -91,16 +91,6 @@ enum CompanionDirectory {
     static func remove(_ id:String,in document:inout Document) throws {
         var rooms=try groups(document);rooms.removeAll {$0.id==id};document.root.raw["companionRooms"]=try encode(rooms)
     }
-    static func recipients(question:String,selected:CompanionPersona?,group:CompanionGroup,document:Document)->[CompanionPersona] {
-        if let selected,group.members.contains(selected) {return [selected]}
-        let mentioned=group.members.filter {p in
-            let title=(try? read(.direct(p),in:document).profile.name) ?? nil
-            return question.contains("@"+p.label) || (title.map {question.contains("@"+$0)} ?? false)
-        }
-        if !mentioned.isEmpty {return mentioned}
-        if CompanionClock.reply(question) != nil {return Array(group.members.prefix(1))}
-        return group.members
-    }
     static func pending(_ turn:CompanionMessage,in data:CompanionData)->[CompanionPersona] {
         let completed=Set(data.messages.filter {$0.turnID==turn.id}.compactMap(\.speakerID))
         return (turn.recipients ?? []).compactMap(CompanionPersona.init(rawValue:)).filter {!completed.contains($0.rawValue)}
@@ -111,13 +101,10 @@ enum CompanionDirectory {
         if data.profile.growthEnabled == false {context.profile.growthEnabled=false}
         // Group memories and shared history stay in the room. No private transcript/memories are copied.
         context.profile.proactive=false
+        context.profile.sharedRoom=nil
         context.messages=data.messages.map {message in
             var mapped=message
-            if message.role=="assistant",let id=message.speakerID,let author=CompanionPersona(rawValue:id) {
-                let name=(try? read(.direct(author),in:document).profile.title) ?? author.label
-                mapped.content="群成员「"+name+"」（"+id+"）说："+message.content
-                if author != persona {mapped.role="user"}
-            }
+            if message.role=="assistant" {mapped.content=CompanionGroupChat.clean(message.content)}
             return mapped
         }
         return context

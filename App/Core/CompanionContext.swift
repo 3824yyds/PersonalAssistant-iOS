@@ -64,7 +64,7 @@ enum CompanionContext {
         for fact in values {
             guard !fact.text.isEmpty,fact.text.count<=180,!fact.quote.isEmpty,fact.quote.count<=500,
                   let message=byID[fact.messageID],message.contextText.contains(fact.quote) else {return nil}
-            lines.append((message.role=="user" ? "用户说：":"伙伴曾回复：")+fact.text)
+            lines.append((message.role=="user" ? "用户说：":(message.speakerID.flatMap(CompanionPersona.init(rawValue:)).map {$0.label+"曾回复："} ?? "伙伴曾回复："))+fact.text)
         }
         let text=lines.joined(separator:"\n")
         return text.count<=summaryLimit ? text:nil

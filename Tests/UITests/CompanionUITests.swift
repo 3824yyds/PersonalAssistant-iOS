@@ -44,15 +44,58 @@ final class CompanionUITests:XCTestCase {
         XCTAssertEqual(app.staticTexts["companion.title"].label,"伙伴")
         app.buttons["companion.back"].tap();app.buttons["companion.hub.male"].tap();XCTAssertEqual(app.staticTexts["companion.title"].label,"阿川")
     }
-    func testGroupCreationBothSpeakersAndMentionedOnlyReplyPersist() {
+    func testGroupCreationNaturalAddressingAndBothSpeakersPersist() {
         let app=launchProduct(["--ui-companion-fixture"]);tapProductTab("助理",in:app);createGroup(app)
         send("大家一起聊聊",app)
         XCTAssertTrue(app.staticTexts["我也在，今天想一起聊点什么？"].waitForExistence(timeout:8));XCTAssertTrue(app.staticTexts["先挑一件最想聊的，我听着。"].waitForExistence(timeout:8))
-        app.buttons["companion.group.target"].tap();app.buttons["@男生伙伴"].tap();send("只让你回答",app)
+        XCTAssertFalse(app.buttons["companion.group.target"].exists);send("男生伙伴，你回答就好",app)
         XCTAssertTrue(app.staticTexts["这轮我单独接话。"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1)
-        recordScreen(app,"CompanionGroupWithDistinctSpeakersAndMention")
+        recordScreen(app,"CompanionGroupWithNaturalAddressing")
         app.buttons["companion.back"].tap();app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.hub.group.'")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts["这轮我单独接话。"].waitForExistence(timeout:5))
+    }
+    func testGroupNaturalChatCleansLegacyLabelsAndRoutesByNameAndContextWithoutMentions() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-group-delivery-fixture","--ui-companion-group-legacy-fixture"])
+        tapProductTab("助理",in:app);openHub(app)
+        app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.hub.group.'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["阿力你好，我是大肥鱼。"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["companion.group.target"].exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '群发言者' OR label CONTAINS '群成员「'")).firstMatch.exists)
+        send("阿力，你说一下",app)
+        XCTAssertTrue(app.staticTexts["我先把计划理一理，你听听合不合适。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1)
+        send("她刚才说的你怎么看",app)
+        XCTAssertTrue(app.staticTexts["她的意思是先把分工说清楚，我赞同。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '群发言者' OR label CONTAINS '群成员「'")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["companion.error.message"].exists)
+        recordScreen(app,"CompanionNaturalGroupNamesAndContext")
+        app.buttons["companion.back"].tap();app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.hub.group.'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["她的意思是先把分工说清楚，我赞同。"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.buttons["companion.group.target"].exists)
+    }
+    func testGroupIntroductionHasNaturalSeparateRepliesThroughRealDeliveryPipeline() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-group-delivery-fixture"])
+        tapProductTab("助理",in:app);createGroup(app);send("你们彼此互相认识一下",app)
+        XCTAssertTrue(app.staticTexts["阿力你好，我是大肥鱼。以后直接聊就行。"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["你好，大肥鱼。我是阿力，以后慢慢聊。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1);XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.male").count,1)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '群发言者' OR label CONTAINS '群成员「'")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["companion.group.target"].exists)
+        recordScreen(app,"CompanionNaturalGroupIntroduction")
+    }
+    func testGroupQuotedReplyAutomaticallyTargetsOriginalSpeaker() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-group-delivery-fixture"])
+        tapProductTab("助理",in:app);createGroup(app);send("你们彼此互相认识一下",app)
+        let answer=app.staticTexts["你好，大肥鱼。我是阿力，以后慢慢聊。"]
+        XCTAssertTrue(answer.waitForExistence(timeout:8));answer.press(forDuration:1);app.buttons["回复"].tap()
+        XCTAssertTrue(app.descendants(matching:.any).matching(identifier:"companion.reply.preview").firstMatch.waitForExistence(timeout:5))
+        send("这句展开聊聊",app)
+        XCTAssertTrue(app.staticTexts["我说的是先分清要做什么，咱们一件一件来。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.female").count,1)
+        XCTAssertEqual(app.staticTexts.matching(identifier:"companion.speaker.male").count,2)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format:"label CONTAINS '群发言者' OR label CONTAINS '群成员「'")).firstMatch.exists)
+        recordScreen(app,"CompanionGroupReplyAutomaticallySelectsQuotedSpeaker")
     }
     func testGroupCancellationRetriesOnlyMissingMember() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-group-slow-fixture"]);tapProductTab("助理",in:app);createGroup(app)
