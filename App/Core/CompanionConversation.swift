@@ -133,6 +133,16 @@ extension CompanionRules {
         state.messages.append(CompanionMessage(role:"assistant",content:"好，那我就叫\(candidate)啦！",source:"伙伴资料",renamedFrom:old ?? "",renamedTo:candidate))
         return true
     }
+    /// Retry an already persisted user turn without appending it a second time. This also
+    /// recovers a pre-update naming confirmation that failed before its local receipt saved.
+    static func localRetry(_ state:CompanionData,now:Date=Date())->CompanionData? {
+        guard let user=state.messages.last,user.role=="user",user.replyTo==nil else {return nil}
+        var next=state;next.messages.removeLast()
+        guard (try? appendUserTurn(user.content,to:&next,now:now)) == true else {return nil}
+        let userIndex=next.messages.count-2
+        next.messages[userIndex]=user
+        return next
+    }
     @discardableResult static func undoMemory(_ message:CompanionMessage,in data:inout CompanionData)->Bool {
         guard let id=message.memoryID,let current=data.memories.first(where:{$0.id==id}),
               message.rememberedText == nil || current.text==message.rememberedText else {return false}

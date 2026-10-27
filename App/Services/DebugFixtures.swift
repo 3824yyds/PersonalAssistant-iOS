@@ -72,6 +72,12 @@ enum DebugFixtures {
             state.messages=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这是送我的名字吗？"),CompanionMessage(role:"user",content:"名字"),CompanionMessage(role:"assistant",content:"确认一下，是叫我“大肥鱼”对吧？")]
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-response-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-recover-confirmed-fixture") {
+            var state=CompanionData();state.profile.nameRecoveryChecked=true;state.profile.proactive=false
+            state.messages=[CompanionMessage(role:"assistant",content:"你来啦，今天过得怎么样？也可以先给我取个名字呀。"),CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这名字来得突然，我抖了抖水花～真要拿“大肥鱼”当我的名字？确认了我可就顶着它到处游了。")]
+            if ProcessInfo.processInfo.arguments.contains("--ui-companion-recover-confirmed-fixture") {state.messages += [CompanionMessage(role:"user",content:"是的"),CompanionMessage(role:"user",content:"今天的天气怎么样")]}
+            try? state.write(to:&d)
+        }
         if ProcessInfo.processInfo.arguments.contains("--ui-companion-quote-fixture") {
             var state=CompanionData();state.profile.name="小鱼";state.profile.proactive=false;state.profile.nameRecoveryChecked=true
             state.messages=[CompanionMessage(id:"quoted-first",role:"assistant",content:"先聊长沙计划，还是西安？"),CompanionMessage(id:"quoted-user",role:"user",content:"西安先排五天"),CompanionMessage(id:"quoted-last",role:"assistant",content:"好，西安可以先留五天。")]

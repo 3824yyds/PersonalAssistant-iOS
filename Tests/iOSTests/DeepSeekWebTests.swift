@@ -16,7 +16,77 @@ private final class WebProtocol:URLProtocol {
     }
     override func stopLoading() {}
 }
+private final class DelayedCompanionProtocol:URLProtocol {
+    static var finished=false
+    private var delivery:DispatchWorkItem?
+    override class func canInit(with request:URLRequest)->Bool {request.url?.host=="api.deepseek.com"}
+    override class func canonicalRequest(for request:URLRequest)->URLRequest {request}
+    override func startLoading() {
+        client?.urlProtocol(self,didReceive:HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:"HTTP/1.1",headerFields:["Content-Type":"text/event-stream"])!,cacheStoragePolicy:.notAllowed)
+        client?.urlProtocol(self,didLoad:Data("data: {\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}\n\n".utf8))
+        let work=DispatchWorkItem { [self] in
+            Self.finished=true
+            client?.urlProtocol(self,didLoad:Data("data: {\"choices\":[{\"delta\":{\"content\":\"，接着聊。\"}}]}\n\ndata: [DONE]\n\n".utf8));client?.urlProtocolDidFinishLoading(self)
+        }
+        delivery=work;DispatchQueue.main.asyncAfter(deadline:.now()+0.5,execute:work)
+    }
+    override func stopLoading() {delivery?.cancel()}
+}
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testRepeatedUnexposedNameCallsHaveBoundedLatencyBudgetAndNeverRename() async throws {
+        var calls=0;let data=CompanionData()
+        WebProtocol.handler={_ in
+            calls+=1
+            return (200,try self.sse(["tool_calls":[["index":0,"id":"stale-\(calls)","function":["name":"propose_companion_name","arguments":"{\"name\":\"阿肥\",\"quote\":\"大肥鱼\"}"]]]]))
+        }
+        do {_=try await CompanionReplyService.answer(question:"今天的天气怎么样",data:data,history:[],client:client());XCTFail("Repeated unsupported tool calls must stop")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("本轮操作较多"))}
+        XCTAssertEqual(calls,3);XCTAssertNil(data.profile.name)
+    }
+    @MainActor func testCompanionPreviewArrivesBeforeSSECompletesAndFinalTextRemainsWhole() async throws {
+        let config=URLSessionConfiguration.ephemeral;config.protocolClasses=[DelayedCompanionProtocol.self]
+        let streamClient=DeepSeekWebClient(apiKey:"fixture",configuration:config)
+        DelayedCompanionProtocol.finished=false;var early=false,previews:[String]=[]
+        let result=try await CompanionReplyService.answer(question:"你好",data:CompanionData(),history:[],client:streamClient,onPartial:{text in
+            previews.append(text);if !text.isEmpty && !DelayedCompanionProtocol.finished {early=true}
+        })
+        XCTAssertTrue(early,"The first text must not wait for the entire answer")
+        XCTAssertTrue(previews.contains("你好"));XCTAssertEqual(result.0,"你好，接着聊。")
+    }
+    @MainActor func testWeatherAfterScreenshotConfirmationDoesNotExposeOrExecuteNameTool() async throws {
+        var data=CompanionData();data.profile.name="大肥鱼";var calls=0
+        let history=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"真要拿“大肥鱼”当我的名字？"),CompanionMessage(role:"user",content:"是的")]
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request),tools=body["tools"] as? [[String:Any]] ?? []
+            XCTAssertFalse(tools.contains {($0["function"] as? [String:Any])?["name"] as? String=="propose_companion_name"})
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"stale-name","function":["name":"propose_companion_name","arguments":"{\"name\":\"阿肥\",\"quote\":\"大肥鱼\"}"]]]]))}
+            let messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            XCTAssertTrue((messages.last?["content"] as? String ?? "").contains("工具参数无效"))
+            return (200,try self.sse(["content":"你想查哪座城市的天气？"]))
+        }
+        let result=try await CompanionReplyService.answer(question:"今天的天气怎么样",data:data,history:history,client:client())
+        XCTAssertEqual(result.0,"你想查哪座城市的天气？");XCTAssertNil(result.3);XCTAssertEqual(calls,2)
+    }
+    @MainActor func testAcceptedCompanionStickerCompletesInOneGenerationWithOriginalText() async throws {
+        var calls=0;WebProtocol.handler={_ in
+            calls+=1;XCTAssertEqual(calls,1,"A second narration-only API call adds unnecessary latency")
+            return (200,try self.sse(["content":"来，抱一下。","tool_calls":[["index":0,"id":"hug","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]]))
+        }
+        let result=try await CompanionReplyService.answer(question:"用抱抱表情包",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(calls,1);XCTAssertEqual(result.4,"hug");XCTAssertEqual(result.0,"来，抱一下。")
+    }
+    @MainActor func testExternalEvidenceAndStickerStillRequireFinalWeatherAnswer() async throws {
+        var chats=0
+        WebProtocol.handler={request in
+            if request.url?.path=="/v1/tools/search" {return (200,Data(#"{"results":[{"title":"天气来源","url":"https://example.com/weather","content":"晴，20度"}]}"#.utf8))}
+            chats+=1
+            if chats==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"weather","function":["name":"web_search","arguments":"{\"query\":\"上海 天气\"}"]]]]))}
+            if chats==2 {return (200,try self.sse(["tool_calls":[["index":0,"id":"hug","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]]))}
+            return (200,try self.sse(["content":"来源显示晴，20度[1]。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:"查上海天气，再用抱抱表情包",data:CompanionData(),history:[],client:client())
+        XCTAssertEqual(chats,3);XCTAssertEqual(result.4,"hug");XCTAssertEqual(result.2.count,1);XCTAssertTrue(result.0.contains("20度"))
+    }
     @MainActor func testPrivateGrowthFeedbackCannotBeCopiedIntoPublicSearch() async throws {
         var data=CompanionData();_=try CompanionRules.appendUserTurn("以后和我聊天少用反问，我的私人号码9876543210",to:&data)
         XCTAssertFalse((data.experiences ?? []).isEmpty)
@@ -62,7 +132,7 @@ final class DeepSeekWebTests:XCTestCase {
             return (200,try self.sse(["content":"来，抱一下。 "]))
         }
         let result=try await CompanionReplyService.answer(question:"图在哪里",data:CompanionData(),history:[],client:client())
-        XCTAssertEqual(calls,3);XCTAssertEqual(result.4,"hug");XCTAssertEqual(result.0,"来，抱一下。")
+        XCTAssertEqual(calls,2);XCTAssertEqual(result.4,"hug");XCTAssertTrue(result.0.isEmpty)
     }
     @MainActor func testPersistentFakeImageReceiptStopsAfterOneRepairWithoutCannedSuccess() async throws {
         var calls=0;WebProtocol.handler={_ in calls+=1;return (200,try self.sse(["content":"图已经发过去了。 "]))}
@@ -189,15 +259,27 @@ final class DeepSeekWebTests:XCTestCase {
         let result=try await CompanionReplyService.answer(question:emoji,data:data,history:data.messages,client:client())
         XCTAssertNil(result.4)
     }
-    @MainActor func testStickerIsNotReturnedWhenFinalTextStreamFails() async throws {
+    @MainActor func testStickerIsNotReturnedWhenOriginalToolStreamIsIncomplete() async throws {
+        var calls=0
+        WebProtocol.handler={_ in
+            calls+=1
+            let data=try self.sse(["tool_calls":[["index":0,"id":"sticker","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]])
+            return (200,Data(String(decoding:data,as:UTF8.self).replacingOccurrences(of:"data: [DONE]",with:"").utf8))
+        }
+        do {_=try await CompanionReplyService.answer(question:"陪我聊聊",data:CompanionData(),history:[],client:client());XCTFail("An incomplete tool stream must not commit any image")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("连接提前结束"))}
+        XCTAssertEqual(calls,1)
+    }
+    @MainActor func testOrdinaryChatStillGeneratesTextAndDoesNotCommitImageIfFinalStreamFails() async throws {
         var calls=0
         WebProtocol.handler={_ in
             calls+=1
             if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"sticker","function":["name":"send_companion_sticker","arguments":"{\"id\":\"hug\"}"]]]]))}
             throw URLError(.networkConnectionLost)
         }
-        do {_=try await CompanionReplyService.answer(question:"陪我聊聊",data:CompanionData(),history:[],client:client());XCTFail("An uncompleted reply must not commit a sticker")}
+        do {_=try await CompanionReplyService.answer(question:"陪我聊聊",data:CompanionData(),history:[],client:client());XCTFail("Ordinary chat must not become an image-only shortcut")}
         catch {XCTAssertEqual((error as? URLError)?.code,.networkConnectionLost)}
+        XCTAssertEqual(calls,2)
     }
     @MainActor func testNamingClarificationCanUsePreviousUserEvidenceAndProseConfirmationBecomesRealProposal() async throws {
         let history=[CompanionMessage(role:"user",content:"大肥鱼"),CompanionMessage(role:"assistant",content:"这是给我的名字吗？")]
@@ -231,7 +313,7 @@ final class DeepSeekWebTests:XCTestCase {
             calls+=1
             return (200,try self.sse(["tool_calls":[["index":0,"id":"bad-name","function":["name":"propose_companion_name","arguments":"{\"name\":\"阿肥\",\"quote\":\"不存在的取名指令\"}"]]]]))
         }
-        do {_=try await CompanionReplyService.answer(question:"我说的是吃饭时间",data:CompanionData(),history:[],client:client());XCTFail("Expected invalid proposal rejection")}
+        do {_=try await CompanionReplyService.answer(question:"我想给你取个名字",data:CompanionData(),history:[],client:client());XCTFail("Expected invalid proposal rejection")}
         catch {XCTAssertTrue(error.localizedDescription.contains("名字尚未更改"))}
         XCTAssertEqual(calls,1)
     }
@@ -314,7 +396,7 @@ final class DeepSeekWebTests:XCTestCase {
         }
         let result=try await CompanionReplyService.answer(question:"我决定了，以后你就用小鱼这个名字",data:data,history:[],client:client())
         XCTAssertEqual(result.3,"小鱼");XCTAssertTrue(result.0.contains("确认后"));XCTAssertFalse(result.0.contains("已经改名"))
-        XCTAssertNil(data.profile.name)
+        XCTAssertNil(data.profile.name);XCTAssertEqual(calls,1)
     }
     @MainActor func testCompanionOrdinaryChatUsesFlashFullContextAndSelectedTone() async throws {
         var data=CompanionData();data.profile.name="大肥鱼";data.profile.tone = .spicy;data.memories=[CompanionMemory(text:"喜欢安静的地方")]
@@ -329,7 +411,7 @@ final class DeepSeekWebTests:XCTestCase {
             XCTAssertTrue(system.contains("大肥鱼"));XCTAssertTrue(system.contains("贴吧老哥"));XCTAssertTrue(system.contains("喜欢安静的地方"))
             XCTAssertFalse(system.contains("再给必要的2–4个要点"))
             let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
-            XCTAssertEqual(tools.count,3);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"web_search")
+            XCTAssertEqual(Set(tools.compactMap {($0["function"] as? [String:Any])?["name"] as? String}),Set(["web_search","send_companion_sticker"]))
             return (200,try self.sse(["content":"哦，你问的是时间，我刚才听岔了。 "]))
         }
         let result=try await CompanionReplyService.answer(question:"我问为什么这么晚",data:data,history:history,client:client())

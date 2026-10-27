@@ -10,6 +10,7 @@ struct CompanionProfile: Codable, Equatable, Sendable {
     var tone: CompanionTone? = nil
     var gentleUntil: Date? = nil
     var nameRecoveryChecked: Bool? = nil
+    var confirmationRecoveryChecked: Bool? = nil
     var stickers: Bool? = nil
     var avatarMotion:Bool? = nil
     var personaID:String? = nil
@@ -130,7 +131,7 @@ enum CompanionRules {
               !["嗯","嗯嗯","哦","好","好的","好呀","好吧","那好吧","行","可以","随便","你好","谢谢","再见","什么","什么名字","啥","谁","今天有点累","我一个人"].contains(name) else { return nil }
         return cleanName(name)
     }
-    private static func contextualName(_ name:String)->String? {
+    static func contextualName(_ name:String)->String? {
         let words=String(name.filter {$0.isLetter || $0.isNumber})
         guard !words.isEmpty,!["嗯","嗯嗯","哦","好","好的","好呀","好吧","对","对的","是","是的","谢谢","名字","你的名字"].contains(words),
               name.range(of:"我|你|他说|她说|取名|起名|叫|今天|帮忙|以后|给你|吃饭|睡觉|累了|不想|不知道",options:.regularExpression)==nil else {return nil}

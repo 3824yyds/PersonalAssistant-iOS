@@ -1,6 +1,23 @@
 import XCTest
 
 final class CompanionUITests:XCTestCase {
+    func testNewScreenshotYesConfirmsNameAndWeatherUsesOrdinaryChat() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-response-fixture","--ui-companion-delivery-fixture"]);tapProductTab("助理",in:app);enter(app)
+        send("是的",app);XCTAssertTrue(app.staticTexts["好呀，那我就叫大肥鱼啦！"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+        send("今天的天气怎么样",app)
+        XCTAssertTrue(app.staticTexts["你想查哪座城市的天气？"].waitForExistence(timeout:8))
+        XCTAssertFalse(app.staticTexts["companion.error.message"].exists)
+        recordScreen(app,"CompanionScreenshotNameThenWeatherFixed")
+        app.buttons["companion.back"].tap();enter(app);XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
+    }
+    func testUpgradeRecoversExistingConfirmationAndKeepsUnansweredWeatherRetryable() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-recover-confirmed-fixture","--ui-companion-delivery-fixture"]);tapProductTab("助理",in:app);enter(app)
+        let recovered=expectation(for:NSPredicate(format:"label == %@","大肥鱼"),evaluatedWith:app.staticTexts["companion.title"]);wait(for:[recovered],timeout:8)
+        XCTAssertTrue(app.buttons["重试这句话"].waitForExistence(timeout:8));app.buttons["重试这句话"].tap()
+        XCTAssertTrue(app.staticTexts["你想查哪座城市的天气？"].waitForExistence(timeout:8));XCTAssertFalse(app.staticTexts["companion.error.message"].exists)
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format:"label == %@","今天的天气怎么样")).count,1)
+        recordScreen(app,"CompanionRecoveredConfirmationBeforeWeather")
+    }
     func testRealDeliveryPipelineRendersImagesInsteadOfMetadataAndAllowsExplicitRepeat() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-delivery-fixture"]);tapProductTab("助理",in:app);enter(app)
         XCTAssertFalse(app.staticTexts["Flash · 文字伙伴"].exists)

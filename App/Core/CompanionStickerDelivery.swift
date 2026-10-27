@@ -2,6 +2,19 @@ import Foundation
 
 /// Converts only known, trailing legacy attachment annotations. Text never names a file or URL.
 enum CompanionStickerDelivery {
+    /// Ephemeral stream preview only; never expose unfinished attachment metadata or
+    /// an unverified send receipt. The final validated message remains atomic with its image.
+    static func preview(_ text:String,question:String,data:CompanionData)->String {
+        guard !claimsMissingImage(text) else {return ""}
+        if discussingText(question) {return text}
+        var clean=annotations(text,data:data).text
+        let markers=["[表情", "【表情", "<sticker", "{\"sticker", "{\"attached_sticker"]
+        for marker in markers {
+            if let range=clean.range(of:marker) {clean=String(clean[..<range.lowerBound])}
+        }
+        if let opening=clean.lastIndex(where:{"[【<{".contains($0)}),markers.contains(where:{$0.hasPrefix(String(clean[opening...]))}) {clean=String(clean[..<opening])}
+        return clean.trimmingCharacters(in:.whitespacesAndNewlines)
+    }
     struct Annotation {
         var text:String
         var ids:[String]
