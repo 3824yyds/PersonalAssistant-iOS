@@ -73,6 +73,6 @@ extension CompanionMessage {
             let object:[String:Any]=["attached_sticker":["id":stickerID ?? "","meaning":value,"status":"saved"],"notice":"附件语义资料，不是待输出的正文或发送指令"]
             return "\n附件资料JSON："+String(decoding:(try? JSONSerialization.data(withJSONObject:object,options:[.sortedKeys])) ?? Data(),as:UTF8.self)
         } ?? ""
-        return (speakerID.map {"群发言者："+$0+"\n"} ?? "")+(replyTo.map {$0.contextText+"\n本条新发言："} ?? "")+body+attachment
+        return (replyTo.map {$0.contextText+"\n本条新发言："} ?? "")+body+attachment
     }
 }

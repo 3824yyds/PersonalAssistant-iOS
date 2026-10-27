@@ -33,6 +33,73 @@ private final class DelayedCompanionProtocol:URLProtocol {
     override func stopLoading() {delivery?.cancel()}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testGroupServiceCleansNestedScreenshotLabelsInPreviewAndFinalReply() async throws {
+        var document=Document(),female=CompanionData(),male=CompanionPersona.male.initial
+        female.profile.name="大肥鱼";male.profile.name="阿力";try female.write(to:&document);try CompanionDirectory.write(male,space:.direct(.male),to:&document)
+        var room=try CompanionDirectory.create(name:"工作室",members:[.female,.male],in:&document)
+        let turn=CompanionMessage(role:"user",content:"你们彼此互相认识一下",recipients:["female","male"])
+        room.data.messages=[turn,CompanionMessage(role:"assistant",content:"群发言者：female\n群成员「大肥鱼」（female）说：阿力你好。",speakerID:"female",turnID:turn.id)]
+        let context=CompanionDirectory.groupContext(room.data,as:.male,document:document);var calls=0,previews:[String]=[]
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]])
+            let json=try XCTUnwrap((messages[1]["content"] as? String)?.data(using:.utf8)),object=try XCTUnwrap(JSONSerialization.jsonObject(with:json) as? [String:Any]),records=try XCTUnwrap(object["conversation"] as? [[String:Any]])
+            XCTAssertEqual(records.count,2);XCTAssertEqual(records[1]["text"] as? String,"阿力你好。");XCTAssertEqual(records[1]["speaker_id"] as? String,"female")
+            return (200,try self.sse(["content":"群发言者：male\n群成员「阿力」（male）说：群发言者：male\n好啊，大肥鱼，以后直接聊就行。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:turn.content,data:context,history:context.messages,client:client(),allowNaming:false,scene:CompanionGroupChat.scene(room,as:.male,document:document),incomingMessage:turn,onPartial:{previews.append($0)})
+        XCTAssertEqual(calls,1);XCTAssertEqual(result.0,"好啊，大肥鱼，以后直接聊就行。")
+        XCTAssertTrue(previews.allSatisfy {!$0.contains("群发言者") && !$0.contains("群成员") && !$0.contains("male")})
+    }
+    @MainActor func testAmbiguousGroupReferenceUsesSmallToolFreeSemanticPlanWithNoPrivateMemory() async throws {
+        var document=Document(),male=CompanionPersona.male.initial;male.profile.name="阿力";male.memories=[CompanionMemory(text:"只在私聊的秘密")];try CompanionDirectory.write(male,space:.direct(.male),to:&document)
+        var group=try CompanionDirectory.create(name:"工作室",members:[.female,.male],in:&document)
+        let old=CompanionMessage(role:"user",content:"大家聊聊",recipients:["female","male"])
+        group.data.messages=[old,CompanionMessage(role:"assistant",content:"她刚刚说得挺有意思。",speakerID:"male",turnID:old.id)]
+        let turn=CompanionMessage(role:"user",content:"她刚才说的你怎么看",recipients:["female","male"],routingPending:true);var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request)
+            XCTAssertNil(body["tools"]);XCTAssertEqual(body["max_tokens"] as? Int,192)
+            let text=String(decoding:try JSONSerialization.data(withJSONObject:body),as:UTF8.self)
+            XCTAssertTrue(text.contains("阿力"));XCTAssertTrue(text.contains("她刚才说的你怎么看"));XCTAssertFalse(text.contains("只在私聊的秘密"))
+            return (200,try self.sse(["content":"{\"speakers\":[\"male\"]}"]))
+        }
+        let result=try await CompanionGroupReplyService.recipients(turn:turn,group:group,document:document,client:client())
+        XCTAssertEqual(result,[.male]);XCTAssertEqual(calls,1)
+        let snapshot=group.data
+        for invalid in ["{\"speakers\":[\"female\",\"female\"]}","{\"speakers\":[\"ghost\"]}","{\"speakers\":[]}","{\"speakers\":[\"male\"],\"say\":\"bad\"}"] {
+            WebProtocol.handler={_ in (200,try self.sse(["content":invalid]))}
+            do {_=try await CompanionGroupReplyService.recipients(turn:turn,group:group,document:document,client:client());XCTFail("Invalid routing must remain retryable")}
+            catch {}
+        }
+        XCTAssertEqual(group.data,snapshot)
+    }
+    @MainActor func testClearGroupAddressAndQuoteNeverNeedAnExtraRoutingRequest() async throws {
+        var document=Document(),male=CompanionPersona.male.initial;male.profile.name="阿力";try CompanionDirectory.write(male,space:.direct(.male),to:&document)
+        let group=try CompanionDirectory.create(name:"小群",members:[.female,.male],in:&document)
+        WebProtocol.handler={_ in XCTFail("Unambiguous chat should not make an extra API request");throw URLError(.badServerResponse)}
+        let direct=CompanionMessage(role:"user",content:"阿力，你说呢",recipients:["female","male"])
+        let collective=CompanionMessage(role:"user",content:"大家认识一下",recipients:["female","male"])
+        let quoted=CompanionMessage(role:"user",content:"这条展开聊聊",replyTo:CompanionQuote(messageID:"quoted",role:"assistant",text:"慢慢来。",authorID:"male"),recipients:["female","male"])
+        let first=try await CompanionGroupReplyService.recipients(turn:direct,group:group,document:document,client:client())
+        let both=try await CompanionGroupReplyService.recipients(turn:collective,group:group,document:document,client:client())
+        let selected=try await CompanionGroupReplyService.recipients(turn:quoted,group:group,document:document,client:client())
+        XCTAssertEqual(first,[.male]);XCTAssertEqual(both,[.female,.male]);XCTAssertEqual(selected,[.male])
+    }
+    @MainActor func testGroupIdentityOnlyCandidatesCannotPersistAsDialogueAndRepairIsBounded() async throws {
+        var calls=0;WebProtocol.handler={_ in calls+=1;return (200,try self.sse(["content":"群发言者：female\n群成员「大肥鱼」（female）说："]))}
+        do {_=try await CompanionReplyService.answer(question:"大家好",data:CompanionData(),history:[],client:client(),allowNaming:false,scene:"共享群聊，只说自然正文。");XCTFail("Identity labels alone are not a reply")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("没有有效正文"))}
+        XCTAssertEqual(calls,2)
+    }
+    @MainActor func testInterruptedGroupRoutingDoesNotAcceptPartialPlan() async throws {
+        var document=Document();let group=try CompanionDirectory.create(name:"小群",members:[.female,.male],in:&document)
+        WebProtocol.handler={_ in
+            let full=try self.sse(["content":"{\"speakers\":[\"male\"]}"])
+            return (200,Data(String(decoding:full,as:UTF8.self).replacingOccurrences(of:"data: [DONE]\n\n",with:"").utf8))
+        }
+        do {_=try await CompanionGroupReplyService.recipients(turn:CompanionMessage(role:"user",content:"你呢",recipients:["female","male"]),group:group,document:document,client:client());XCTFail("A disconnected plan is not complete")}
+        catch {XCTAssertTrue(error.localizedDescription.contains("提前结束"))}
+    }
     @MainActor func testRepeatedUnexposedNameCallsHaveBoundedLatencyBudgetAndNeverRename() async throws {
         var calls=0;let data=CompanionData()
         WebProtocol.handler={_ in

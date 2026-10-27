@@ -50,6 +50,7 @@ struct CompanionMessage: Codable, Equatable, Identifiable, Sendable {
     var speakerID:String? = nil
     var turnID:String? = nil
     var recipients:[String]? = nil
+    var routingPending:Bool? = nil
 }
 
 struct CompanionData: Codable, Equatable, Sendable {
@@ -88,6 +89,7 @@ struct CompanionData: Codable, Equatable, Sendable {
               messages.allSatisfy({m in
                   (m.speakerID==nil || (m.role=="assistant" && CompanionPersona(rawValue:m.speakerID!) != nil)) &&
                   (m.turnID==nil || (m.role=="assistant" && !m.turnID!.isEmpty && m.turnID!.count<=100)) &&
+                  (m.routingPending==nil || (m.role=="user" && m.recipients != nil)) &&
                   (m.recipients==nil || (m.role=="user" && !(m.recipients ?? []).isEmpty && (m.recipients?.count ?? 0)<=2 && Set(m.recipients ?? []).count==m.recipients?.count && (m.recipients ?? []).allSatisfy {CompanionPersona(rawValue:$0) != nil}))
               }),
               memories.allSatisfy({ ["preference", "topic"].contains($0.kind) && !$0.text.isEmpty && $0.text.count <= 300 && $0.quote.count <= 1200 }),

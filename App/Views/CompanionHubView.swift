@@ -55,7 +55,7 @@ private struct CompanionGroupCreateView:View {
         Form {
             Section("群名称") {TextField("1到20字",text:$name).accessibilityIdentifier("companion.group.name")}
             Section("邀请伙伴") {ForEach(CompanionPersona.allCases) {p in Toggle(isOn:Binding(get:{selected.contains(p)},set:{if $0 {selected.insert(p)}else{selected.remove(p)}})) {HStack {CompanionAvatar(size:38,persona:p);Text((try? CompanionDirectory.read(.direct(p),in:store.current).profile.name) ?? p.label)}}}}
-            Section {Text("普通消息最多让两位各接一句；@某一位时只由对应伙伴回复。不会自动无限互聊。每位伙伴的回复分别产生模型用量。群内只使用共享聊天与群内记忆。") .font(.footnote).foregroundStyle(.secondary)}
+            Section {Text("直接像平常一样聊天，伙伴会结合称呼、引用和上下文接话。每轮最多两位各接一句，不会无限互聊。回复与需要时的发言判断会产生模型用量；群内只使用共享聊天与群内记忆。") .font(.footnote).foregroundStyle(.secondary)}
             if let error {Text(error).foregroundStyle(.red)}
         }.navigationTitle("创建群聊").navigationBarTitleDisplayMode(.inline)
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("取消") {dismiss()}.disabled(saving)};ToolbarItem(placement:.confirmationAction) {Button("创建") {save()}.disabled(saving || selected.isEmpty || CompanionRules.cleanName(name)==nil).accessibilityIdentifier("companion.group.confirm")}}
@@ -80,7 +80,7 @@ struct CompanionGroupInfoView:View {
             Section("群名称") {TextField("群名称",text:$name)}
             Section("群成员") {ForEach(session.members) {p in HStack {CompanionAvatar(size:42,persona:p);VStack(alignment:.leading) {Text(session.profile(p).title);Text(p.gender).font(.caption).foregroundStyle(.secondary)}}}}
             Section {NavigationLink("群里的相处习惯") {CompanionGrowthView(session:session)}}
-            Section {Text("用输入框上方的@选择回复者。普通消息每位最多接一句，群聊不会自己无限继续。共享记忆与私聊分开；人物名字、外貌与基础性格沿用各自资料。要给某一位改名，请进入对应私聊。") .font(.footnote).foregroundStyle(.secondary)}
+            Section {Text("直接叫名字或回复某条消息，就能和对应伙伴聊；对大家说话时，两位可以自然接话。每轮每位最多一句，不会无限互聊。共享记忆与私聊分开，形象与基础性格沿用各自资料。改名请到对应私聊。") .font(.footnote).foregroundStyle(.secondary)}
             if let error=session.error {Text(error).foregroundStyle(.red)}
         }.navigationTitle("群聊信息").navigationBarTitleDisplayMode(.inline).onAppear {name=session.title}
             .toolbar {ToolbarItem(placement:.cancellationAction) {Button("完成") {dismiss()}};ToolbarItem(placement:.confirmationAction) {Button("保存") {saving=true;Task {if let clean=CompanionRules.cleanName(name),await session.update({$0.profile.name=clean}) {dismiss()};saving=false}}.disabled(saving || CompanionRules.cleanName(name)==nil)}}

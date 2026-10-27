@@ -72,7 +72,7 @@ final class CompanionRoomsAndDeliveryTests:XCTestCase {
         let context=CompanionDirectory.groupContext(group.data,as:.male,document:document)
         XCTAssertEqual(context.profile.persona,.male);XCTAssertEqual(context.memories,group.data.memories)
         let system=CompanionConversation.messages(question:"继续聊",data:context,history:context.messages)[0]["content"] as? String ?? ""
-        XCTAssertFalse(system.contains("私聊的秘密"));XCTAssertTrue(context.messages.last!.content.contains("female"));XCTAssertEqual(context.messages.last?.role,"user")
+        XCTAssertFalse(system.contains("私聊的秘密"));XCTAssertEqual(context.messages.last?.speakerID,"female");XCTAssertEqual(context.messages.last?.content,"去散步吧。");XCTAssertEqual(context.messages.last?.role,"assistant")
         XCTAssertEqual(try CompanionDirectory.read(.direct(.female),in:document).memories,female.memories)
     }
     func testGroupRetryTargetsOnlyMissingMembersAndRejectsDuplicateTurnReplies() throws {
@@ -85,13 +85,12 @@ final class CompanionRoomsAndDeliveryTests:XCTestCase {
         try CompanionDirectory.write(group.data,space:.group(group.id),to:&document);XCTAssertNoThrow(try document.validated())
         group.data.messages.append(CompanionMessage(role:"assistant",content:"重复",speakerID:"female",turnID:user.id));XCTAssertThrowsError(try group.validate())
     }
-    func testGroupMentionsAndExplicitSelectionDoNotStartAutonomousRounds() throws {
+    func testGroupNaturalAddressingDoesNotNeedMentionsOrStartAutonomousRounds() throws {
         var document=Document(),male=CompanionPersona.male.initial;male.profile.name="阿川";try CompanionDirectory.write(male,space:.direct(.male),to:&document)
         let group=try CompanionDirectory.create(name:"小群",members:[.female,.male],in:&document)
-        XCTAssertEqual(CompanionDirectory.recipients(question:"大家聊聊",selected:nil,group:group,document:document),[.female,.male])
-        XCTAssertEqual(CompanionDirectory.recipients(question:"@阿川 你说呢",selected:nil,group:group,document:document),[.male])
-        XCTAssertEqual(CompanionDirectory.recipients(question:"大家聊聊",selected:.female,group:group,document:document),[.female])
-        XCTAssertEqual(CompanionDirectory.recipients(question:"现在几点了",selected:nil,group:group,document:document).count,1)
+        XCTAssertEqual(CompanionGroupChat.localRecipients(question:"大家聊聊",replyTo:nil,group:group,document:document),[.female,.male])
+        XCTAssertEqual(CompanionGroupChat.localRecipients(question:"阿川，你说呢",replyTo:nil,group:group,document:document),[.male])
+        XCTAssertEqual(CompanionGroupChat.localRecipients(question:"现在几点了",replyTo:nil,group:group,document:document)?.count,1)
         XCTAssertThrowsError(try CompanionDirectory.create(name:"坏群",members:[.female,.female],in:&document))
         XCTAssertThrowsError(try CompanionDirectory.create(name:"空群",members:[],in:&document))
     }
