@@ -54,6 +54,14 @@ final class CompanionGroupChatTests:XCTestCase {
             XCTAssertNil(CompanionGroupChat.localRecipients(question:q,replyTo:nil,group:group,document:document),q)
         }
     }
+    func testExclusionsRedirectionsAndSpeakerOrderNeverUseNaiveNameOrCollectiveShortcut() throws {
+        let (document,group)=try room()
+        let quote=CompanionQuote(messageID:"source",role:"assistant",text:"慢慢聊。",authorID:"male")
+        for q in ["大家先别说话，让阿力回答","你们不用都回答，阿力说就行","大家聊聊，让他先说","阿力，你先别接话，让她说","大肥鱼，不用你回答，我问他","你们谁先说一下","大家先让男生说说","不是问你，我在问她","换一位回答","另一位怎么看"] {
+            XCTAssertNil(CompanionGroupChat.localRecipients(question:q,replyTo:nil,group:group,document:document),q)
+            XCTAssertNil(CompanionGroupChat.localRecipients(question:q,replyTo:quote,group:group,document:document),"quoted: "+q)
+        }
+    }
     func testPlansRejectInventedMissingRepeatedAndEmptyMembersAndKeepRequestedOrder() throws {
         XCTAssertEqual(try CompanionGroupChat.validatedPlan(["male","female"],members:[.female,.male]),[.male,.female])
         for raw in [[],["female","female"],["unknown"],["male","unknown"]] {XCTAssertThrowsError(try CompanionGroupChat.validatedPlan(raw,members:[.female,.male]))}
