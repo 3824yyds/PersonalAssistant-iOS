@@ -55,11 +55,13 @@ enum CompanionGroupChat {
         let q=question.trimmingCharacters(in:.whitespacesAndNewlines)
         // A name/collective address is not enough when the sentence excludes,
         // redirects or reorders speakers. Let the semantic planner read it all.
-        let redirect = #"只有|只让|只要.{0,12}(?:回答|接话|说)|(?:不要|不用|别|先别|不必).{0,8}(?:回答|接话|开口|说话|抢话)|(?:问|让)(?:他|她)|(?:让|请)(?:男生|女生)|先让.{0,20}(?:说|答)|不是(?:问|跟|对)你|没(?:在)?问你|换(?:个人|一位|一个)|另一(?:个|位)|其他人|其余|(?:男生|女生|他|她).{0,4}先(?:说|答|来)|谁.{0,6}先(?:说|答|来)"#
-        if q.range(of:redirect,options:.regularExpression) != nil {return nil}
-        if q.range(of:#"^(?:大家|你们|两位|各位|你俩)"#,options:.regularExpression) != nil || q.range(of:#"^(?:早上好|晚上好|你好|嗨|哈喽|hello|hi)(?:[，,！!？?。\s]|$)"#,options:[.regularExpression,.caseInsensitive]) != nil {return group.members}
+        if q.range(of:"不|别|只|先|谁|换|他|她|另|其|让|除",options:.regularExpression) != nil {return nil}
         let names=group.members.map {member in (member,((try? CompanionDirectory.read(.direct(member),in:document).profile.name) ?? nil) ?? member.label)}
         let mentioned=names.filter {q.contains($0.1)}
+        if q.range(of:#"^(?:大家|你们|两位|各位|你俩)"#,options:.regularExpression) != nil {
+            return mentioned.isEmpty ? group.members:nil
+        }
+        if q.range(of:#"^(?:早上好|晚上好|你好|嗨|哈喽|hello|hi)(?:[，,！!？?。\s]|$)"#,options:[.regularExpression,.caseInsensitive]) != nil,mentioned.isEmpty {return group.members}
         if mentioned.count==1,let (member,name)=mentioned.first {
             let pattern="^@?"+NSRegularExpression.escapedPattern(for:name)+#"(?:[，,：:！!？?。\s]|你|请|帮我)"#
             if q.range(of:pattern,options:.regularExpression) != nil {return [member]}
