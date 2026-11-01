@@ -10,10 +10,14 @@
 
 仅将这一条回复的朗读文本发送给语音服务，不发送整段历史、记忆或账本。去除Markdown装饰、引用序号、网址和不适合朗读的emoji。下载完整音频后验证可播放，再加密缓存；音频下载不携带API Key，拒绝重定向与非官方音频地址。本机语音缓存独立于32MB加密资料库，有64MB/100条上限，可单独清理。恢复备份后保留聊天文字，缺失的缓存需重新生成。换音色后重新生成会产生新用量，调整播放语速无需重新合成。
 
-验证状态以本次同源CI最终结果为准。自动化的语音网络及播放检查使用明确隔离的模拟传输和合成测试WAV，验证消息、下载、解码、缓存、错误与页面流程，**不代表对真实人声自然度、真实服务免费额度、网络延迟或实体iPhone的验收**。当前工作环境没有百炼语音账号，未调用真实付费语音服务。
+最终同源检查通过：219项核心、16张表情资源、91项原生集成和33项页面流程（6+27两阶段）。UI与设备工作流均attempt2成功，最终没有执行超时或动画通知警告。早期候选出现辅助功能标识问题与偶发离页测试超时，诊断和修复/重跑记录见HANDOFF.md。自动化的语音网络及播放检查使用明确隔离的模拟传输和合成测试WAV，验证消息、下载、解码、缓存、错误与页面流程，**不代表对真实人声自然度、真实服务免费额度、网络延迟或实体iPhone的验收**。当前工作环境没有百炼语音账号，未调用真实付费语音服务。
 
 安装：沿用原签名身份和相同Bundle ID覆盖安装Build13至16，保留四位PIN和现有资料，**无需卸载**。iPhone arm64未签名IPA，最低iOS17，iOS26 SDK，Bundle ID cn.local.assistant.ios。
 
 [下载IPA](https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build17/PersonalAssistant-iOS-3.5.1-build17-unsigned.ipa)
 
 官方接入资料：[Qwen-TTS API](https://help.aliyun.com/zh/model-studio/qwen-tts-api)、[音色列表](https://help.aliyun.com/zh/model-studio/qwen-tts-voice-list)、[价格与免费额度](https://help.aliyun.com/zh/model-studio/model-pricing)。
+
+应用源：b3cdbaf557cc72655825fdb5f432de195c8af676；同源UI41302401790与设备41302534076。安装包108305757字节，SHA-256：f6273db34b3f36ec99a120a519e492950b48f5c2e4403e5bda721794e1fc1c36。Release标签指向该应用源。
+
+[首次配置与常见问题](COMPANION_VOICE_SETUP.md) · [完整验证记录](BUILD17_VERIFICATION.json)

@@ -1,41 +1,35 @@
-# PersonalAssistant-iOS · Build 16 交接
+# PersonalAssistant-iOS · Build 17 交接
 
-2026-10-27。最新已发布为 **3.5.1（Build 16）**。应用源 **5ad8000088b309eb7941e811c3a98c48ffad4699**；分支codex/natural-group-build16，草稿PR8基于Build15分支，未合并main。后续应用改动使用Build17。
+2026-11-01。应用源 **b3cdbaf557cc72655825fdb5f432de195c8af676**；分支codex/companion-voice-build17，草稿PR9基于codex/natural-group-build16，未合并main。后续应用改动使用Build18。
 
-## 交付事实
+## 功能与配置
 
-- Release：https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build16（ID425077274）。
-- IPA：https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build16/PersonalAssistant-iOS-3.5.1-build16-unsigned.ipa
-- 本地包：/workspace/deliverables/build16-release-device/PersonalAssistant-iOS-3.5.1-build16-unsigned.ipa
-- **108177329字节，SHA256 10174dc2b20371951c6006942219f0a59591e939b91da46464aac6d09c228591**。本地CRC、arm64设备Mach-O、版本16、SDK26.2、Bundle ID、无FairPlay/DEBUG夹具/旧GGUF检查通过。CI原始校验单独保留为ci-verification.json，与本地结果及SHA256SUMS一致。
-- 同源检查40451122704、设备构建发布40451307886，最终均attempt2成功。标签v3.5.1-build16、Release target与上述已验证应用源一致；Release IPA的size/digest已核对一致。之后文档提交不改变IPA或标签。
-- 设备最终artifact12712295828，ZIPsha732439cb759ff7120fadb1c0085d76f4d2001c62eb2126d2b8174a93a10d1c99；最终UI artifact12713516152，ZIPsha96cfa5ba8bb23ddff5cd6d6596abb16b2830c4e9665c8fdc8f5848e3263c8c2f。不要把旧attempt的同名artifact当成最终包。
-- PR8：https://github.com/3824yyds/PersonalAssistant-iOS/pull/8。Build15交接归档Docs/HANDOFF_BUILD15.md。
+两位伙伴新增文字/语音/语音和文字回复。右上角「… → 语音回复」配置。北京地域百炼qwen3-tts-flash官方接口；默认女声Cherry芊悦、男声Ethan晨煦；另有固定声音可选，播放语速0.8至1.2倍。自动播放默认关闭。文字先独立保存，语音生成不阻塞下一轮，群聊按真实发言者分配音色、串行合成播放。正文可展开，失败保留文字且单独重试语音；旧消息可长按语音播放。
 
-## 修复内容
+用户已明确不试听、要安装包；用户没有语音服务账号。官方免费演示无法作为App的持续后端，本版没有共享密钥、演示爬取或系统朗读替代。**实际自然语音需要用户自己的百炼账号/北京API Key与额度；免费额度有条件及有效期。** 密钥在本机Keychain，DeepSeek仍负责文字聊天，与TTS密钥分开。没有真实服务账号，未调用真实付费TTS，未做实体iPhone、人声自然度或真实网络延迟验收。自动化使用DEBUG隔离的静音WAV验证解码、播放器、缓存和UI，不能当真人试听。
 
-用户群聊截图出现“群发言者：female”“群成员「大肥鱼」（female）说”等重复文字，还要求移除@，自动理解自然称呼与指代。
+语音仅发送当前回复的朗读文本，不发送整段历史记忆。Markdown、引用、网址和emoji去除后按标点切分，每块最多450Unicode标量，总量1800，超限明确保留文字，不截断伪成功。音频URL官方域名白名单、HTTPS、不重定向、下载不带Key、8MB上限及WAV/播放器验证。AES-GCM独立缓存64MB/100项，cacheID带作用域/消息/角色/音色/文本并绑定AAD；不占32MB资料库、不备份，可再生成。换音色会新用量，调播放速度不重新生成。
 
-旧群聊把身份拼进正文、把其他AI改作user角色，模型复述后又在后续轮次重复叠加。现在群聊用JSON独立记录真实发言者、正文、本轮用户消息标识，保留原用户与同轮伙伴回复的实际顺序，其他AI不会冒作真人用户。清理新回复的预览/最终保存，以及旧消息的显示、复制、引用显示、请求副本和历史窗口；原始记录、引用快照和窗口索引不重写。只有标签而无正文的候选不保存，最多一次重整，不伪造成功。
+离页、后台、锁定、耳机拔出或中断时停止。CompanionPlaybackAudioSession仅释放自己成功启用的音频会话，空闲关闭不干扰其他音频；Session.close幂等、无变化不重复发布状态。返回按钮保留玻璃外观，停用离页时的交互玻璃变形。保留头像动态、表情、自传照片、回复引用、自然群聊路由、48K字符窗口与环形显示。
 
-移除@选择栏及相关引导。明确称呼、简单集体消息或明确引用可直接判断；含限定、否定、转向、顺序和间接指代的句子不走简单名字捷径，使用一次无工具、关闭思考、最多192输出token的Flash判断，严格校验成员集合/去重/顺序后保存计划。原用户消息先以可选routingPending保存，失败与取消后可重试；计划确认后不重复推断，已答成员不再重复发言。每人每轮最多一条，无自主无限互聊。
+## 安装与原偏好
 
-发言判断仅取最近12条、每条最多800字的群记录；真正回答仍使用完整当前窗口与已确认摘要，不缩短既有48,000字符窗口。群内不带私聊记忆与经历，各自身份、形象、表情库保持独立。群聊摘要保留发言归属，群内习惯仅影响对应成员。新增routingPending可选，不改变加密封装版本2。
+iPhone arm64未签名IPA，iOS17起，SDK26.2，Bundle ID cn.local.assistant.ios。**使用原签名身份和相同Bundle ID覆盖安装Build13至16，保留四位PIN和资料，不要卸载。** 未改封装v2、PIN、资料库或备份迁移格式。
 
-页面回归另发现返回私聊时等待动画完成的超时。Session.visible/active改为发布状态，头像动画仅在当前页可见且活动时运行，离页或后台停止帧刷新，重新进入恢复，继续尊重个人开关及减少动态效果设置。Build15取名确认、流式预览、表情发送和四位PIN保留。
+女伙伴温暖热情、会玩梗；男伙伴以用户最新“温柔稳重、善于安慰人”为准。无后台主动消息，不重启训练、宣传视频或实时通话。用户取消内部研究限制，不重新添加。Flash/Pro在输入区选择，标题不显示Flash·文字伙伴。各私聊记忆隔离，群内只用群共享上下文。
 
-## 验证与限制
+## 早期候选与诊断记录
 
-- 213项核心、16图SHA/RGBA资源、80项原生（55网络+3输入法+18加密+4PIN附件）、29项伙伴页面全部通过。最终原生2.42秒、页面1206.98秒，TEST SUCCEEDED，没有执行超时或“动画完成通知未收到”警告。
-- 最终jobs：focused-ios122025287088、core122025325713、assets122025289222，设备122025304260。核心/资源成功结果在同源重跑中沿用，源码始终5ad8000；原生与29页面完整重跑，没有跳过断言或增加时限。
-- 已查看最终模拟器截图：7F05D06E…两人自然介绍；147A9313…旧标记清理、自然叫名与指代；99363B0D…自动回复引用作者。正确头像/昵称在气泡外，无@栏和程序前缀。图片对应网络模拟数据，不是付费模型质量评测。
-- 日志、截图和验证资料：/workspace/companion-build16-checks/final-ui；release-verification.json；最终包目录含CI原始校验、checksum与delivery-manifest.json。
-- 未做真实付费API连续质量、端到端耗时、实体iPhone或Face ID验收。复杂指代仍可能需要澄清，语义判断有额外模型用量；不能宣称完全不会理解错误或固定秒回。后台主动、音色和训练不在本次范围。
+旧580候选有父视图AX标识覆盖子按钮问题；去除父标识后四个新语音流程两轮通过。D606两轮分别遇到旧私聊/旧群聊离页动画通知超时，各89原生与其余页面通过，但两轮整体失败且门禁阻止发布，均不是交付包。B3补上音频会话所有权、幂等退出、无变化不发布与返回玻璃动画调整，并把两条超时导航回归一起纳入第一阶段。未增加时限、跳过断言或缩减覆盖。B3总33页面分6+27两阶段；原生91（80既有+9语音+2音频会话所有权），核心219、表情资源16。以下最终交付只采用同源完整成功的记录。
 
-早期4d/4ba候选与运行未交付；4ba曾在两个既有私聊流程遇到XCTest动画通知超时。补上离页头像暂停后，5ad首轮29个页面功能断言全部通过，但首条取消重试用例仍发生一次动画通知超时，Xcode判整轮失败；同一份5ad代码重跑后全部通过。旧诊断保留在first-ui与visibility-attempt1-ui。未提高时限、跳过用例或绕过发布门禁。早期未发布包删除后仅留meta/log，实际已交付Build13/14/15包未动。40b562…是5ad首轮候选SHA，最终交付必须用上面的10174d…。
+B3首轮第一阶段6项页面全部通过（284.529秒）、91项原生通过（3.099秒），后27项页面的26项通过；表情包/草稿/键盘已通过断言后，在返回伙伴列表时又发生一次动画通知超时。整轮失败，发布门禁生效。随后按原B3代码重跑完整检查，未修改测试、执行时限或应用源。同一份B3代码重跑后整套通过，记录见下。
 
-## 安装
+## 最终交付与验证
 
-**从Build13/14/15更新，用原签名身份及相同Bundle ID覆盖安装，保留四位PIN和资料，无需卸载。** iPhone arm64未签名，最低iOS17，SDK26.2，Bundle ID cn.local.assistant.ios。旧Build12及更早长密码资料/备份仍不兼容，不要把旧版卸载要求套到当前升级。
+最新已发布3.5.1（Build17），Release ID430581343：[下载页](https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build17)。[IPA](https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build17/PersonalAssistant-iOS-3.5.1-build17-unsigned.ipa)，108305757字节，SHA256 **f6273db34b3f36ec99a120a519e492950b48f5c2e4403e5bda721794e1fc1c36**。本地包在/workspace/deliverables/build17-release-device。CI原始校验、独立本地校验和SHA256SUMS一致；设备arm64、版本17、SDK26.2、Bundle ID、无FairPlay/DEBUG夹具/旧GGUF检查通过。Release目标、标签和IPA附件digest/size都已核对，与应用源B3一致；后续文档提交不改变标签或安装包。
 
-详见Docs/BUILD16_RELEASE.md与Docs/BUILD16_VERIFICATION.json。不要重启已搁置的语音、宣传视频或训练任务；男生性格以用户最新“温柔稳重、善于安慰人”为准。
+同源检查41302401790及设备发布41302534076最终均attempt2成功。UI job124845702963：第一阶段6项257.254秒，第二阶段91原生2.690秒及27页面1078.672秒，全部通过，无执行超时或动画通知警告。核心219、16张表情资源的同源成功结果沿用，逻辑job124845704146/124845737596。总33个不同UI用例，无删除断言或提高时限。设备job124845710096。
+
+最终设备artifact13082448581，ZIPsha5099f8ccbe138cce3a34bb5b4a15e7980c6a271d9236dcb655ee2822bf7dafdd；UI artifact13084316059，ZIPsha42645424686133f7d558617bb61be4ca7ebc889e71223ebd8d95c294938306b2。日志和截图在/workspace/companion-build17-checks/final-ui；summary.json逐项校验6+27与91。已看私聊文字展开、未配置账号入口、语音失败保留文字、群聊女声结束后男声播放的最终模拟器截图。静音测试WAV不代表实际人声质量。
+
+草稿PR9：https://github.com/3824yyds/PersonalAssistant-iOS/pull/9，未合并main。Build16交接已归档Docs/HANDOFF_BUILD16.md。详见Docs/BUILD17_RELEASE.md、Docs/BUILD17_VERIFICATION.json与Docs/COMPANION_VOICE_SETUP.md。旧未发布候选仅留诊断元数据，不能当最终交付；既有已交付Build13至16安装包保留。后续应用改动使用Build18。
