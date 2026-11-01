@@ -2,6 +2,14 @@ import XCTest
 @testable import AssistantCore
 
 final class CompanionHistoryTests:XCTestCase {
+    func testHistoricalNamingQuestionsDoNotBecomeNameChanges() throws {
+        for question in ["我第一次叫你大肥鱼是什么日期？","哪天给你取的名字？","我给你取名是什么时候","第一次叫你“大肥鱼”是几号","我给你取名是啥时候","我给你取名多少天了","我给你取名多长时间了","我给你取名的时间"] {
+            XCTAssertFalse(CompanionNaming.isNamingRequest(question,history:[]),question)
+            var data=CompanionData();data.profile.name="大肥鱼"
+            XCTAssertFalse(try CompanionRules.appendUserTurn(question,to:&data),question);XCTAssertEqual(data.profile.name,"大肥鱼")
+        }
+        XCTAssertTrue(CompanionNaming.isNamingRequest("以后叫你“什么时候”吧",history:[]))
+    }
     private let zone=TimeZone(identifier:"Asia/Shanghai")!
     private func date(_ value:String)->Date {ISO8601DateFormatter().date(from:value)!}
     private var old:Date {date("2026-10-26T19:36:00Z")}

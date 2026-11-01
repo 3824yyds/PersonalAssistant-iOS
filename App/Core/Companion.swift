@@ -112,7 +112,7 @@ enum CompanionRules {
     /// Statements may rename her; suggestions and bare names require a naming context.
     static func proposedName(_ input: String, history:[CompanionMessage] = []) -> String? {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.contains("如果"), !value.contains("假如"), !value.contains("假设") else { return nil }
+        guard !value.contains("如果"), !value.contains("假如"), !value.contains("假设"),!CompanionNaming.asksNamingDate(value) else { return nil }
         let pattern = #"^(?:记住[，,：:]?\s*)?(?:我说[，,：:]?\s*)?(?:那)?(?:以后(?:就)?叫你|从现在起叫你|(?:我)?给你(?:取个名字叫|取名字叫|起个名字叫|取名(?:为|叫)?|起名(?:为|叫)?)|把你的名字改成|你的名字(?:就叫|是|叫)|你就叫)[「『“\"]?(.+?)[」』”\"]?(?:吧|啦)?[。！!]*$"#
         if !value.contains("？"),!value.contains("?"), let name=captureName(value,pattern:pattern) {return name}
         let last=history.last

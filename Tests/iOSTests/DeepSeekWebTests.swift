@@ -51,7 +51,7 @@ final class DeepSeekWebTests:XCTestCase {
         let old=ISO8601DateFormatter().date(from:"2026-10-26T19:36:00Z")!,now=ISO8601DateFormatter().date(from:"2026-11-01T14:04:00Z")!
         var data=CompanionData();data.profile.web=false;data.profile.stickers=false;data.profile.name="大肥鱼"
         let first=CompanionMessage(role:"user",content:"大肥鱼",date:old);data.messages=[first];data.windows=[CompanionWindow(startIndex:1,summary:"伙伴已经有名字")]
-        let question="我第一次喊你大肥鱼是什么日期？",turn=CompanionMessage(role:"user",content:question,date:now);data.messages.append(turn)
+        let question="我第一次叫你大肥鱼是什么日期？",turn=CompanionMessage(role:"user",content:question,date:now);data.messages.append(turn)
         let before=data;var calls=0,statuses:[String]=[]
         WebProtocol.handler={request in
             calls+=1;let payload=try self.body(request),messages=try XCTUnwrap(payload["messages"] as? [[String:Any]])
@@ -67,7 +67,7 @@ final class DeepSeekWebTests:XCTestCase {
             XCTAssertEqual(records[0]["text"] as? String,"大肥鱼");XCTAssertEqual(records[0]["sent_at"] as? String,"2026-10-27T03:36:00+08:00");XCTAssertEqual(records[0]["calendar_days_ago"] as? Int,5)
             return (200,try self.sse(["content":"现存记录里最早是10月27日，不是今天。取名时间也不能当生日，年龄还没设定。 "]))
         }
-        let result=try await CompanionReplyService.answer(question:question,data:data,history:[first],client:client(),allowNaming:false,now:now,timeZone:TimeZone(identifier:"Asia/Shanghai")!,onStatus:{statuses.append($0)})
+        let result=try await CompanionReplyService.answer(question:question,data:data,history:[first],client:client(),now:now,timeZone:TimeZone(identifier:"Asia/Shanghai")!,onStatus:{statuses.append($0)})
         XCTAssertEqual(calls,2);XCTAssertTrue(result.0.contains("10月27日"));XCTAssertTrue(statuses.contains("正在查看聊天记录…"));XCTAssertEqual(data,before)
         XCTAssertThrowsError(try CompanionReplyService.publicQuery("用户的私聊秘密是深夜失眠",data:data,historyExcerpts:["用户的私聊秘密是深夜失眠"]))
     }

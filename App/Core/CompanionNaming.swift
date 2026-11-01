@@ -51,8 +51,14 @@ enum CompanionNaming {
     static func clarification(_ text:String)->Bool {
         ["名字","你的名字","我说你的名字","给你取名字","取名"].contains(text.trimmingCharacters(in:CharacterSet(charactersIn:"。！! ")))
     }
+    static func asksNamingDate(_ question:String)->Bool {
+        // A quoted proposed name may itself contain “什么时候”; inspect intent outside it.
+        let intent=question.replacingOccurrences(of:#"[「『“\"][^」』”\"\n]{1,40}[」』”\"]"#,with:"名字",options:.regularExpression)
+        return intent.range(of:"什么时候|什么时间|什么日期|啥时候|何时|哪[天日年月]|哪一[天日年月]|几月|几号|多久|几天|多少天|多长时间|(?:取名|起名|改名)(?:字)?的(?:时间|日期)|核对.{0,8}(?:日期|时间)|查看.{0,8}(?:日期|时间)",options:.regularExpression) != nil
+    }
     static func isNamingRequest(_ question:String,history:[CompanionMessage])->Bool {
         let q=question.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !asksNamingDate(q) else {return false}
         guard q.range(of:"如果|假如|假设|故事|引用|原样|翻译|我朋友|同事|我叫|我的名字|他叫|她叫|别改|不改|不要|取消|不叫|撤销",options:.regularExpression)==nil else {return false}
         if affirmative(q) {return pending(history) != nil}
         if clarification(q) {return history.last?.role=="assistant" && history.last!.content.range(of:"名字|取名|叫我",options:.regularExpression) != nil}
