@@ -57,14 +57,16 @@ enum CompanionContext {
         data.awaitingProactiveReply=false;data.lastProactive=Date()
         return true
     }
-    static func facts(_ values:[CompanionSummaryFact],source:[CompanionMessage])->String? {
+    static func facts(_ values:[CompanionSummaryFact],source:[CompanionMessage],retained:CompanionData?=nil)->String? {
         guard !values.isEmpty,values.count<=24,Set(source.map(\.id)).count==source.count else {return nil}
         let byID=Dictionary(uniqueKeysWithValues:source.map {($0.id,$0)})
         var lines:[String]=[]
         for fact in values {
             guard !fact.text.isEmpty,fact.text.count<=180,!fact.quote.isEmpty,fact.quote.count<=500,
                   let message=byID[fact.messageID],message.contextText.contains(fact.quote) else {return nil}
-            lines.append((message.role=="user" ? "用户说：":(message.speakerID.flatMap(CompanionPersona.init(rawValue:)).map {$0.label+"曾回复："} ?? "伙伴曾回复："))+fact.text)
+            var date=message.source=="已确认摘要" ? "":"[原消息时间："+CompanionHistory.formatter(.current).string(from:message.date)+"] "
+            if let quote=message.replyTo,let retained,let original=CompanionHistory.quoteEvidence(quote,data:retained,now:Date(),timeZone:.current)["sent_at"] as? String {date+="[引用原消息时间："+original+"] "}
+            lines.append(date+(message.role=="user" ? "用户说：":(message.speakerID.flatMap(CompanionPersona.init(rawValue:)).map {$0.label+"曾回复："} ?? "伙伴曾回复："))+fact.text)
         }
         let text=lines.joined(separator:"\n")
         return text.count<=summaryLimit ? text:nil

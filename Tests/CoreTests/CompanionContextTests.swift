@@ -60,7 +60,8 @@ final class CompanionContextTests:XCTestCase {
         let user=CompanionMessage(role:"user",content:"面试改到周日下午两点，不是周六了。")
         let assistant=CompanionMessage(role:"assistant",content:"我刚才把时间记错了。")
         let good=[CompanionSummaryFact(text:"面试改到周日下午两点",messageID:user.id,quote:"改到周日下午两点"),CompanionSummaryFact(text:"曾误记时间",messageID:assistant.id,quote:"把时间记错了")]
-        XCTAssertEqual(CompanionContext.facts(good,source:[user,assistant]),"用户说：面试改到周日下午两点\n伙伴曾回复：曾误记时间")
+        let format=CompanionHistory.formatter(.current)
+        XCTAssertEqual(CompanionContext.facts(good,source:[user,assistant]),"[原消息时间：\(format.string(from:user.date))] 用户说：面试改到周日下午两点\n[原消息时间：\(format.string(from:assistant.date))] 伙伴曾回复：曾误记时间")
         XCTAssertNil(CompanionContext.facts([CompanionSummaryFact(text:"假事实",messageID:user.id,quote:"周一")],source:[user]))
         XCTAssertNil(CompanionContext.facts([CompanionSummaryFact(text:"假事实",messageID:"missing",quote:"面试")],source:[user]))
         XCTAssertNil(CompanionContext.facts(good,source:[user,user]))
