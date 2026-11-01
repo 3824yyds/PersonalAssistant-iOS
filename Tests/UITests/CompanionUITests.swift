@@ -20,6 +20,10 @@ final class CompanionUITests:XCTestCase {
         app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.transcript.'")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts["你来啦，今天过得怎么样？也可以先给我取个名字呀。"].exists)
         recordScreen(app,"CompanionVoiceBubbleAndTranscript")
+        send("今天想聊点什么",app)
+        let replies=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.play.'"))
+        let two=expectation(for:NSPredicate(format:"count == 2"),evaluatedWith:replies);wait(for:[two],timeout:8)
+        XCTAssertTrue(app.staticTexts["6″"].firstMatch.exists)
         app.buttons["companion.back"].tap();enter(app);XCTAssertTrue(play.waitForExistence(timeout:8))
     }
     func testVoiceQuotaFailureKeepsTextAndOffersIndependentVoiceRetry() {

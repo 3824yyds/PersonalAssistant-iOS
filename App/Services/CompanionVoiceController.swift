@@ -53,7 +53,7 @@ import AVFoundation
         #endif
         return CompanionVoiceNetworkPolicy.session()
     }
-    func beginTurn() {stop();suppressAuto=false}
+    func beginTurn() {let lengths=durations;stop();durations=lengths;suppressAuto=false}
     func stop() {
         token=UUID();task?.cancel();task=nil;queue=[];manual=[];processing=[]
         stopPlayback();durations=[:];errors=[:]
