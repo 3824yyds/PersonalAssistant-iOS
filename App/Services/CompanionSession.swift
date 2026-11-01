@@ -91,9 +91,13 @@ import Combine
     func cancel() {
         voice.stop()
         requestID = UUID(); request?.cancel(); request = nil
-        busy = false; partial = ""; status = "";speaking=nil; touch()
+        if busy {busy=false}
+        if !partial.isEmpty {partial=""}
+        if !status.isEmpty {status=""}
+        if speaking != nil {speaking=nil}
+        touch()
     }
-    func close() {visible=false;voice.visible=false;cancel()}
+    func close() {guard visible else {return};visible=false;voice.visible=false;cancel()}
     func requestVoice(_ message:CompanionMessage) {
         guard unlocked,visible,message.role=="assistant" else {return}
         voice.enqueue(message,persona:CompanionPersona(rawValue:message.speakerID ?? "") ?? persona,play:true);touch()
