@@ -1,0 +1,100 @@
+{
+  "version": "3.5.1",
+  "build": 17,
+  "source_commit": "b3cdbaf557cc72655825fdb5f432de195c8af676",
+  "ui_run": {
+    "id": 41302401790,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "b3cdbaf557cc72655825fdb5f432de195c8af676"
+  },
+  "device_run": {
+    "id": 41302534076,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "b3cdbaf557cc72655825fdb5f432de195c8af676"
+  },
+  "release_id": 430581343,
+  "release_url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build17",
+  "tag": "refs/tags/v3.5.1-build17",
+  "tag_source": "b3cdbaf557cc72655825fdb5f432de195c8af676",
+  "ipa": {
+    "name": "PersonalAssistant-iOS-3.5.1-build17-unsigned.ipa",
+    "size": 108305757,
+    "digest": "sha256:f6273db34b3f36ec99a120a519e492950b48f5c2e4403e5bda721794e1fc1c36",
+    "asset_id": 698331039,
+    "url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build17/PersonalAssistant-iOS-3.5.1-build17-unsigned.ipa"
+  },
+  "device_artifact": 13082448581,
+  "device_zip_sha256": "5099f8ccbe138cce3a34bb5b4a15e7980c6a271d9236dcb655ee2822bf7dafdd",
+  "ui_artifact": 13084316059,
+  "ui_zip_sha256": "42645424686133f7d558617bb61be4ca7ebc889e71223ebd8d95c294938306b2",
+  "all_checks_match_source": true,
+  "checks": {
+    "core": {
+      "tests": 219,
+      "failures": 0,
+      "seconds": 2.181,
+      "job": 124845704146,
+      "retained_same_source_success": true
+    },
+    "stickers": {
+      "images": 16,
+      "result": "success",
+      "job": 124845737596,
+      "retained_same_source_success": true
+    },
+    "ios_native": {
+      "tests": 91,
+      "failures": 0,
+      "seconds": 2.69,
+      "job": 124845702963
+    },
+    "ios_ui": {
+      "tests": 33,
+      "failures": 0,
+      "phases": [
+        {
+          "tests": 6,
+          "seconds": 257.254
+        },
+        {
+          "tests": 27,
+          "seconds": 1078.672
+        }
+      ],
+      "job": 124845702963,
+      "execution_timeouts": 0,
+      "animation_notification_warnings": 0,
+      "result": "TEST SUCCEEDED"
+    }
+  },
+  "package_verification": {
+    "version": "3.5.1",
+    "build": "17",
+    "sdk": "iphoneos26.2",
+    "platform": "iOS device",
+    "architecture": "arm64",
+    "unsigned": true,
+    "fairplay_encrypted": false,
+    "minimum_ios": "17.0",
+    "bundle_id": "cn.local.assistant.ios",
+    "bytes": 108305757,
+    "sha256": "f6273db34b3f36ec99a120a519e492950b48f5c2e4403e5bda721794e1fc1c36",
+    "device_installation_verified": false,
+    "companion_engine": "deepseek-flash",
+    "companion_model_bundled": false,
+    "live_conversation_evaluation_performed": false
+  },
+  "screenshots_viewed": [
+    "0568F83A-21F4-46C3-ADB0-10CA065D79BA.png",
+    "C18C1C9F-DDEE-4192-97EC-6969F5295EB6.png",
+    "99777BCE-F624-46EE-8044-01FDC00A9CC3.png",
+    "FB3BCA11-7F7C-488D-9D5D-A6AD62971262.png"
+  ],
+  "tts_provider": "Alibaba Cloud Beijing qwen3-tts-flash",
+  "requires_own_tts_account_and_key": true,
+  "real_paid_provider_quality_evaluation": false,
+  "physical_iphone_acceptance": false,
+  "test_audio_is_silent_debug_fixture": true
+}

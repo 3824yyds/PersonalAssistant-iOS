@@ -103,6 +103,10 @@ enum DebugFixtures {
             state.messages.append(CompanionMessage(role:"user",content:"周六去杭州面试，需要提前准备。"))
             try? state.write(to:&d)
         }
+        if ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-unconfigured-fixture") {
+            var data=(try? CompanionData.read(d)) ?? CompanionData();data.profile.voiceReply = .voice;try? data.write(to:&d)
+            var config=CompanionVoiceSettings();config.autoPlay=ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-autoplay-fixture");try? config.write(to:&d)
+        }
         return d
     }
     @MainActor static func actionReply(_ question:String,tools:[[String:Any]],handler:ChatToolHandler?) async throws -> (String,String)? {

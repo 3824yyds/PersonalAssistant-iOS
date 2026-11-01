@@ -11,10 +11,11 @@ enum CompanionReplyService {
     ]] }
     /// No local-model or canned-reply fallback: a failed cloud turn stays retryable.
     @MainActor static func answer(question:String,data:CompanionData,history:[CompanionMessage],proactive:Bool=false,client:DeepSeekWebClient,
-        replyTo:CompanionQuote?=nil,allowNaming:Bool=true,scene:String?=nil,incomingMessage:CompanionMessage?=nil,onPartial:(@MainActor @Sendable (String)->Void)?=nil,onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
+        replyTo:CompanionQuote?=nil,allowNaming:Bool=true,scene:String?=nil,incomingMessage:CompanionMessage?=nil,voiceReply:Bool=false,onPartial:(@MainActor @Sendable (String)->Void)?=nil,onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
         let current=CompanionContext.messagesForRequest(data,history:history)
         guard CompanionContext.summary(data).count+current.reduce(0,{$0+$1.contextText.count})+(incomingMessage ?? CompanionConversation.incoming(question:question,data:data,replyTo:replyTo)).contextText.count<CompanionContext.limit else {throw AppError.message("当前窗口上下文已达上限，请先精简并开启新窗口")}
         var messages=CompanionConversation.messages(question:question,data:data,history:history,proactive:proactive,replyTo:replyTo,scene:scene,incomingMessage:incomingMessage)
+        if voiceReply {messages[0]["content"]=(messages[0]["content"] as? String ?? "")+"\n"+CompanionVoiceText.instruction}
         let web=data.profile.web && !proactive && question.range(of:"不要联网|不用联网|别联网|不要搜索|不用搜索",options:.regularExpression)==nil
         let maxTokens=question.range(of:"详细|展开|完整|逐步|长文",options:.regularExpression)==nil ? 768:3072
         let preferred=CompanionStickerDelivery.preferredID(question,data:data,history:current)

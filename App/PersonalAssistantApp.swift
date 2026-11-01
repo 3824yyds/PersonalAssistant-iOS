@@ -25,7 +25,7 @@ import SwiftUI
                 .background {AppearanceWindow(appearance:store.document==nil ? .light:store.appearance).frame(width:0,height:0).allowsHitTesting(false)}
                 .appErrorScope().environmentObject(store)
                 .onChange(of:phase) { _,next in
-                    if next == .background { backgroundAt = Date(); store.speech?.cancel();store.voiceCapture=nil;store.cancelReply() }
+                    if next == .background { backgroundAt = Date(); store.companionVoice?.stop();store.speech?.cancel();store.voiceCapture=nil;store.cancelReply() }
                     if next == .active, let date = backgroundAt, Date().timeIntervalSince(date)>60 { store.lock(); backgroundAt=nil }
                 }
         }

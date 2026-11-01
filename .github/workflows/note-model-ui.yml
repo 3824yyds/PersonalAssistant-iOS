@@ -49,19 +49,28 @@ jobs:
                   subprocess.run(['xcrun','simctl','shutdown',device],check=False,timeout=60)
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('SIMULATOR_ID='+device+'\n')
           PY
+      - name: Voice and navigation UI checks
+        run: |
+          mkdir -p build
+          set -o pipefail
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Voice.xcresult -only-testing:AssistantUITests/CompanionUITests/testNewScreenshotYesConfirmsNameAndWeatherUsesOrdinaryChat -only-testing:AssistantUITests/CompanionUITests/testGroupNaturalChatCleansLegacyLabelsAndRoutesByNameAndContextWithoutMentions -only-testing:AssistantUITests/CompanionUITests/testVoiceConfigurationExplainsAccountRequirementAndKeepsTextReadable -only-testing:AssistantUITests/CompanionUITests/testVoiceMessageDecodesPlaysShowsTranscriptAndReopensFromEncryptedCache -only-testing:AssistantUITests/CompanionUITests/testVoiceQuotaFailureKeepsTextAndOffersIndependentVoiceRetry -only-testing:AssistantUITests/CompanionUITests/testGroupVoiceRepliesUseSeparateSpeakersAndPreserveBothTexts -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test 2>&1 | tee build/voice-tests.log
       - name: Companion UI, crypto and network tool integration
         run: |
           mkdir -p build
           set -o pipefail
-          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Companion.xcresult -only-testing:AssistantTests/DeepSeekWebTests -only-testing:AssistantTests/CompositionTests -only-testing:AssistantTests/VaultTests -only-testing:AssistantTests/PINAndAttachmentTests -only-testing:AssistantUITests/CompanionUITests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test 2>&1 | tee build/companion-tests.log
+          xcodebuild -project PersonalAssistant.xcodeproj -scheme PersonalAssistant -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -resultBundlePath build/Companion.xcresult -only-testing:AssistantTests/CompanionVoiceTests -only-testing:AssistantTests/DeepSeekWebTests -only-testing:AssistantTests/CompositionTests -only-testing:AssistantTests/VaultTests -only-testing:AssistantTests/PINAndAttachmentTests -only-testing:AssistantUITests/CompanionUITests -skip-testing:AssistantUITests/CompanionUITests/testNewScreenshotYesConfirmsNameAndWeatherUsesOrdinaryChat -skip-testing:AssistantUITests/CompanionUITests/testGroupNaturalChatCleansLegacyLabelsAndRoutesByNameAndContextWithoutMentions -skip-testing:AssistantUITests/CompanionUITests/testVoiceConfigurationExplainsAccountRequirementAndKeepsTextReadable -skip-testing:AssistantUITests/CompanionUITests/testVoiceMessageDecodesPlaysShowsTranscriptAndReopensFromEncryptedCache -skip-testing:AssistantUITests/CompanionUITests/testVoiceQuotaFailureKeepsTextAndOffersIndependentVoiceRetry -skip-testing:AssistantUITests/CompanionUITests/testGroupVoiceRepliesUseSeparateSpeakersAndPreserveBothTexts -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES test 2>&1 | tee build/companion-tests.log
       - name: Export UI screenshots
         if: always()
-        run: xcrun xcresulttool export attachments --path build/Companion.xcresult --output-path build/Screenshots || true
+        run: |
+          xcrun xcresulttool export attachments --path build/Voice.xcresult --output-path build/VoiceScreenshots || true
+          xcrun xcresulttool export attachments --path build/Companion.xcresult --output-path build/Screenshots || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: companion-test-results
           path: |
+            build/voice-tests.log
             build/companion-tests.log
+            build/VoiceScreenshots
             build/Screenshots
           retention-days: 7
