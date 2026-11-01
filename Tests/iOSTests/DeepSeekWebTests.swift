@@ -33,6 +33,75 @@ private final class DelayedCompanionProtocol:URLProtocol {
     override func stopLoading() {delivery?.cancel()}
 }
 final class DeepSeekWebTests:XCTestCase {
+    @MainActor func testHistoricalQuoteRequestCarriesOriginalOctoberDateAndFiveCalendarDays() async throws {
+        let old=ISO8601DateFormatter().date(from:"2026-10-26T19:36:00Z")!,now=ISO8601DateFormatter().date(from:"2026-11-01T14:04:00Z")!,zone=TimeZone(identifier:"Asia/Shanghai")!
+        var data=CompanionData();data.profile.web=false
+        let first=CompanionMessage(role:"user",content:"大肥鱼",date:old);data.messages=[first];data.windows=[CompanionWindow(startIndex:1,summary:"伙伴名字是大肥鱼")]
+        let quote=CompanionQuote.snapshot(first,data:data),turn=CompanionMessage(role:"user",content:"你自己看这是哪天",date:now,replyTo:quote);data.messages.append(turn)
+        let before=data;var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let payload=try self.body(request),messages=try XCTUnwrap(payload["messages"] as? [[String:Any]]),system=messages[0]["content"] as! String
+            XCTAssertEqual(messages.count,2);XCTAssertTrue(system.contains("2026-10-27T03:36:00+08:00"));XCTAssertTrue(system.contains("\"calendar_days_ago\":5"));XCTAssertTrue(system.contains("2026-11-01T22:04:00+08:00"))
+            return (200,try self.sse(["content":"这条原消息是10月27日发的，今天是11月1日，已经跨了5个日历日。我刚才把日期说错了。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:turn.content,data:data,history:[first],client:client(),replyTo:quote,allowNaming:false,now:now,timeZone:zone)
+        XCTAssertEqual(calls,1);XCTAssertTrue(result.0.contains("10月27日"));XCTAssertEqual(data,before)
+    }
+    @MainActor func testHistoryToolReadsRetainedOldWindowAndContinuesGenerationWithoutWebOrWrites() async throws {
+        let old=ISO8601DateFormatter().date(from:"2026-10-26T19:36:00Z")!,now=ISO8601DateFormatter().date(from:"2026-11-01T14:04:00Z")!
+        var data=CompanionData();data.profile.web=false;data.profile.stickers=false;data.profile.name="大肥鱼"
+        let first=CompanionMessage(role:"user",content:"大肥鱼",date:old);data.messages=[first];data.windows=[CompanionWindow(startIndex:1,summary:"伙伴已经有名字")]
+        let question="我第一次叫你大肥鱼是什么日期？",turn=CompanionMessage(role:"user",content:question,date:now);data.messages.append(turn)
+        let before=data;var calls=0,statuses:[String]=[]
+        WebProtocol.handler={request in
+            calls+=1;let payload=try self.body(request),messages=try XCTUnwrap(payload["messages"] as? [[String:Any]])
+            if calls==1 {
+                let tools=try XCTUnwrap(payload["tools"] as? [[String:Any]])
+                XCTAssertEqual(tools.count,1);XCTAssertEqual((tools[0]["function"] as? [String:Any])?["name"] as? String,"search_companion_history")
+                XCTAssertEqual(messages.count,2)
+                return (200,try self.sse(["tool_calls":[["index":0,"id":"history","function":["name":"search_companion_history","arguments":#"{"query":"大肥鱼","role":"user","order":"oldest"}"#]]]]))
+            }
+            XCTAssertEqual(messages.last?["role"] as? String,"tool")
+            let evidence=try XCTUnwrap((messages.last?["content"] as? String)?.data(using:.utf8)),object=try XCTUnwrap(JSONSerialization.jsonObject(with:evidence) as? [String:Any]),records=try XCTUnwrap(object["results"] as? [[String:Any]])
+            XCTAssertEqual(object["total_matches"] as? Int,1);XCTAssertEqual(records[0]["message_id"] as? String,first.id)
+            XCTAssertEqual(records[0]["text"] as? String,"大肥鱼");XCTAssertEqual(records[0]["sent_at"] as? String,"2026-10-27T03:36:00+08:00");XCTAssertEqual(records[0]["calendar_days_ago"] as? Int,5)
+            return (200,try self.sse(["content":"现存记录里最早是10月27日，不是今天。取名时间也不能当生日，年龄还没设定。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:question,data:data,history:[first],client:client(),now:now,timeZone:TimeZone(identifier:"Asia/Shanghai")!,onStatus:{statuses.append($0)})
+        XCTAssertEqual(calls,2);XCTAssertTrue(result.0.contains("10月27日"));XCTAssertTrue(statuses.contains("正在查看聊天记录…"));XCTAssertEqual(data,before)
+        XCTAssertThrowsError(try CompanionReplyService.publicQuery("用户的私聊秘密是深夜失眠",data:data,historyExcerpts:["用户的私聊秘密是深夜失眠"]))
+    }
+    @MainActor func testGroupHistoryToolCannotReadEitherPrivateChat() async throws {
+        var document=Document(),female=CompanionData(),male=CompanionPersona.male.initial
+        female.messages=[CompanionMessage(role:"user",content:"私聊口令只在这里")];male.messages=[CompanionMessage(role:"user",content:"私聊口令不要外传")]
+        try female.write(to:&document);try CompanionDirectory.write(male,space:.direct(.male),to:&document)
+        var room=try CompanionDirectory.create(name:"群聊",members:[.female,.male],in:&document)
+        let turn=CompanionMessage(role:"user",content:"群里以前提过私聊口令吗",recipients:["female"]);room.data.messages=[turn]
+        var context=CompanionDirectory.groupContext(room.data,as:.female,document:document);context.profile.web=false;context.profile.stickers=false
+        var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]]),all=String(decoding:try JSONSerialization.data(withJSONObject:messages),as:UTF8.self)
+            XCTAssertFalse(all.contains("只在这里"));XCTAssertFalse(all.contains("不要外传"))
+            if calls==1 {return (200,try self.sse(["tool_calls":[["index":0,"id":"group-history","function":["name":"search_companion_history","arguments":#"{"query":"私聊口令","role":"all","order":"oldest"}"#]]]]))}
+            let object=try XCTUnwrap(JSONSerialization.jsonObject(with:Data((messages.last!["content"] as! String).utf8)) as? [String:Any]);XCTAssertEqual(object["total_matches"] as? Int,0)
+            return (200,try self.sse(["content":"群里保留的记录没有找到。我不能把私聊内容拿到群里说。 "]))
+        }
+        let result=try await CompanionReplyService.answer(question:turn.content,data:context,history:context.messages,client:client(),allowNaming:false,scene:CompanionGroupChat.scene(room,as:.female,document:document),incomingMessage:turn)
+        XCTAssertEqual(calls,2);XCTAssertTrue(result.0.contains("没有找到"))
+    }
+    @MainActor func testCompressionRequestIncludesOriginalTimestampAndFinalSummaryKeepsIt() async throws {
+        let old=ISO8601DateFormatter().date(from:"2026-10-26T19:36:00Z")!
+        let original=CompanionMessage(role:"user",content:"今天给你取名大肥鱼",date:old)
+        var data=CompanionData();data.messages=[original];var calls=0
+        WebProtocol.handler={request in
+            calls+=1;let body=try self.body(request),messages=try XCTUnwrap(body["messages"] as? [[String:Any]]),input=try XCTUnwrap(JSONSerialization.jsonObject(with:Data((messages.last!["content"] as! String).utf8)) as? [String:Any]),records=try XCTUnwrap(input["messages"] as? [[String:Any]])
+            XCTAssertEqual(records[0]["sent_at"] as? String,CompanionHistory.formatter(.current).string(from:old))
+            let json=String(decoding:try JSONSerialization.data(withJSONObject:["facts":[["text":"用户给伙伴取名大肥鱼","messageID":original.id,"quote":"取名大肥鱼"]]]),as:UTF8.self)
+            return (200,try self.sse(["content":json]))
+        }
+        let result=try await CompanionCompressionService.preview(data:data,client:client())
+        XCTAssertEqual(calls,1);XCTAssertTrue(result.text.contains(CompanionHistory.formatter(.current).string(from:old)));XCTAssertEqual(data.messages,[original])
+    }
     @MainActor func testGroupServiceCleansNestedScreenshotLabelsInPreviewAndFinalReply() async throws {
         var document=Document(),female=CompanionData(),male=CompanionPersona.male.initial
         female.profile.name="大肥鱼";male.profile.name="阿力";try female.write(to:&document);try CompanionDirectory.write(male,space:.direct(.male),to:&document)
@@ -478,7 +547,7 @@ final class DeepSeekWebTests:XCTestCase {
             XCTAssertTrue(system.contains("大肥鱼"));XCTAssertTrue(system.contains("贴吧老哥"));XCTAssertTrue(system.contains("喜欢安静的地方"))
             XCTAssertFalse(system.contains("再给必要的2–4个要点"))
             let tools=try XCTUnwrap(body["tools"] as? [[String:Any]])
-            XCTAssertEqual(Set(tools.compactMap {($0["function"] as? [String:Any])?["name"] as? String}),Set(["web_search","send_companion_sticker"]))
+            XCTAssertEqual(Set(tools.compactMap {($0["function"] as? [String:Any])?["name"] as? String}),Set(["web_search","send_companion_sticker","search_companion_history"]))
             return (200,try self.sse(["content":"哦，你问的是时间，我刚才听岔了。 "]))
         }
         let result=try await CompanionReplyService.answer(question:"我问为什么这么晚",data:data,history:history,client:client())

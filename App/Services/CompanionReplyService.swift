@@ -1,6 +1,10 @@
 import Foundation
 
 enum CompanionReplyService {
+    static let historyTool:[String:Any] = ["type":"function","function":[
+        "name":"search_companion_history","description":"只读查询本聊天保留的原消息，含压缩前旧窗口。查第一次提及、取名时间、旧话题时用短的原文关键词；不是联网搜索，也不检索其他私聊。返回原文、真实发送时间和按设备时区计算的日历天数。",
+        "parameters":["type":"object","properties":["query":["type":"string","maxLength":80,"description":"80字以内的原文关键词，如名字；不是整句提问"],"role":["type":"string","enum":["all","user","assistant"]],"order":["type":"string","enum":["oldest","newest"]]],"required":["query","role","order"],"additionalProperties":false]
+    ]]
     static let nameTool:[String:Any] = ["type":"function","function":[
         "name":"propose_companion_name","description":"用户希望给伙伴取名或改名时提出候选名字，仅显示确认卡，不直接保存。介绍用户或第三方名字时不使用。",
         "parameters":["type":"object","properties":["name":["type":"string"],"quote":["type":"string","description":"连续复制含名字的用户原话；通常当前句，仅在用户紧接着澄清‘名字’时允许引用紧邻上一轮候选"]],"required":["name","quote"],"additionalProperties":false]
@@ -11,16 +15,18 @@ enum CompanionReplyService {
     ]] }
     /// No local-model or canned-reply fallback: a failed cloud turn stays retryable.
     @MainActor static func answer(question:String,data:CompanionData,history:[CompanionMessage],proactive:Bool=false,client:DeepSeekWebClient,
-        replyTo:CompanionQuote?=nil,allowNaming:Bool=true,scene:String?=nil,incomingMessage:CompanionMessage?=nil,voiceReply:Bool=false,onPartial:(@MainActor @Sendable (String)->Void)?=nil,onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
+        replyTo:CompanionQuote?=nil,allowNaming:Bool=true,scene:String?=nil,incomingMessage:CompanionMessage?=nil,voiceReply:Bool=false,now:Date=Date(),timeZone:TimeZone = .current,onPartial:(@MainActor @Sendable (String)->Void)?=nil,onStatus:(@MainActor @Sendable (String)->Void)?=nil) async throws -> (String,String,[WebSource],String?,String?) {
         let current=CompanionContext.messagesForRequest(data,history:history)
         guard CompanionContext.summary(data).count+current.reduce(0,{$0+$1.contextText.count})+(incomingMessage ?? CompanionConversation.incoming(question:question,data:data,replyTo:replyTo)).contextText.count<CompanionContext.limit else {throw AppError.message("当前窗口上下文已达上限，请先精简并开启新窗口")}
-        var messages=CompanionConversation.messages(question:question,data:data,history:history,proactive:proactive,replyTo:replyTo,scene:scene,incomingMessage:incomingMessage)
+        let incoming=incomingMessage ?? CompanionConversation.incoming(question:question,data:data,replyTo:replyTo,now:now)
+        var messages=CompanionConversation.messages(question:question,data:data,history:history,proactive:proactive,now:now,replyTo:replyTo,scene:scene,incomingMessage:incoming,timeZone:timeZone)
         if voiceReply {messages[0]["content"]=(messages[0]["content"] as? String ?? "")+"\n"+CompanionVoiceText.instruction}
         let web=data.profile.web && !proactive && question.range(of:"不要联网|不用联网|别联网|不要搜索|不用搜索",options:.regularExpression)==nil
         let maxTokens=question.range(of:"详细|展开|完整|逐步|长文",options:.regularExpression)==nil ? 768:3072
         let preferred=CompanionStickerDelivery.preferredID(question,data:data,history:current)
         let naming=replyTo==nil && allowNaming && CompanionNaming.isNamingRequest(question,history:current)
         let permitted=data.assistantStickers.filter {CompanionStickerRules.allowed($0.id,question:question,data:data,history:current,proactive:proactive) && (preferred==nil || $0.id==preferred)}.map(\.id)
+        var historySearches=0,privateHistory:[String]=[]
         for attempt in 0...1 {
             try Task.checkCancellation()
             var sources:[WebSource]=[]
@@ -28,8 +34,17 @@ enum CompanionReplyService {
             var sticker:String?
             var stickerRequested=false
             let result=try await client.answer(messages:messages,model:CompanionConversation.model,webSearch:web && attempt==0,
-                responseStyle:CompanionConversation.responseStyle,maxTokens:maxTokens,validateSearch:{query in try publicQuery(query,data:data,quotedText:replyTo?.text)},
-                localTools:proactive ? []:(naming ? [nameTool]:[])+(permitted.isEmpty ? []:[stickerTool(data,ids:permitted)]),onTool:{tool,arguments in
+                responseStyle:CompanionConversation.responseStyle,maxTokens:maxTokens,validateSearch:{query in try publicQuery(query,data:data,quotedText:replyTo?.text,historyExcerpts:privateHistory)},
+                localTools:proactive ? []:[historyTool]+(naming ? [nameTool]:[])+(permitted.isEmpty ? []:[stickerTool(data,ids:permitted)]),onTool:{tool,arguments in
+                    if tool == "search_companion_history" {
+                        guard historySearches<2 else {return Item(["error":.string("本轮聊天检索已达两次，请依据已有原文回答；没有证据不要猜测")])}
+                        historySearches+=1
+                        do {
+                            let result=try CompanionHistory.search(arguments,data:data,excluding:incoming.id,now:now,timeZone:timeZone)
+                            privateHistory+=result.items("results").map {$0.text("text")}
+                            return result
+                        } catch {return Item(["error":.string(error.localizedDescription)])}
+                    }
                     if tool == "send_companion_sticker" {
                         guard !stickerRequested else {return Item(["accepted":.bool(false),"message":.string("每轮最多选择一次表情包，请直接回应用户。")])}
                         stickerRequested=true
@@ -84,10 +99,11 @@ enum CompanionReplyService {
         }
         throw AppError.message("伙伴回复未完成，请重试")
     }
-    static func publicQuery(_ query:String,data:CompanionData,quotedText:String?=nil) throws -> String {
+    static func publicQuery(_ query:String,data:CompanionData,quotedText:String?=nil,historyExcerpts:[String]=[]) throws -> String {
         let clean=WebEvidence.query(query)
         // Never forward verbatim long memories or numbers copied from private memory to search.
         var privateTexts:[String]=data.memories.map(\.text)
+        privateTexts+=historyExcerpts
         privateTexts.append(CompanionContext.summary(data))
         privateTexts.append(contentsOf:(data.customStickers ?? []).map(\.meaning))
         for experience in data.experiences ?? [] {

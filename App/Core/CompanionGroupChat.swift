@@ -21,7 +21,8 @@ enum CompanionGroupChat {
     static func text(_ message:CompanionMessage)->String {
         message.role=="assistant" && message.speakerID != nil ? clean(message.content):message.content
     }
-    static func transcript(_ history:[CompanionMessage],data:CompanionData)->String {
+    static func transcript(_ history:[CompanionMessage],data:CompanionData,timeZone:TimeZone = .current)->String {
+        let format=CompanionHistory.formatter(timeZone)
         let records:[[String:Any]]=history.map {message in
             var copy=message
             if copy.role=="assistant" {copy.content=clean(copy.content)}
@@ -29,7 +30,7 @@ enum CompanionGroupChat {
                 // The saved snapshot remains unchanged; only the request copy is cleaned.
                 quote=CompanionQuote(messageID:quote.messageID,role:quote.role,text:clean(quote.text),authorID:quote.authorID);copy.replyTo=quote
             }
-            return ["message_id":copy.id,"kind":copy.role=="user" ? "human":"companion","speaker_id":copy.speakerID ?? "human","text":CompanionStickerDelivery.historyText(copy,data:data)]
+            return ["message_id":copy.id,"sent_at":format.string(from:copy.date),"kind":copy.role=="user" ? "human":"companion","speaker_id":copy.speakerID ?? "human","text":CompanionStickerDelivery.historyText(copy,data:data)]
         }
         return String(decoding:(try? JSONSerialization.data(withJSONObject:records,options:[.sortedKeys])) ?? Data("[]".utf8),as:UTF8.self)
     }

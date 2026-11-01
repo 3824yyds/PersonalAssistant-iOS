@@ -1,0 +1,101 @@
+{
+  "version": "3.5.1",
+  "build": 18,
+  "source_commit": "7bc9fa5bc865e7ccd15da7a80e5642a3dd453bb4",
+  "ui_run": {
+    "id": 41316719687,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "7bc9fa5bc865e7ccd15da7a80e5642a3dd453bb4"
+  },
+  "device_run": {
+    "id": 41316785554,
+    "attempt": 2,
+    "conclusion": "success",
+    "source": "7bc9fa5bc865e7ccd15da7a80e5642a3dd453bb4"
+  },
+  "release_id": 430670798,
+  "release_url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/tag/v3.5.1-build18",
+  "tag": "refs/tags/v3.5.1-build18",
+  "tag_source": "7bc9fa5bc865e7ccd15da7a80e5642a3dd453bb4",
+  "ipa": {
+    "name": "PersonalAssistant-iOS-3.5.1-build18-unsigned.ipa",
+    "size": 108327411,
+    "digest": "sha256:74e3f7d5cf6c8667b9241e39ae5ab1e96c339a792e063dcdd6f43c5b5e75b698",
+    "asset_id": 698709665,
+    "url": "https://github.com/3824yyds/PersonalAssistant-iOS/releases/download/v3.5.1-build18/PersonalAssistant-iOS-3.5.1-build18-unsigned.ipa"
+  },
+  "device_artifact": 13088436723,
+  "device_zip_sha256": "9dc0bc0a00f759c3f87e844a06e4d913fe2bed3dc56938dcd786eae506cf40b1",
+  "ui_artifact": 13089721350,
+  "ui_zip_sha256": "d1cea263650502a98b55b649ce63d4b187930e8878ce8b3d756f1d11aa0d8d2d",
+  "all_checks_match_source": true,
+  "checks": {
+    "core": {
+      "tests": 230,
+      "failures": 0,
+      "seconds": 1.984,
+      "job": 124882633812,
+      "retained_same_source_success": true
+    },
+    "stickers": {
+      "images": 16,
+      "result": "success",
+      "job": 124882603894,
+      "retained_same_source_success": true
+    },
+    "ios_native": {
+      "tests": 95,
+      "failures": 0,
+      "seconds": 2.889,
+      "job": 124882602672
+    },
+    "ios_ui": {
+      "tests": 33,
+      "failures": 0,
+      "phases": [
+        {
+          "tests": 6,
+          "seconds": 259.168
+        },
+        {
+          "tests": 27,
+          "seconds": 1028.31
+        }
+      ],
+      "job": 124882602672,
+      "execution_timeouts": 0,
+      "animation_notification_warnings": 0,
+      "result": "TEST SUCCEEDED"
+    }
+  },
+  "new_native_integration_cases_passed": [
+    "testHistoricalQuoteRequestCarriesOriginalOctoberDateAndFiveCalendarDays",
+    "testHistoryToolReadsRetainedOldWindowAndContinuesGenerationWithoutWebOrWrites",
+    "testGroupHistoryToolCannotReadEitherPrivateChat",
+    "testCompressionRequestIncludesOriginalTimestampAndFinalSummaryKeepsIt"
+  ],
+  "package_verification": {
+    "version": "3.5.1",
+    "build": "18",
+    "sdk": "iphoneos26.2",
+    "platform": "iOS device",
+    "architecture": "arm64",
+    "unsigned": true,
+    "fairplay_encrypted": false,
+    "minimum_ios": "17.0",
+    "bundle_id": "cn.local.assistant.ios",
+    "bytes": 108327411,
+    "sha256": "74e3f7d5cf6c8667b9241e39ae5ab1e96c339a792e063dcdd6f43c5b5e75b698",
+    "device_installation_verified": false,
+    "companion_engine": "deepseek-flash",
+    "companion_model_bundled": false,
+    "live_conversation_evaluation_performed": false
+  },
+  "screenshots_viewed": [
+    "6132CDCD-65A0-44AF-972C-0EC57DAFB3BE.png",
+    "5F6D52F4-13D8-42C9-9543-9BDF02B732E0.png"
+  ],
+  "real_paid_provider_quality_evaluation": false,
+  "physical_iphone_acceptance": false
+}

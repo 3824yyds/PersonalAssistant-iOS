@@ -111,7 +111,7 @@ final class DeepSeekWebClient {
                 guard !call.id.isEmpty else {throw AppError.message("云端工具调用缺少标识，请重试")}
                 var toolResult:[String:Any]
                 if localNames.contains(call.name),let onTool {
-                    await onStatus?(call.name=="propose_companion_name" ? "正在确认名字…":(call.name=="send_companion_sticker" ? "正在选表情…":"正在保存到应用…"))
+                    await onStatus?(call.name=="search_companion_history" ? "正在查看聊天记录…":(call.name=="propose_companion_name" ? "正在确认名字…":(call.name=="send_companion_sticker" ? "正在选表情…":"正在保存到应用…")))
                     let value=try await onTool(call.name,call.arguments)
                     let hasText = !message.content.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
                     localCompletion = localCompletion && (value.bool("requires_confirmation") || (value.bool("will_attach_to_this_reply") && (hasText || value.bool("image_only_allowed"))))
