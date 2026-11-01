@@ -58,7 +58,6 @@ private struct CompanionVoiceBubble:View {
                 Button(expanded ? "收起文字":"查看文字") {expanded.toggle()}.font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("companion.voice.transcript."+message.id)
             }
         }.padding(.horizontal,15).padding(.vertical,12).background(Theme.panel(scheme).opacity(0.9),in:RoundedRectangle(cornerRadius:20))
-            .accessibilityIdentifier("companion.voice.bubble."+message.id)
             .task(id:message.id) {await voice.inspect(message,persona:CompanionPersona(rawValue:message.speakerID ?? "") ?? session.persona)}
     }
 }
