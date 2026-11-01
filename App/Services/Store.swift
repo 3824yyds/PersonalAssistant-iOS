@@ -51,6 +51,7 @@ struct VoiceCaptureState:Equatable {
     var activeTask: Task<Void,Never>?
     var activeReplyID: String?
     var speech: SpeechService?
+    weak var companionVoice:CompanionVoiceController?
     init() {
         if let files=try? FileManager.default.contentsOfDirectory(at:FileManager.default.temporaryDirectory,includingPropertiesForKeys:nil) {for file in files where file.lastPathComponent.hasPrefix("note-preview-") {try? FileManager.default.removeItem(at:file)}}
         hasVault = (try? PrivateFiles.url()).map { FileManager.default.fileExists(atPath:$0.path) } ?? false
@@ -135,6 +136,7 @@ struct VoiceCaptureState:Equatable {
         } catch { present(error) }
     }
     func lock() {
+        companionVoice?.stop();companionVoice=nil
         epoch = UUID(); cancelReply()
         speech?.cancel(); LocalModel.shared.cancel()
         document = nil; vaultBytes=0; messages = []; sessions = []; chatDraft="";chatImages=[];pendingChatActions=[];noteFolder="收件箱";voiceCapture=nil;key.resetBytes(in:0..<key.count); key = Data(); salt = Data()

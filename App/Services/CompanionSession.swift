@@ -12,6 +12,7 @@ import Combine
     @Published var replyTo:CompanionQuote?
     @Published private(set) var speaking:CompanionPersona?
     let space:CompanionSpace
+    let voice:CompanionVoiceController
     private unowned let store: AppStore
     private var request: Task<Void,Never>?
     private var requestID = UUID()
@@ -40,7 +41,7 @@ import Combine
         return store.cloudEnabled && store.hasAPIKey
     }
     init(store: AppStore,space:CompanionSpace = .direct(.female)) {
-        self.store = store;self.space=space;epoch = store.epoch
+        self.store = store;self.space=space;epoch = store.epoch;voice=CompanionVoiceController(store:store,space:space)
         do { data = try CompanionDirectory.read(space,in:store.current) }
         catch { data = space.persona.initial; self.error = error.localizedDescription }
         peerProfiles=Dictionary(uniqueKeysWithValues:CompanionPersona.allCases.map {($0,(try? CompanionDirectory.read(.direct($0),in:store.current).profile) ?? $0.initial.profile)})
@@ -56,20 +57,26 @@ import Combine
     @discardableResult func update(_ edit: (inout CompanionData) throws -> Void) async -> Bool {
         guard unlocked else { return false }
         if store.busy { error = "资料正在保存，请稍后重试"; return false }
+        let previousIDs=Set(data.messages.map(\.id))
         let saved = await store.commit { document in
             var next = try CompanionDirectory.read(self.space,in:document)
-            try edit(&next); try CompanionDirectory.write(next,space:self.space,to:&document)
+            try edit(&next)
+            if next.profile.voiceMode != .text {
+                for index in next.messages.indices where !previousIDs.contains(next.messages[index].id) && next.messages[index].role=="assistant" && !next.messages[index].content.isEmpty {next.messages[index].voiceRequested=true}
+            }
+            try CompanionDirectory.write(next,space:self.space,to:&document)
         }
         guard unlocked else { return false }
         if saved {
             data = (try? CompanionDirectory.read(space,in:store.current)) ?? data
             if let replyTo,!data.messages.contains(where:{$0.id==replyTo.messageID}) {self.replyTo=nil}
+            if voice.configured {for message in data.messages where !previousIDs.contains(message.id) && message.voiceRequested==true {voice.enqueue(message,persona:CompanionPersona(rawValue:message.speakerID ?? "") ?? persona)}}
         }
         else { error = store.error ?? "伙伴资料未能保存，请稍后重试" }
         return saved
     }
     func open() async {
-        visible = true; touch()
+        visible = true;voice.visible=true;store.companionVoice=voice;voice.refreshConfiguration();touch()
         guard !isGroup else {return}
         guard data.messages.isEmpty || data.profile.nameRecoveryChecked != true || data.profile.confirmationRecoveryChecked != true else { return }
         await update {
@@ -82,10 +89,31 @@ import Combine
         }
     }
     func cancel() {
+        voice.stop()
         requestID = UUID(); request?.cancel(); request = nil
         busy = false; partial = ""; status = "";speaking=nil; touch()
     }
-    func close() { visible = false; cancel() }
+    func close() {visible=false;voice.visible=false;cancel()}
+    func requestVoice(_ message:CompanionMessage) {
+        guard unlocked,visible,message.role=="assistant" else {return}
+        voice.enqueue(message,persona:CompanionPersona(rawValue:message.speakerID ?? "") ?? persona,play:true);touch()
+    }
+    func saveVoiceSettings(_ config:CompanionVoiceSettings,mode:CompanionVoiceMode,secret:String) async -> Bool {
+        guard unlocked,!busy,!store.busy else {return false}
+        let value=secret.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard value.count<=4096,!value.contains("\n"),!value.contains("\r") else {error="语音密钥格式无效，请重新粘贴";return false}
+        voice.stop()
+        let saved=await store.commit {document in
+            try config.write(to:&document)
+            var next=try CompanionDirectory.read(self.space,in:document);next.profile.voiceReply=mode
+            try CompanionDirectory.write(next,space:self.space,to:&document)
+        }
+        guard saved,unlocked else {error=store.error ?? "语音设置未能保存";return false}
+        data=(try? CompanionDirectory.read(space,in:store.current)) ?? data
+        do {if !value.isEmpty {try Keychain.save(Data(value.utf8),name:"companion-qwen-tts")};voice.refreshConfiguration();error=nil;return true}
+        catch {self.error="语音密钥未能保存到钥匙串，请重试";return false}
+    }
+    func removeVoiceKey() {voice.stop();Keychain.delete("companion-qwen-tts");voice.refreshConfiguration()}
     func send() {
         let question = draft.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !busy, !question.isEmpty else { return }
@@ -120,6 +148,7 @@ import Combine
     private func begin(question:String, proactive:Bool, retry:Bool=false,stickerID:String?=nil,quote:CompanionQuote?=nil) {
         if isGroup {if !proactive {beginGroup(question:question,retry:nil,stickerID:stickerID,quote:quote)};return}
         guard unlocked, !busy else { return }
+        voice.beginTurn()
         let id=UUID(); requestID=id; busy=true; error=nil; partial=""; status=proactive ? "正在接着话题想…":"正在想…"
         request=Task { [weak self] in
             guard let self else { return }
@@ -150,7 +179,7 @@ import Combine
                 let text:String,source:String,sources:[WebSource],proposal:String?,sticker:String?
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--ui-companion-delivery-fixture") {
-                    (text,source,sources,proposal,sticker)=try await CompanionReplyService.answer(question:question,data:self.data,history:previous,client:CompanionDeliveryFixture.client(),replyTo:quote,onPartial:{[weak self] value in self?.showPreview(value,id:id)})
+                    (text,source,sources,proposal,sticker)=try await CompanionReplyService.answer(question:question,data:self.data,history:previous,client:CompanionDeliveryFixture.client(),replyTo:quote,voiceReply:self.data.profile.voiceMode != .text,onPartial:{[weak self] value in self?.showPreview(value,id:id)})
                 } else if ProcessInfo.processInfo.arguments.contains("--ui-companion-fixture"),!CompanionRules.needsWeb(question) {
                     try await Task.sleep(nanoseconds:ProcessInfo.processInfo.arguments.contains("--ui-companion-slow-fixture") ? 3_000_000_000:300_000_000)
                     text=quote == nil ? "我在呢，接着聊。":"收到，你是在回复这条消息，我接着这句聊。";source="界面测试夹具";sources=[];proposal=nil
@@ -175,17 +204,18 @@ import Combine
     }
     private func cloudReply(question:String,previous:[CompanionMessage],proactive:Bool,id:UUID,quote:CompanionQuote?) async throws -> (String,String,[WebSource],String?,String?) {
         try await CompanionReplyService.answer(question:question,data:data,history:previous,proactive:proactive,
-            client:DeepSeekWebClient(apiKey:try AIService.credential()),replyTo:quote,onPartial:{[weak self] value in self?.showPreview(value,id:id)},onStatus:{ [weak self] value in
+            client:DeepSeekWebClient(apiKey:try AIService.credential()),replyTo:quote,voiceReply:self.data.profile.voiceMode != .text,onPartial:{[weak self] value in self?.showPreview(value,id:id)},onStatus:{ [weak self] value in
                 guard let self,self.requestID==id,self.unlocked else{return};self.status=value
             })
     }
     func tick() {
         guard !isGroup else {return}
-        guard replyTo==nil,CompanionRules.mayInitiate(data:data,visible:visible && !panelOpen,active:active,editing:editing,draft:draft,busy:busy || store.busy,now:Date(),lastInteraction:interaction),cloudAvailable else {return}
+        guard replyTo==nil,CompanionRules.mayInitiate(data:data,visible:visible && !panelOpen,active:active,editing:editing,draft:draft,busy:busy || store.busy || !voice.processing.isEmpty || voice.playingID != nil,now:Date(),lastInteraction:interaction),cloudAvailable else {return}
         begin(question:"用户仍停留在聊天页。请根据前文或记忆主动说一句简短、自然的话，可以接着未完话题；没有依据就问候，不虚构经历，不催促回复。",proactive:true)
     }
     private func beginGroup(question:String,retry:CompanionMessage?,stickerID:String?,quote:CompanionQuote?) {
         guard unlocked,!busy,case .group(let roomID)=space else {return}
+        voice.beginTurn()
         let requestToken=UUID();requestID=requestToken;busy=true;error=nil;partial="";status="正在接话…"
         request=Task { [weak self] in
             guard let self else {return}
@@ -240,11 +270,11 @@ import Combine
                         result=(member == .male ? (turn.recipients?.count==1 ? "这轮我单独接话。":"先挑一件最想聊的，我听着。"):"我也在，今天想一起聊点什么？","界面测试夹具",[],nil,nil)
                     } else {
                         guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
-                        result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
+                        result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,voiceReply:self.data.profile.voiceMode != .text,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
                     }
                     #else
                     guard self.cloudAvailable else {throw AppError.message("群聊需要开启云端智能")}
-                    result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
+                    result=try await CompanionReplyService.answer(question:question,data:context,history:history,client:self.groupClient(),replyTo:quote,allowNaming:false,scene:scene,incomingMessage:turn,voiceReply:self.data.profile.voiceMode != .text,onPartial:{[weak self] value in self?.showPreview(value,id:requestToken)},onStatus:{[weak self] value in guard let self,self.requestID==requestToken,self.unlocked else{return};self.status=self.profile(member).title+" · "+value})
                     #endif
                     }
                     try Task.checkCancellation();guard self.requestID==requestToken,self.unlocked else {return}

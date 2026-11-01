@@ -90,6 +90,7 @@ public struct Document: Codable, Equatable, Sendable {
     }
     public func encoded() throws -> Data { let e = JSONEncoder(); e.outputFormatting = [.sortedKeys]; return try e.encode(self) }
     public func validated() throws -> Document {
+        _ = try CompanionVoiceSettings.read(self)
         guard (1...4).contains(root.int("version", fallback: 4)), root.text("scope", fallback: "all") == "all" else { throw AppError.message("请选择完整备份；当前不合并局部备份") }
         guard records.count <= 20_000, notes.count <= 10_000, accounts.count <= 500,
               Set(records.map(\.id)).count == records.count, Set(notes.map(\.id)).count == notes.count,

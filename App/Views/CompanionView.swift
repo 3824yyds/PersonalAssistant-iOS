@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history; var id:String {rawValue} }
+private enum CompanionPanel: String, Identifiable { case profile, memory, compression, history, voice; var id:String {rawValue} }
 
 struct CompanionAvatar: View {
     var size:CGFloat = 36
@@ -98,6 +98,7 @@ struct CompanionView: View {
             .sheet(item:$panel,onDismiss:{session.compression=nil}) {value in
                 NavigationStack {
                     switch value {
+                    case .voice:CompanionVoiceSettingsView(session:session)
                     case .profile:if session.isGroup {CompanionGroupInfoView(session:session)} else {CompanionProfileView(session:session)}
                     case .memory:CompanionMemoryView(session:session)
                     case .compression:CompanionCompressionView(session:session)
@@ -125,6 +126,7 @@ struct CompanionView: View {
                 Menu {
                     Section("当前窗口：\(CompanionContext.count(session.data).formatted()) / 48,000字符") {
                     Button(session.isGroup ? "群聊信息":session.persona.pronoun+"的资料",systemImage:"person.crop.circle") {open(.profile)}
+                    Button("语音回复",systemImage:"waveform") {open(.voice)}.accessibilityIdentifier("companion.voice.settings")
                     Button("你们的记忆",systemImage:"bookmark") {open(.memory)}
                     Button("精简并新开窗口",systemImage:"text.badge.checkmark") {dismissKeyboard();session.prepareCompression()}.accessibilityIdentifier("companion.compress").disabled(CompanionContext.current(session.data).isEmpty)
                     Button("手动整理新窗口",systemImage:"square.and.pencil") {dismissKeyboard();session.prepareCompression(manual:true)}.disabled(CompanionContext.current(session.data).isEmpty)
@@ -213,10 +215,7 @@ struct CompanionView: View {
                 }
                 if let quote=message.replyTo {quotePreview(quote,cancellable:false).accessibilityIdentifier("companion.quote."+message.id)}
                 if !CompanionGroupChat.text(message).isEmpty && (message.role != "user" || message.stickerID == nil) {
-                Text(.init(WebEvidence.cited(CompanionGroupChat.text(message),sources:message.sources)))
-                    .padding(.horizontal,15).padding(.vertical,12)
-                    .background(message.role=="user" ? Theme.accent.opacity(0.12):Theme.panel(scheme).opacity(0.85),in:RoundedRectangle(cornerRadius:20))
-                    .accessibilityIdentifier("companion.message.\(message.id)")
+                CompanionMessageBody(message:message,session:session,voice:session.voice) {open(.voice)}
                 }
                 if let name=message.renamedTo,CompanionRules.canUndoName(message,data:session.data) {
                     HStack(spacing:8) {Text("名字已更新为「\(name)」");Button("撤销") {Task {await session.undoName(message)}}.disabled(session.busy || store.busy)}
@@ -236,6 +235,7 @@ struct CompanionView: View {
         }.frame(maxWidth:.infinity,alignment:message.role=="user" ? .trailing:.leading)
             .contextMenu {
                 Button("回复",systemImage:"arrowshape.turn.up.left") {session.selectReply(message);showKeyboard()}.disabled(session.busy)
+                if message.role=="assistant",!message.content.isEmpty {Button("语音播放",systemImage:"waveform") {session.requestVoice(message)}}
                 Button("复制",systemImage:"doc.on.doc") {UIPasteboard.general.string=message.content.isEmpty ? session.data.descriptor(message.stickerID)?.description:CompanionGroupChat.text(message)}
             }
             .accessibilityAction(named:"回复这条消息") {session.selectReply(message);showKeyboard()}

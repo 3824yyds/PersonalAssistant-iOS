@@ -1,6 +1,45 @@
 import XCTest
 
 final class CompanionUITests:XCTestCase {
+    func testVoiceConfigurationExplainsAccountRequirementAndKeepsTextReadable() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-unconfigured-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.staticTexts["你来啦，今天过得怎么样？也可以先给我取个名字呀。"].waitForExistence(timeout:8))
+        app.buttons["伙伴更多功能"].tap();app.buttons["companion.voice.settings"].tap()
+        XCTAssertTrue(app.navigationBars["伙伴语音"].waitForExistence(timeout:5));XCTAssertTrue(app.secureTextFields["companion.voice.key"].exists)
+        XCTAssertTrue(app.staticTexts["尚未配置语音服务"].exists)
+        recordScreen(app,"CompanionVoiceAccountSetup")
+        app.buttons["取消"].tap();XCTAssertTrue(app.buttons["companion.send"].exists)
+    }
+    func testVoiceMessageDecodesPlaysShowsTranscriptAndReopensFromEncryptedCache() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-fixture"]);tapProductTab("助理",in:app);enter(app)
+        let play=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.play.'")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout:8))
+        let ready=expectation(for:NSPredicate(format:"label == %@","播放伙伴语音"),evaluatedWith:play);wait(for:[ready],timeout:8)
+        play.tap();XCTAssertTrue(app.buttons["停止语音"].waitForExistence(timeout:5))
+        app.buttons["停止语音"].tap()
+        app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.transcript.'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["你来啦，今天过得怎么样？也可以先给我取个名字呀。"].exists)
+        recordScreen(app,"CompanionVoiceBubbleAndTranscript")
+        app.buttons["companion.back"].tap();enter(app);XCTAssertTrue(play.waitForExistence(timeout:8))
+    }
+    func testVoiceQuotaFailureKeepsTextAndOffersIndependentVoiceRetry() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-fixture","--ui-companion-voice-failure-fixture"]);tapProductTab("助理",in:app);enter(app)
+        XCTAssertTrue(app.staticTexts["companion.voice.error"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["你来啦，今天过得怎么样？也可以先给我取个名字呀。"].exists)
+        XCTAssertTrue(app.buttons["重试语音"].exists);XCTAssertFalse(app.staticTexts["companion.error.message"].exists)
+        recordScreen(app,"CompanionVoiceFailureKeepsText")
+    }
+    func testGroupVoiceRepliesUseSeparateSpeakersAndPreserveBothTexts() {
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-fixture"]);tapProductTab("助理",in:app);createGroup(app)
+        app.buttons["伙伴更多功能"].tap();app.buttons["companion.voice.settings"].tap();XCTAssertTrue(app.buttons["companion.voice.save"].waitForExistence(timeout:5));app.buttons["companion.voice.save"].tap()
+        send("大家一起聊聊",app)
+        XCTAssertTrue(app.staticTexts["我也在，今天想一起聊点什么？"].waitForExistence(timeout:8))
+        XCTAssertTrue(app.staticTexts["先挑一件最想聊的，我听着。"].waitForExistence(timeout:8))
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.play.'")).count,2)
+        XCTAssertTrue(app.staticTexts["companion.speaker.female"].exists);XCTAssertTrue(app.staticTexts["companion.speaker.male"].exists)
+        recordScreen(app,"CompanionGroupVoiceMessages")
+    }
+
     func testNewScreenshotYesConfirmsNameAndWeatherUsesOrdinaryChat() {
         let app=launchProduct(["--ui-companion-fixture","--ui-companion-response-fixture","--ui-companion-delivery-fixture"]);tapProductTab("助理",in:app);enter(app)
         send("是的",app);XCTAssertTrue(app.staticTexts["好呀，那我就叫大肥鱼啦！"].waitForExistence(timeout:8));XCTAssertEqual(app.staticTexts["companion.title"].label,"大肥鱼")
