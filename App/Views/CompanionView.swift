@@ -112,7 +112,7 @@ struct CompanionView: View {
     }
     private var header:some View {
         HStack(spacing:8) {
-            Button {dismissKeyboard();session.close();dismiss()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle(),interactive:true)}
+            Button {dismissKeyboard();session.close();dismiss()} label:{Image(systemName:"chevron.left").font(.system(size:19)).frame(width:44,height:44).appGlass(Circle())}
                 .buttonStyle(.plain).accessibilityLabel("返回普通聊天").accessibilityIdentifier("companion.back")
             Spacer(minLength:4)
             Button {if !session.busy && !store.busy {open(.profile)}} label:{HStack(spacing:8) {

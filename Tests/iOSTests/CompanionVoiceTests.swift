@@ -17,6 +17,19 @@ private final class VoiceProtocol:URLProtocol {
 }
 
 final class CompanionVoiceTests:XCTestCase {
+    @MainActor func testIdleAudioOwnerDoesNotTouchSessionAndActiveOwnerReleasesOnlyOnce() throws {
+        var starts=0,stops=0
+        let audio=CompanionPlaybackAudioSession(activate:{starts+=1},deactivate:{stops+=1})
+        audio.end();audio.end();XCTAssertEqual(stops,0)
+        try audio.begin();try audio.begin();XCTAssertEqual(starts,1);XCTAssertTrue(audio.active)
+        audio.end();audio.end();XCTAssertEqual(stops,1);XCTAssertFalse(audio.active)
+    }
+    @MainActor func testFailedActivationNeverDeactivatesAnotherAudioOwner() {
+        var stops=0
+        let audio=CompanionPlaybackAudioSession(activate:{throw URLError(.cannotConnectToHost)},deactivate:{stops+=1})
+        XCTAssertThrowsError(try audio.begin());audio.end();XCTAssertFalse(audio.active);XCTAssertEqual(stops,0)
+    }
+
     private func session()->URLSession {let c=URLSessionConfiguration.ephemeral;c.protocolClasses=[VoiceProtocol.self];return URLSession(configuration:c)}
     private func body(_ request:URLRequest) throws -> [String:Any] {
         let raw:Data

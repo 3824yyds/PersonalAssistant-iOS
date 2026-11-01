@@ -19,6 +19,7 @@ import AVFoundation
     private var current:(String,CompanionVoiceClip,Double)?
     private var part=0
     private var player:AVAudioPlayer?
+    private let audio=CompanionPlaybackAudioSession()
     private var interruption:NSObjectProtocol?
     private var route:NSObjectProtocol?
     private var suppressAuto=false
@@ -27,10 +28,14 @@ import AVFoundation
     init(store:AppStore,space:CompanionSpace) {
         self.store=store;self.space=space;epoch=store.epoch
         super.init();refreshConfiguration()
-        interruption=NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) {[weak self] _ in Task {@MainActor in self?.stop()}}
+        interruption=NotificationCenter.default.addObserver(forName:AVAudioSession.interruptionNotification,object:nil,queue:.main) {[weak self] notification in
+            let kind=notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard kind==AVAudioSession.InterruptionType.began.rawValue else {return}
+            Task {@MainActor in guard let self,self.audio.active || !self.processing.isEmpty else {return};self.stop()}
+        }
         route=NotificationCenter.default.addObserver(forName:AVAudioSession.routeChangeNotification,object:nil,queue:.main) {[weak self] notification in
             let reason=notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            if reason==AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {Task {@MainActor in self?.stop()}}
+            if reason==AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue {Task {@MainActor in guard let self,self.audio.active || !self.processing.isEmpty else {return};self.stop()}}
         }
     }
     deinit {if let interruption {NotificationCenter.default.removeObserver(interruption)};if let route {NotificationCenter.default.removeObserver(route)}}
@@ -53,14 +58,18 @@ import AVFoundation
         #endif
         return CompanionVoiceNetworkPolicy.session()
     }
-    func beginTurn() {let lengths=durations;stop();durations=lengths;suppressAuto=false}
-    func stop() {
-        token=UUID();task?.cancel();task=nil;queue=[];manual=[];processing=[]
-        stopPlayback();durations=[:];errors=[:]
+    func beginTurn() {stop(preservingDurations:true);suppressAuto=false}
+    func stop(preservingDurations:Bool=false) {
+        token=UUID();task?.cancel();task=nil;queue=[];manual=[]
+        if !processing.isEmpty {processing=[]}
+        stopPlayback()
+        if !preservingDurations,!durations.isEmpty {durations=[:]}
+        if !errors.isEmpty {errors=[:]}
     }
     private func stopPlayback() {
-        player?.delegate=nil;player?.stop();player=nil;playingID=nil;playback=[];current=nil;part=0
-        try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)
+        player?.delegate=nil;player?.stop();player=nil
+        if playingID != nil {playingID=nil}
+        playback=[];current=nil;part=0;audio.end()
     }
     private func settings() throws -> CompanionVoiceSettings {try CompanionVoiceSettings.read(store.current)}
     func inspect(_ message:CompanionMessage,persona:CompanionPersona) async {
@@ -117,7 +126,7 @@ import AVFoundation
     private func playPart() {
         guard let item=current,part<item.1.parts.count,unlocked,visible else {finishPlayback();return}
         do {
-            let audio=AVAudioSession.sharedInstance();try audio.setCategory(.playback,mode:.spokenAudio);try audio.setActive(true)
+            try audio.begin()
             let next=try AVAudioPlayer(data:item.1.parts[part]);next.enableRate=true;next.rate=Float(item.2);next.delegate=self;next.prepareToPlay()
             player=next;playingID=item.0
             guard next.play() else {throw AppError.message("语音未能开始播放，请检查音频输出后重试")}
@@ -125,7 +134,7 @@ import AVFoundation
     }
     private func finishPlayback() {
         player?.delegate=nil;player=nil;current=nil;playingID=nil;part=0
-        if playback.isEmpty {try? AVAudioSession.sharedInstance().setActive(false,options:.notifyOthersOnDeactivation)}else {startNext()}
+        if playback.isEmpty {audio.end()}else {startNext()}
     }
     nonisolated func audioPlayerDidFinishPlaying(_ player:AVAudioPlayer,successfully flag:Bool) {
         Task {@MainActor [weak self] in
