@@ -69,7 +69,8 @@ import AVFoundation
         if let clip=try? await CompanionVoiceCache.shared.read(id,key:key),unlocked,visible,token==stamp {durations[message.id]=clip.duration}
     }
     func enqueue(_ message:CompanionMessage,persona:CompanionPersona,play:Bool=false) {
-        guard unlocked,visible,message.role=="assistant",!CompanionVoiceText.clean(message.content).isEmpty else {return}
+        guard unlocked,visible,message.role=="assistant" else {return}
+        guard CompanionVoiceText.clean(message.content).unicodeScalars.contains(where:{CharacterSet.alphanumerics.contains($0)}) else {errors[message.id]="这条消息只有表情或符号，没有可朗读的文字";return}
         if play,playingID==message.id {suppressAuto=true;stopPlayback();return}
         if play {suppressAuto=true;stopPlayback();manual.insert(message.id)}
         if processing.contains(message.id) {return}
@@ -77,7 +78,7 @@ import AVFoundation
         do {
             let config=try settings()
             queue.append((message,persona,config));processing.insert(message.id)
-            if task==nil {let stamp=token;task=Task {[weak self] in await self?.process(stamp)}}
+            if task==nil {let stamp=token;task=Task {[weak self] in guard let self else {return};await self.process(stamp)}}
         } catch {errors[message.id]="语音设置无效，请重新保存"}
     }
     private func process(_ stamp:UUID) async {

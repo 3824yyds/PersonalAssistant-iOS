@@ -105,7 +105,7 @@ enum DebugFixtures {
         }
         if ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-fixture") || ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-unconfigured-fixture") {
             var data=(try? CompanionData.read(d)) ?? CompanionData();data.profile.voiceReply = .voice;try? data.write(to:&d)
-            try? CompanionVoiceSettings().write(to:&d)
+            var config=CompanionVoiceSettings();config.autoPlay=ProcessInfo.processInfo.arguments.contains("--ui-companion-voice-autoplay-fixture");try? config.write(to:&d)
         }
         return d
     }

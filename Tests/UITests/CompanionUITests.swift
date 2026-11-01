@@ -30,13 +30,17 @@ final class CompanionUITests:XCTestCase {
         recordScreen(app,"CompanionVoiceFailureKeepsText")
     }
     func testGroupVoiceRepliesUseSeparateSpeakersAndPreserveBothTexts() {
-        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-fixture"]);tapProductTab("助理",in:app);createGroup(app)
+        let app=launchProduct(["--ui-companion-fixture","--ui-companion-voice-fixture","--ui-companion-voice-autoplay-fixture"]);tapProductTab("助理",in:app);createGroup(app)
         app.buttons["伙伴更多功能"].tap();app.buttons["companion.voice.settings"].tap();XCTAssertTrue(app.buttons["companion.voice.save"].waitForExistence(timeout:5));app.buttons["companion.voice.save"].tap()
         send("大家一起聊聊",app)
         XCTAssertTrue(app.staticTexts["我也在，今天想一起聊点什么？"].waitForExistence(timeout:8))
         XCTAssertTrue(app.staticTexts["先挑一件最想聊的，我听着。"].waitForExistence(timeout:8))
         XCTAssertEqual(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.play.'")).count,2)
         XCTAssertTrue(app.staticTexts["companion.speaker.female"].exists);XCTAssertTrue(app.staticTexts["companion.speaker.male"].exists)
+        let buttons=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH 'companion.voice.play.'"))
+        let first=expectation(for:NSPredicate(format:"label == %@","停止语音"),evaluatedWith:buttons.element(boundBy:0));wait(for:[first],timeout:8)
+        let second=expectation(for:NSPredicate(format:"label == %@","停止语音"),evaluatedWith:buttons.element(boundBy:1));wait(for:[second],timeout:15)
+        XCTAssertEqual(buttons.element(boundBy:0).label,"播放伙伴语音")
         recordScreen(app,"CompanionGroupVoiceMessages")
     }
 

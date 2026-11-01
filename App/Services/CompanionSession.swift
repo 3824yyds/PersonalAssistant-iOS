@@ -62,7 +62,7 @@ import Combine
             var next = try CompanionDirectory.read(self.space,in:document)
             try edit(&next)
             if next.profile.voiceMode != .text {
-                for index in next.messages.indices where !previousIDs.contains(next.messages[index].id) && next.messages[index].role=="assistant" && !next.messages[index].content.isEmpty {next.messages[index].voiceRequested=true}
+                for index in next.messages.indices where !previousIDs.contains(next.messages[index].id) && next.messages[index].role=="assistant" && CompanionVoiceText.clean(next.messages[index].content).unicodeScalars.contains(where:{CharacterSet.alphanumerics.contains($0)}) {next.messages[index].voiceRequested=true}
             }
             try CompanionDirectory.write(next,space:self.space,to:&document)
         }

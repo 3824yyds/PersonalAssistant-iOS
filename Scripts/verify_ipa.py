@@ -17,7 +17,7 @@ with zipfile.ZipFile(p) as z:
         offset+=size
     assert platform==2,'Must be an iOS-device build, not a simulator bundle'
     assert not encrypted,'A re-signable build must not be App Store encrypted'
-    assert all(marker not in binary for marker in [b'--ui-companion-fixture',b'--ui-companion-voice-fixture',b'--ui-companion-voice-failure-fixture',b'--ui-companion-voice-unconfigured-fixture',b'--ui-companion-delivery-fixture',b'--ui-companion-group-slow-fixture',b'--ui-companion-group-delivery-fixture',b'--ui-companion-group-legacy-fixture']), 'Release build must not contain simulated companion replies'
+    assert all(marker not in binary for marker in [b'--ui-companion-fixture',b'--ui-companion-voice-fixture',b'--ui-companion-voice-autoplay-fixture',b'--ui-companion-voice-failure-fixture',b'--ui-companion-voice-unconfigured-fixture',b'--ui-companion-delivery-fixture',b'--ui-companion-group-slow-fixture',b'--ui-companion-group-delivery-fixture',b'--ui-companion-group-legacy-fixture']), 'Release build must not contain simulated companion replies'
     assert b'MIT' in z.read('Payload/PersonalAssistant.app/OpenSourceLicenses.txt'),'Bundled open-source license is required'
     assert info['CFBundleShortVersionString']=='3.5.1'
     assert info['CFBundleVersion']=='17'
